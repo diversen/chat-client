@@ -1,0 +1,3 @@
+recursive-include ollama_client/templates *
+recursive-include ollama_client/static *
+include ollama_client/config-dist.py

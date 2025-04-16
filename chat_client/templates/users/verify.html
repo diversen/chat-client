@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block head %}
+{% endblock head %}
+
+{% block content %}
+
+{% if token %}
+
+<main class="default-container">
+    <h3 class="main-title">Verify Account</h3>
+    <form id="signup-form">
+        <input id="token" type="hidden" name="token" value="{{ token }}" required>
+        <button id="submit" class="btn btn-primary">Click to verify your account</button>
+    </form>
+</main>
+
+<script type="module">
+
+    import { Requests } from "/static/js/requests.js";
+    import { Flash } from "/static/js/flash.js";
+
+    const spinner = document.querySelector('.loading-spinner');
+    const submit = document.getElementById('submit');
+    submit.addEventListener('click', async function(event) {
+
+        event.preventDefault();
+        spinner.classList.toggle('hidden');
+
+        try {
+            const url = '/user/verify';
+            const form = document.getElementById('signup-form');
+            const formData = new FormData(form);
+            const res = await Requests.asyncPost(url, formData);
+            if (res.error) {
+                Flash.setMessage(res.message, 'error');
+            } else {
+                console.log(res)
+                window.location.href = '/user/login';
+            }
+            
+        } catch (e) {
+            console.log(e)
+            Flash.setMessage(res.message, 'error');
+        } finally {
+            spinner.classList.toggle('hidden');
+        }   
+    });
+
+
+</script>
+
+{% else %}
+<main class="default-container">
+    <h3 class="main-title">Code is expired</h3>
+    <p>Code is expired. Please request a new verification code on 
+        <a href="/user/verify">this page</a>
+    </p>
+</main>
+{% endif %}
+
+{% endblock content %}

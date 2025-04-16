@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    {% include "imports/scripts_head.html" %}
+
+
+
+</head>
+
+<body>
+
+    <div class="katex-test">
+# Test
+
+\[
+\begin{pmatrix}
+a & b & c \\
+d & e & f \\
+g & h & i
+\end{pmatrix}
+\]
+
+
+
+\[
+\begin{align*}
+    E &= mc^2 \\
+    F &= ma \\
+    a &= \frac{F}{m} \\
+    v &= u + at \\
+    s &= ut + \frac{1}{2}at^2
+\end{align*}
+\]
+
+
+    </div>
+
+    <div class="katex-parsed">
+
+    </div>
+
+    <script type="module">
+        function getMarkdownIt() {
+            return markdownit({ html: true})
+            // getMarkdownIt({ html: true, breaks: true });
+            const md = markdownit('commonmark')
+            return md;
+
+            // Prevent escaping of < and > inside inline code
+            md.renderer.rules.code_inline = (tokens, idx) => {
+                return `<code>${tokens[idx].content}</code>`;
+            };
+
+            // Prevent escaping of < and > inside code blocks
+            md.renderer.rules.code_block = (tokens, idx) => {
+                return `<pre><code>${tokens[idx].content}</code></pre>`;
+            };
+
+            // Prevent escaping of < and > inside fenced code blocks
+            md.renderer.rules.fence = (tokens, idx) => {
+                const token = tokens[idx];
+                const langClass = token.info ? ` class="language-${token.info}"` : "";
+                // Use raw content without escaping
+                return `<pre><code${langClass}>${token.content}</code></pre>`;
+            };
+            return md;
+        }
+
+
+        let ketexSource = document.querySelector('.katex-test').textContent;
+        ketexSource = ketexSource.replace(/\\\\/g, '\\\\\\\\');
+        const katextTest = document.querySelector('.katex-test');
+
+        const md = getMarkdownIt();
+        console.log(ketexSource);
+
+        const markdownRendered = md.render(ketexSource);
+        console.log(markdownRendered);
+
+        katextTest.innerHTML = markdownRendered;
+        renderMathInElement(katextTest, {
+            delimiters: [
+                { left: '$', right: '$', display: true },
+                { left: '\(', right: '\)', display: false },
+                { left: '\[', right: '\]', display: true },
+                { left: '\begin{equation}', right: '\end{equation}', display: true },
+            ]
+        });
+    </script>
+    <div class="loading-spinner hidden"></div>
+</body>
+
+</html>

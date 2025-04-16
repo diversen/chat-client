@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+
+{% block head %}
+{% endblock head %}
+
+{% block content %}
+
+{% if logged_in %}
+
+<main class="default-container">
+
+    <h3>Logout</h3>
+
+    <div class="action-links">
+        <a class="action-link" href="/user/logout?logout=1">Logout</a>
+        <a class="action-link" href="/user/logout?logout_all=1">Logout of all devices</a>
+    </div>
+</main>
+
+{% endif %}
+
+{% if not logged_in %}
+<main class="default-container">
+
+    <h3>Logout</h3>
+    <p>You are not logged in.</p>
+</main>
+{% endif %}
+
+{% endblock content %}

@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block head %}
+{% endblock head %}
+
+{% block content %}
+
+
+{% if logged_in %}
+<main class="default-container">
+    <h3>Login</h3>
+    <p>You are already logged in.</p>
+</main>
+
+{% endif %}
+
+{% if not logged_in %}
+
+<main class="default-container">
+
+    <h3>Login</h3>
+
+    <form action="/user/login" method="post">
+
+        <label for="email">E-mail</label>
+        <input id="email" type="text" name="email">
+
+        <label for="password">Password</label>
+        <input id="password" type="password" name="password">
+
+        <label for="remember">Keep me signed in</label>
+        <input type="checkbox" value="1" id="remember" name="remember" checked="checked">
+
+        <br>
+        <button id="login">Send</button>
+
+    </form>
+    <div>
+        <p>
+            <a href="/user/reset">Reset your password</a>
+        </p>
+    </div>
+</main>
+
+<script type="module">
+
+    import { Flash } from '/static/js/flash.js';
+    import { Requests } from '/static/js/requests.js';
+
+    document.getElementById('login').addEventListener('click', async (event) => {
+        event.preventDefault();
+        const spinner = document.querySelector('.loading-spinner');
+        spinner.classList.toggle('hidden');
+
+        let jsonData = {
+            email: document.getElementById('email').value,
+            password: document.getElementById('password').value,
+            remember: document.getElementById('remember').checked
+        };
+
+        try {
+            const res = await Requests.asyncPostJson('/user/login', jsonData);
+            if (res.error) {
+                Flash.setMessage(res.message, 'error');
+            } else {
+                window.location.href = '/';
+            }
+        } catch (error) {
+            console.error(error);
+        } finally {
+            spinner.classList.toggle('hidden');
+        }
+    });
+
+</script>
+{% endif %}
+
+{% endblock content %}

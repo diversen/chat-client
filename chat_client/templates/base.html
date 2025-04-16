@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    {% include "includes/scripts_head.html" %}
+
+    <script type="module">
+        import '/static/js/main-menu-overlay.js'
+        import { Flash } from '/static/js/flash.js'
+
+        Flash.removeAfterSecs = 10;
+        // Flash.singleMessage = false;
+        Flash.clearMessages();
+    </script>
+
+    {% block head %}
+    {% endblock head %}
+
+</head>
+
+<body {% if body_class %}class="{{ body_class }}"{% endif %}>
+    <nav class="top-bar">
+        <div class="navigation-left">
+            <a href="/" id="logo">
+                <img src="/static/favicon_io/android-chrome-192x192.png?version={{ version }}" height="192" width="192" alt="Ollama logo">
+            </a>
+            <span>{{ version }}</span>
+        </div>
+        <div class="navigation-right">
+
+            {% if logged_in%}
+            <a href="/" id="new" title="New conversation">
+                <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"
+                    fill="#e8eaed">
+                    <path d="M440-440H200v-80h240v-240h80v240h240v80H520v240h-80v-240Z" />
+                </svg>
+            </a>
+
+            <a href="/user/dialogs" id="dialogs" title="Dialogs">
+                <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e8eaed"><path d="M200-800v241-1 400-640 200-200Zm0 720q-33 0-56.5-23.5T120-160v-640q0-33 23.5-56.5T200-880h320l240 240v100q-19-8-39-12.5t-41-6.5v-41H480v-200H200v640h241q16 24 36 44.5T521-80H200Zm460-120q42 0 71-29t29-71q0-42-29-71t-71-29q-42 0-71 29t-29 71q0 42 29 71t71 29ZM864-40 756-148q-21 14-45.5 21t-50.5 7q-75 0-127.5-52.5T480-300q0-75 52.5-127.5T660-480q75 0 127.5 52.5T840-300q0 26-7 50.5T812-204L920-96l-56 56Z"/></svg>
+            </a>
+            {% endif %}
+
+            <a href="#" id="main-menu-hamburger" class="overlay" aria-label="Open Menu" aria-expanded="false">
+                <svg class="menu-closed" xmlns="http://www.w3.org/2000/svg" fill="currentColor" height="24"
+                    viewBox="0 -960 960 960" width="24">
+                    <path d="M120-240v-80h720v80H120Zm0-200v-80h720v80H120Zm0-200v-80h720v80H120Z"></path>
+                </svg>
+                <svg class="menu-open" xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960"
+                    width="24px" fill="#e8eaed">
+                    <path
+                        d="M120-240v-80h520v80H120Zm664-40L584-480l200-200 56 56-144 144 144 144-56 56ZM120-440v-80h400v80H120Zm0-200v-80h520v80H120Z" />
+                </svg>
+            </a>
+        </div>
+    </nav>
+
+    {% if not logged_in %}
+    <div class="main-menu-overlay">
+        <a href="/user/login">Log ind</a>
+        <a href="/user/reset">Reset password</a>
+        <a href="/user/signup">Create account</a>
+    </div>
+    {% else %}
+    <div class="main-menu-overlay">
+        <a href="/user/logout">Log out</a>
+        <a href="/user/profile">Profile</a>
+    </div>
+    {% endif %}
+
+    {% block content %}
+    {% endblock content %}
+
+    <div class="flash-messages">
+        {% for message in flash_messages %}
+        <div class="flash flash-static flash-{{ message.type }}">
+            {{ message.message }}
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="loading-spinner hidden"></div>
+</body>
+
+</html>

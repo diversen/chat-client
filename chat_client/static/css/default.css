@@ -1,0 +1,408 @@
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    scroll-margin-top: var(--main-menu-top);
+}
+
+code {
+    scrollbar-width: thin;
+    font-size: 0.85em;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    width: 100vw;
+    height: 100vh;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+
+nav {
+    position: fixed;
+    top: 0;
+    z-index: 100;
+    background-color: var(--nav-background);
+    height: var(--main-menu-top);
+    min-height: 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: stretch;
+    width: 100%;
+}
+
+#logo img {
+    height: 50px;
+    margin-top: 10px;
+    width: auto;
+}
+
+nav svg {
+    color: var(--nav-text);
+    fill: var(--nav-text);
+    height: 40px;
+    width: 40px;
+    display: block;
+}
+
+.navigation-left {
+    display: flex;
+    align-items: center;
+    margin-left:12px;
+    gap: 10px;
+}
+
+.navigation-right {
+    padding: 5px;
+    align-items: center;
+    display: flex;
+    margin-right: 5px;
+    gap: 10px;
+}
+
+.navigation-right a {
+    cursor: pointer;
+}
+
+
+.default-container {
+    max-width: 100%;
+    width: var(--width);
+    display: flex;
+    flex-direction: column;
+    margin: 0 auto;
+    padding: 0 20px;
+    top: var(--main-menu-top);
+    position: relative;
+    height: 0;
+
+
+}
+
+.chat-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100vh;
+    height: calc(100vh - 61px);
+    overflow: hidden;
+}
+
+#responses,
+#prompt {
+    max-width: var(--width);
+    width: 100%;
+}
+
+#responses {
+    flex: 1;
+    /* Take up all available space */
+    overflow: auto;
+    padding: 0 20px;
+    scrollbar-width: none;
+    white-space: normal;
+    margin-top: var(--main-menu-top);
+    margin-bottom: 5px;
+
+}
+
+
+#prompt {
+    color: var(--text-main);
+    padding: 10px;
+    position: sticky;
+    bottom: 0;
+
+}
+
+.content {
+    scrollbar-width: thin;
+    margin-bottom: 0px;
+}
+
+#responses p {
+    margin-top: 0;
+}
+
+.copy-button {
+    cursor: pointer;
+    padding: 5px;
+    font-size: 12px;
+}
+
+.code-button-container {
+    display: flex;
+    justify-content: flex-end;
+    gap: 5px;
+}
+
+.loading-spinner {
+    margin-top: 10px;
+    pointer-events: none;
+    width: 1.5em;
+    height: 1.5em;
+    border: 0.4em solid transparent;
+    border-color: var(--focus);
+    border-top-color: var(--selection);
+    border-radius: 50%;
+    animation: loadingspin 1s linear infinite;
+    position: fixed;
+    top: 50%;
+    left: calc(50% - 12px);
+}
+
+.loading-model {
+    pointer-events: none;
+    width: 1em;
+    height: 1em;
+    border: 0.2em solid transparent;
+    border-color: var(--focus);
+    border-top-color: var(--selection);
+    border-radius: 50%;
+    animation: loadingspin 1s linear infinite;
+}
+
+
+@keyframes loadingspin {
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+.actions button {
+    all: unset;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.actions svg {
+    fill: var(--selection);
+    width: 40px;
+    height: 40px;
+}
+
+#abort svg {
+    fill: var(--flash-error-color);
+    width: 40px;
+    height: 40px;
+}
+
+.actions button:disabled svg {
+    fill: var(--selection);
+    cursor: not-allowed;
+    opacity: 0.2;
+    /* Optional: makes the button look faded */
+}
+
+.actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.actions-left {
+    display: flex;
+    justify-content: left;
+    gap: 10px;
+}
+
+.actions-right {
+    display: flex;
+    justify-content: right;
+    gap: 10px;
+}
+
+.page-chat textarea {
+    resize: none;
+}
+
+.page-profile textarea {
+    height: 315px;
+    resize: vertical;
+    overflow-y: hidden;
+}
+
+pre code {
+    display: block;
+    padding: 1em;
+    overflow: auto;
+    scrollbar-width: thin;
+}
+
+.menu-open {
+    display: none;
+}
+
+/** on models sm: 576px */
+@media (max-width: 575px) {
+    #select-model {
+        max-width: 200px;
+    }
+}
+
+#select-model::-webkit-scrollbar {
+    display: none;
+
+}
+
+.executed-code-container {
+    background-color: var(--background-alt);
+    color: var(--text-bright);
+    font-family: "Courier New", Courier, monospace;
+    padding: 7px;
+    border-radius: 8px;
+    overflow: auto;
+    font-size: 0.9em;
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+
+#message {
+    height: 60px;
+    overflow: auto;
+}
+
+/* on screens with small height make the chat textarea smaller */
+@media (max-height: 800px) {
+    #message {
+        height: 60px;
+    }
+}
+
+.message-actions {
+    display: flex;
+}
+
+.message-actions svg {
+    color: var(--nav-text);
+    fill: var(--nav-text);
+    width: 15px;
+    height: 15px;
+}
+
+.action-link {
+    background-color: var(--nav-background);
+    color: var(--nav-text);
+    text-decoration: none;
+    padding: 5px 10px;
+    border-radius: 5px;
+    transition: background-color 0.3s;
+    white-space: nowrap;
+    height: 100%;
+}
+
+.action-link:hover {
+    background-color: rgba(var(--nav-background-rgb), 0.75);
+    text-decoration: none;
+}
+
+.action-link[disabled]{
+    background-color: var(--nav-background);
+    color: var(--text-muted);
+    cursor: not-allowed;
+}
+
+.executed-code-container {
+    margin-top: 10px;
+}
+
+
+.role {
+    font-weight: 900;
+    font-size: 1.1em;
+    margin-bottom: 2px;
+    display: flex;
+    gap: 5px;
+    align-items: anchor-center;
+}
+
+.role_user {
+}
+
+.role_assistant {
+    color: dimgray;
+}
+
+table {
+    border-collapse: collapse;
+    margin-bottom: 10px;
+    width: 100%;
+    table-layout: auto;
+    overflow-x: scroll;
+}
+
+#captcha-img {
+    cursor: pointer;
+}
+
+/**
+ * dialog page 
+ */
+.page-dialogs {
+    overflow-x: hidden;
+}
+
+.dialogs {
+    max-width: 100%;
+}
+
+.dialog {
+    display: flex;
+    gap: 0.3em;
+}
+
+.dialog a {
+    display: inline-block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 90%;
+}
+
+a.delete svg {
+    fill: var(--flash-error-color);
+    height: 24px;
+    width: 24px;
+}
+
+.pagination {
+    margin-top: 10px;
+}
+
+.checkbox-container {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.hidden {
+    display: none;
+}
+
+.katex { 
+    font-size: 1.2em; 
+}
+
+.katex-display { overflow: auto hidden }
+
+a {
+    word-break: break-all;
+    overflow-wrap: anywhere;
+}

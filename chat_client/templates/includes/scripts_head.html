@@ -1,0 +1,47 @@
+<title>{{ title }}</title>
+
+{% if not meta_description %}
+<meta name="description" content="{{ title }}">
+{% else %}
+<meta name="description" content="{{ meta_description }}">
+{% endif %}
+
+<meta name="viewport" content="width=device-width initial-scale=1.0 interactive-widget=resizes-content">
+
+{% if profile.dark_theme %}
+<link id="theme-select" rel="stylesheet" href="/static/css/dark.css?version={{ version }}">
+<link rel="stylesheet" href="/static/dist/atom-one-dark.css?version={{ version }}">
+{% else %}
+<link id="theme-select" rel="stylesheet" href="/static/css/light.css?version={{ version }}">
+<link rel="stylesheet" href="/static/dist/atom-one-light.css?version={{ version }}">
+{% endif %}
+
+{% if use_katex %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.css"
+    integrity="sha384-zh0CIslj+VczCZtlzBcjt5ppRcsAmDnRem7ESsYwWwg3m/OaJ2l4x7YBZl9Kxxib" crossorigin="anonymous">
+{% endif %}
+
+<link rel="stylesheet" href="/static/css/dolphin.css?version={{ version }}">
+<link rel="stylesheet" href="/static/css/default.css?version={{ version }}">
+<link rel="stylesheet" href="/static/css/flash.css?version={{ version }}">
+<link rel="stylesheet" href="/static/css/main-menu-overlay.css?version={{ version }}">
+
+<script src="/static/dist/highlight.min.js?version={{ version }}"></script>
+<script src="/static/dist/markdown-it.min.js?version={{ version }}"></script>
+<script src="/static/dist/diffDOM.js?version={{ version }}"></script>
+
+<link rel="apple-touch-icon" sizes="180x180" href="/static/favicon_io/apple-touch-icon.png?version={{ version }}">
+<link rel="icon" type="image/png" sizes="32x32" href="/static/favicon_io/favicon-32x32.png?version={{ version }}">
+<link rel="icon" type="image/png" sizes="16x16" href="/static/favicon_io/favicon-16x16.png?version={{ version }}">
+<link rel="manifest" href="/static/favicon_io/site.webmanifest?version={{ version }}">
+
+{% if use_katex %}
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/katex.min.js"
+    integrity="sha384-Rma6DA2IPUwhNxmrB/7S3Tno0YY7sFu9WSYMCuulLhIqYSGZ2gKCJWIqhBWqMQfh"
+    crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.21/dist/contrib/auto-render.min.js"
+    integrity="sha384-hCXGrW6PitJEwbkoStFjeJxv+fSOOQKOPbJxSfM6G5sWZjAyWhXiTIIAmQqnlLlh"
+    crossorigin="anonymous"></script>
+{% endif %}
+
+{% include "includes/importmap.html" %}

@@ -1,0 +1,45 @@
+:root {
+    
+    --font-size: 16px;
+    --font-family: ui-sans-serif, -apple-system, system-ui, Segoe UI, Helvetica, Apple Color Emoji, Arial, sans-serif, Segoe UI Emoji, Segoe UI Symbol;
+   
+
+    /* --font-size: 15px;
+    --font-family: "Courier New", Courier, monospace; */
+    --background-body: #1a1d23;
+    --background: #12141e;
+    --background-alt: #10131c;
+    --selection: #34a85c;
+    --text-main: #efefef;
+    --text-bright: #fffaf0;
+    --text-muted: #a9b1ba;
+    --links: #03a9f4;
+    --focus: #00a5bfab;
+    --border: #333d49;
+    --code: white;
+    --animation-duration: 0.1s;
+    --button-base: #2f3134;
+    --button-hover: #21232e;
+    --scrollbar-thumb: var(--button-hover);
+    --scrollbar-thumb-hover: color-mod(var(--scrollbar-thumb) lightness(-30%));
+    --form-placeholder: #a9a9a9;
+    --form-text: #f7f4de;
+    --variable: #d941e2;
+    --highlight: #ffd700;
+    --width: 700px;
+    --select-arrow: svg-load("./assets/select-arrow.svg", fill: #f7f4de);
+
+    --flash-color: white;
+    --flash-success-color: #155724;
+    --flash-notice-color: grey;
+    --flash-error-color: #721c24;
+
+    --nav-text: white;
+    --nav-background: #303030;
+    --nav-background-rgb: 90, 90, 90;
+    --nav-background-hover: #ffffff22;
+
+    --main-menu: white;
+    --main-menu-hover: #ffffff22;
+    --main-menu-top: 61px;
+}

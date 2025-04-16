@@ -1,0 +1,177 @@
+{% extends "base.html" %} {% set body_class = 'page-dialogs' %} {% block head %} {% endblock head %} {% block content %}
+
+<main class="default-container">
+    <h3>Dialogs</h3>
+    <div id="dialogs-container" class="dialogs"></div>
+    <div id="loading" class="loading-spinner hidden"></div>
+    <p id="no-dialogs" class="hidden">No dialogs found</p>
+</main>
+
+<script type="module">
+    import { Flash } from "/static/js/flash.js";
+    import { Requests } from "/static/js/requests.js";
+
+    const container = document.getElementById("dialogs-container");
+    const loading = document.getElementById("loading");
+    const noDialogs = document.getElementById("no-dialogs");
+
+    let currentPage = 1;
+    let isLoading = false;
+    let hasMore = true;
+
+    async function loadDialogs(page) {
+        // Guard against extra calls
+        if (isLoading || !hasMore) return;
+
+        isLoading = true;
+        loading.classList.remove("hidden");
+
+        try {
+            const response = await Requests.asyncGetJson(`/user/dialogs/json?page=${page}`);
+            if (response.error) {
+                Flash.setMessage(response.message, "error");
+                return;
+            }
+
+            const info = response.dialogs_info;
+            // If no dialogs on first load
+            if (info.dialogs.length === 0 && currentPage === 1) {
+                noDialogs.classList.remove("hidden");
+                hasMore = false;
+                return;
+            }
+
+            // Render new dialogs
+            renderDialogs(info.dialogs);
+
+            // Update pagination flags
+            hasMore = info.has_next;
+            currentPage++;
+        } catch (err) {
+            console.error(err);
+        } finally {
+            isLoading = false;
+            loading.classList.add("hidden");
+        }
+    }
+
+    // A small utility for HTML-escaping untrusted content:
+    function escapeHtml(unsafe) {
+        return unsafe
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function renderDialogs(dialogs) {
+        for (const dialog of dialogs) {
+            const html = `
+                <div class="dialog">
+                    
+                    <a href="/chat/${dialog.dialog_id}" class="delete svg-container" data-id="${dialog.dialog_id}">
+                        <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e8eaed">
+                            <path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z" />
+                        </svg>
+                    </a>
+                    <a href="/chat/${dialog.dialog_id}">${escapeHtml(dialog.title)}</a>
+                </div>
+            `;
+            container.insertAdjacentHTML("beforeend", html);
+        }
+
+        attachDeleteHandlers();
+    }
+
+    function attachDeleteHandlers() {
+        // Rebind delete events (in case new dialogs were added)
+        document.querySelectorAll(".delete").forEach((el) => {
+            el.removeEventListener("click", handleDelete);
+            el.addEventListener("click", handleDelete);
+        });
+    }
+
+    async function handleDelete(e) {
+        e.preventDefault();
+        const el = e.currentTarget;
+        // if (!confirm("Are you sure you want to delete this dialog?")) return;
+
+        const dialog_id = el.getAttribute("data-id");
+        loading.classList.remove("hidden");
+
+        try {
+            const response = await Requests.asyncPostJson(`/chat/delete-dialog/${dialog_id}`, {});
+            if (response.error) {
+                Flash.setMessage(response.message, "error");
+            } else {
+                // window.location.href = response.redirect;
+                // Remove the dialog from the DOM
+                const dialog = el.closest(".dialog");
+                dialog.remove();
+                Flash.setMessage("Dialog deleted successfully", "success");
+
+            }
+        } catch (error) {
+            console.error(error);
+        } finally {
+            loading.classList.add("hidden");
+            handleScroll();
+        }
+    }
+
+    function handleScroll() {
+        // Load more if the last dialog's bottom is near or within the viewport
+        if (isLoading || !hasMore) return;
+
+        const dialogs = document.querySelectorAll(".dialog");
+        if (!dialogs.length) return;
+
+        const lastDialog = dialogs[dialogs.length - 1];
+        const rect = lastDialog.getBoundingClientRect();
+
+        // If last dialog is within the visible area (plus small buffer),
+        // we load the next page.
+        if (rect.bottom <= window.innerHeight + 100) {
+            loadDialogs(currentPage);
+        }
+    }
+
+    function contentExceedsViewport() {
+        const dialogs = document.querySelectorAll('.dialog');
+        if (dialogs.length === 0) {
+            // No dialogs at all, so definitely not exceeding the viewport.
+            return false;
+        }
+
+        // Get the bottom of the last .dialog
+        const lastDialogRect = dialogs[dialogs.length - 1].getBoundingClientRect();
+        
+        // If the bottom of the last .dialog extends beyond the visible viewport, 
+        // then return true
+        return lastDialogRect.bottom > window.innerHeight;
+    }
+    
+    async function initialLoadUntilFull() {
+        while (hasMore && !contentExceedsViewport()) {
+            await loadDialogs(currentPage);
+        }
+    }
+
+    window.addEventListener("scroll", handleScroll);
+
+    // Initial load: fill up the page until content extends beyond the viewport
+    initialLoadUntilFull();
+</script>
+
+<style>
+
+    a.svg-container {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+</style>
+
+{% endblock content %}
+

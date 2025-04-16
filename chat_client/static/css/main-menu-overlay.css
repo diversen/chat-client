@@ -1,0 +1,57 @@
+/**
+ * The main menu is hidden by default
+ * When the hamburger menu is clicked, the main menu is shown
+ */
+.main-menu-overlay {
+    display: none;
+    position: fixed;
+    top: calc(var(--main-menu-top) + 2px);
+    right: 0px;
+    background-color: rgba(var(--nav-background-rgb), 0.975);
+    font-size: 0.9rem;
+    min-width: 175px;
+    max-height: 80vh;
+    overflow-y: auto;
+    scrollbar-width: none;
+    z-index: 110;
+    padding: 10px;
+}
+
+.main-menu-overlay::-webkit-scrollbar {
+    width: 0px;
+}
+
+/** 
+ When device is smaller than 576px the width should be 100%
+ */
+@media (max-width: 576px) {
+    .main-menu-overlay {
+        width: 100%;
+    }
+}
+
+.main-menu-overlay h3,
+.main-menu-overlay a {
+    display: flex;
+    color: var(--nav-text);
+    font-size: 0.9em;
+    font-weight: 600;
+    text-decoration: none;
+    border-radius: 6px;
+    padding: 8px;
+    transition: background-color 0.2s ease-in-out;
+    text-transform: uppercase;
+}
+
+.main-menu-overlay a:hover {
+    background-color: var(--nav-background-hover);
+}
+
+.main-menu-overlay h3 {
+    padding: 0;
+    color: var(--text-main);
+}
+
+.main-menu-overlay.active {
+    display: block;
+}
