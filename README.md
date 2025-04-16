@@ -51,9 +51,13 @@ chat-client init-system
 # create a user
 chat-client create-user
 
-# start dev server
+# start dev server. This will work if ollama is installed and running
+# You should have access to all ollama models
 chat-client server-dev
 ```
+
+The default configuration is stored in `./config.py` and the data is stored in `./data/` directory.
+You should checkout the `config.py` file and change the configuration to your needs. 
 
 ## Upgrade using pipx
 
