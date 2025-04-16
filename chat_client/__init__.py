@@ -1,2 +1,2 @@
-__version__ = "0.1.60"
+__version__ = "0.0.1"
 __program__ = "ollama-client"

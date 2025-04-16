@@ -31,7 +31,7 @@ Example are e.g. `ollama` or `openai` etc.
 Install latest version of chat-client globaly:
 
 <!-- LATEST-VERSION-PIPX -->
-	pipx install git+https://github.com/diversen/chat-client@v0.1.60
+	pipx install git+https://github.com/diversen/chat-client@v0.0.1
 
 Make a dir for configuration and data:
 
@@ -60,7 +60,7 @@ chat-client server-dev
 Upgrade to latest version
 
 <!-- LATEST-VERSION-PIPX-FORCE -->
-	pipx install git+https://github.com/diversen/chat-client@v0.1.60 --force
+	pipx install git+https://github.com/diversen/chat-client@v0.0.1 --force
 
 And then restart the running server instance. 
 
