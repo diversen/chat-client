@@ -123,9 +123,6 @@ nav svg {
 #prompt {
     color: var(--text-main);
     padding: 10px;
-    position: sticky;
-    bottom: 0;
-
 }
 
 .content {
