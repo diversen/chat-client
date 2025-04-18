@@ -54,7 +54,7 @@ MAX_AGE = 14 * 24 * 60 * 60  # 14 days
 session_middleware = Middleware(
     SessionMiddleware,
     secret_key=getattr(config, "SESSION_SECRET_KEY", "SECRET_KEY"),
-    https_only=getattr(config, "HTTPS_ONLY", True),
+    https_only=getattr(config, "SESSION_HTTPS_ONLY", True),
     max_age=getattr(config, "SESSION_MAX_AGE", MAX_AGE),
     same_site="lax",
 )
