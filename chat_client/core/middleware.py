@@ -50,12 +50,12 @@ class LimitRequestSizeMiddleware(BaseHTTPMiddleware):
             return JSONResponse({"error": True, "message": "Request body too large"}, status_code=413)
         return await call_next(request)
 
-
+MAX_AGE = 14 * 24 * 60 * 60  # 14 days
 session_middleware = Middleware(
     SessionMiddleware,
-    secret_key=config.SECRET_KEY,
-    https_only=True,
-    max_age=14 * 24 * 60 * 60,  # 14 days
+    secret_key=getattr(config, "SESSION_SECRET_KEY", "SECRET_KEY"),
+    https_only=getattr(config, "HTTPS_ONLY", False),
+    max_age=getattr(config, "SESSION_MAX_AGE", MAX_AGE),
     same_site="lax",
 )
 

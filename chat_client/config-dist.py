@@ -30,8 +30,11 @@ DATABASE = Path(DATA_DIR) / Path("database.db")
 HOSTNAME_WITH_SCHEME = "https://home.10kilobyte.com"
 SITE_NAME = "home.10kilobyte.com"
 
-# Session secret key
-SECRET_KEY = "SECRET_KEY"
+# Session key
+SESSION_SECRET_KEY = "SECRET_KEY_SADFDFREQ2134324AADFDGFFGMIESDF"
+
+# Session HTTPS only
+SESSION_HTTPS_ONLY = False  # Set to True if using HTTPS
 
 # Use mathjax for rendering math
 USE_KATEX = False

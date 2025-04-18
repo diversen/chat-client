@@ -86,7 +86,6 @@ selectModelElem.addEventListener('change', () => {
 
 function setChatContainerHeight() {
     const visibleHeight = window.innerHeight;
-    console.log('Visible height:', visibleHeight);
 
     // Set chat container height to the visible height minus the header ( 61 px)
     const headerHeight = 0;
