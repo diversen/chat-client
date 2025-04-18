@@ -1,4 +1,4 @@
-import { responsesElem, messageElem, sendButtonElem, newButtonElem, abortButtonElem, selectModelElem } from '/static/js/app-elements.js';
+import { responsesElem, messageElem, sendButtonElem, newButtonElem, abortButtonElem, selectModelElem, chatContainer } from '/static/js/app-elements.js';
 
 const SCROLL_THRESHOLD = 200;
 const TOUCH_THRESHOLD = 10;
@@ -83,10 +83,22 @@ selectModelElem.addEventListener('change', () => {
     localStorage.setItem('selectedModel', selectedModel);
 });
 
+
+function setChatContainerHeight() {
+    const visibleHeight = window.innerHeight;
+    console.log('Visible height:', visibleHeight);
+
+    // Set chat container height to the visible height minus the header ( 61 px)
+    const headerHeight = 0;
+    const chatContainerHeight = visibleHeight - headerHeight;
+    chatContainer.style.height = `${chatContainerHeight}px`;
+}
+
 /**
  * On page load, check if a model is saved in local storage and set it as the selected model
  */
 window.addEventListener('load', () => {
+    setChatContainerHeight();
     let selectedModel = localStorage.getItem('selectedModel');
     if (selectedModel) {
         console.log('Selected model:', selectedModel);
@@ -98,6 +110,11 @@ window.addEventListener('load', () => {
         }
     }
     selectModelElem.style.display = 'block';
+});
+
+
+window.addEventListener('resize', () => {
+    setChatContainerHeight();
 });
 
 export { getIsScrolling, setIsScrolling };

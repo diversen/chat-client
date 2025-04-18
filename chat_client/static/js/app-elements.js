@@ -6,5 +6,6 @@ const newButtonElem = document.getElementById('new');
 const abortButtonElem = document.getElementById('abort');
 const selectModelElem = document.getElementById('select-model');
 const loadingSpinner = document.querySelector('.loading-spinner');
+const chatContainer = document.querySelector('.chat-container');
 
-export { responsesElem, messageElem, sendButtonElem, newButtonElem, abortButtonElem, selectModelElem, loadingSpinner }
+export { responsesElem, messageElem, sendButtonElem, newButtonElem, abortButtonElem, selectModelElem, loadingSpinner, chatContainer }
