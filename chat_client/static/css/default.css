@@ -97,8 +97,7 @@ nav svg {
     align-items: center;
     justify-content: center;
     width: 100%;
-    /* height: calc(100vh - 61px); */
-    height: calc(100vh); /* initial height - will be altered by js */
+    height: calc(100vh - 61px);/* initial height - will be altered by js */ 
     overflow: hidden;
 }
 
