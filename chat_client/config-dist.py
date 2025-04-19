@@ -59,7 +59,7 @@ USE_KATEX = False
 #     # The result will be added to the dialog
 #     # Uncomment in order to run python code
 #     "python": {
-#         "module": "ollama_client.tools.python_exec",
+#         "module": "chat_client.tools.python_exec",
 #         "def": "execute",
 #     }
 # }
