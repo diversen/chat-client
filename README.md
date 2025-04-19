@@ -31,7 +31,7 @@ Example are e.g. `ollama` or `openai` etc.
 Install latest version of chat-client globaly:
 
 <!-- LATEST-VERSION-PIPX -->
-	pipx install git+https://github.com/diversen/chat-client@v0.0.5
+	pipx install git+https://github.com/diversen/chat-client@v0.0.6
 
 Make a dir for configuration and data:
 
@@ -64,7 +64,7 @@ You should checkout the `config.py` file and change the configuration to your ne
 Upgrade to latest version
 
 <!-- LATEST-VERSION-PIPX-FORCE -->
-	pipx install git+https://github.com/diversen/chat-client@v0.0.5 --force
+	pipx install git+https://github.com/diversen/chat-client@v0.0.6 --force
 
 And then restart the running server instance. 
 
