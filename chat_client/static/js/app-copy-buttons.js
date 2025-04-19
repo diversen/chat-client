@@ -1,8 +1,8 @@
 import { md } from '/static/js/markdown.js';
 
-async function addCopyButtons(assistantResponseElem, config) {
+async function addCopyButtons(contentElem, config) {
 
-    const codeBlocks = assistantResponseElem.querySelectorAll('pre code');
+    const codeBlocks = contentElem.querySelectorAll('pre code');
 
     codeBlocks.forEach(code => {
 
@@ -27,7 +27,7 @@ async function addCopyButtons(assistantResponseElem, config) {
                 }).then(response => response.json())
 
                 // Remove existing output
-                const existingOutput = assistantResponseElem.querySelector('.executed-code-container');
+                const existingOutput = contentElem.querySelector('.executed-code-container');
                 if (existingOutput) {
                     existingOutput.remove();
                 }
