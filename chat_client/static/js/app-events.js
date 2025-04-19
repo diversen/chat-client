@@ -108,6 +108,7 @@ window.addEventListener('load', () => {
             selectModelElem.value = selectedModel;
         }
     }
+    messageElem.style.display = 'unset';
     selectModelElem.style.display = 'block';
 });
 

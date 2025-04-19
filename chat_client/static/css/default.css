@@ -116,13 +116,13 @@ nav svg {
     white-space: normal;
     margin-top: var(--main-menu-top);
     margin-bottom: 5px;
-
 }
 
 
 #prompt {
     color: var(--text-main);
     padding: 10px;
+
 }
 
 .content {
@@ -273,6 +273,7 @@ pre code {
 #message {
     height: 60px;
     overflow: auto;
+    display: none;
 }
 
 /* on screens with small height make the chat textarea smaller */
