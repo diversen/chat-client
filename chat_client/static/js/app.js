@@ -512,14 +512,6 @@ function checkScroll() {
 responsesElem.addEventListener('scroll', checkScroll);
 new MutationObserver(checkScroll).observe(responsesElem, { childList: true, subtree: true });
 
-scrollToBottom.addEventListener('click', () => {
-    responsesElem.scrollTo({
-        top: responsesElem.scrollHeight,
-        behavior: 'smooth'
-    });
-    // scrollToBottom.style.display = 'none';
-});
-
 /**
  * Load a saved conversation
  */

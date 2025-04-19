@@ -73,4 +73,12 @@ window.addEventListener('resize', () => {
     setChatContainerHeight();
 });
 
+
+scrollToBottom.addEventListener('click', () => {
+    responsesElem.scrollTo({
+        top: responsesElem.scrollHeight,
+        behavior: 'smooth'
+    });
+});
+
 export { getIsScrolling, setIsScrolling };
