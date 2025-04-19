@@ -29,7 +29,6 @@ html {
     scroll-behavior: smooth;
 }
 
-
 nav {
     position: fixed;
     top: 0;
@@ -118,7 +117,6 @@ nav svg {
     margin-bottom: 5px;
     scrollbar-color: var(--text-muted) transparent;
 }
-
 
 #prompt {
     color: var(--text-main);

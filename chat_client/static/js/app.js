@@ -251,7 +251,7 @@ function renderKatex(contentElem) {
 /**
  * Render streamed response text into the content element
  */
-function renderSteamedResponseText(contentElement, streamedResponseText) {
+async function renderSteamedResponseText(contentElement, streamedResponseText) {
     const startTime = performance.now();
 
     streamedResponseText = modifySteamedText(streamedResponseText);
@@ -261,9 +261,9 @@ function renderSteamedResponseText(contentElement, streamedResponseText) {
     highlightCodeInElement(contentElement);
     renderKatex(contentElement);
 
-    // const endTime = performance.now();
-    // const timeSpent = endTime - startTime;
-    // console.log(`Time spent: ${timeSpent} milliseconds`);
+    const endTime = performance.now();
+    const timeSpent = endTime - startTime;
+    console.log(`Time spent: ${timeSpent} milliseconds`);
 }
 
 let lastExecutionTime = 0;
@@ -271,10 +271,10 @@ let pendingExecution = false;
 let executionInterval = 10
 
 
-async function updateContentDiff(contentElement, hiddenContentElem, streamedResponseText) {
+async function updateContentDiff(contentElement, hiddenContentElem, streamedResponseText, force = false) {
     const currentTime = performance.now();
 
-    if (currentTime - lastExecutionTime < executionInterval) {
+    if (!force && currentTime - lastExecutionTime < executionInterval) {
         if (!pendingExecution) {
             pendingExecution = true;
             setTimeout(async () => {
@@ -296,6 +296,7 @@ async function updateContentDiff(contentElement, hiddenContentElem, streamedResp
         console.log("Error in diffDOMExec:", error);
     }
 }
+
 
 
 /**
@@ -344,7 +345,7 @@ async function renderAssistantMessage() {
 
                 // Remove empty elements form the array
                 dataElems = dataElems.filter((data) => data.trim() !== '');
-                dataElems.forEach(processChunk);
+                dataElems.forEach(await processChunk);
             }
         } catch (error) {
             loader.classList.add('hidden');
@@ -374,11 +375,11 @@ async function renderAssistantMessage() {
             }
 
             if (totalTokenCount % 1 === 0) {
-                updateContentDiff(contentElement, hiddenContentElem, streamedResponseText);
+                await updateContentDiff(contentElement, hiddenContentElem, streamedResponseText);
             }
 
             if (finishReason) {
-                updateContentDiff(contentElement, hiddenContentElem, streamedResponseText);
+                await updateContentDiff(contentElement, hiddenContentElem, streamedResponseText, true);
             }
         } catch (error) {
             console.log("Error in processChunk:", error);
@@ -426,20 +427,27 @@ async function renderAssistantMessage() {
         console.error("Error in renderAssistantMessage:", error);
 
         Flash.setMessage('An error occurred. Please try again.', 'error');
+    } finally {
+
+        clearStreaming();
+
+        // wait for the next frame to render
+        // This is a workaround to ensure that the DOM is updated before executing the next code
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+        await updateContentDiff(contentElement, hiddenContentElem, streamedResponseText, true);
+
+        // Enable buttons
+        await addCopyButtons(contentElement, config);
+
+        // Save message to the dialog
+        let assistantMessage = { role: 'assistant', content: streamedResponseText };
+        await createMessage(currentDialogID, assistantMessage);
+
+        // Render copy message
+        renderCopyMessageButton(container, streamedResponseText);
+        currentDialogMessages.push(assistantMessage);
     }
-
-    clearStreaming();
-
-    // Enable buttons
-    await addCopyButtons(contentElement, config);
-
-    // Save message to the dialog
-    let assistantMessage = { role: 'assistant', content: streamedResponseText };
-    await createMessage(currentDialogID, assistantMessage);
-
-    // Render copy message
-    renderCopyMessageButton(container, streamedResponseText);
-    currentDialogMessages.push(assistantMessage);
 }
 
 
@@ -479,9 +487,6 @@ const observer = new MutationObserver((mutationList, observer) => {
         if (mutation.type === "subtree") {
             return;
         }
-
-        console.log('Mutation type:', mutation.type);
-        console.log('Mutation:', mutation);
 
         scrollToLastMessage();
 
