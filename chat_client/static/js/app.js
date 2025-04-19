@@ -524,7 +524,7 @@ function checkScroll() {
     const atBottom = Math.abs(responsesElem.scrollHeight - responsesElem.scrollTop - responsesElem.clientHeight) <= threshold;
     const hasScrollbar = responsesElem.scrollHeight > responsesElem.clientHeight;
   
-    if (hasScrollbar && !atBottom && !getIsScrolling()) {
+    if (hasScrollbar && !atBottom /* && !getIsScrolling() */) {
       scrollToBottom.style.display = 'flex';
     } else {
       scrollToBottom.style.display = 'none';
