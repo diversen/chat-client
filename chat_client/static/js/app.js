@@ -188,6 +188,11 @@ async function sendUserMessage() {
         messageElem.value = '';
 
         renderStaticUserMessage(userMessage);
+
+        // Scroll so that last user message is visible
+        scrollToLastMessage();
+        
+
         await renderAssistantMessage(message);
     } catch (error) {
         await logError(error, 'Error in sendUserMessage');
@@ -325,7 +330,7 @@ async function renderAssistantMessage() {
 
     const selectModel = selectModelElem.value;
 
-    setIsScrolling(true);
+    // setIsScrolling(true);
     // Stream processing function
     const processStream = async (reader, decoder) => {
         try {
@@ -453,52 +458,65 @@ async function renderAssistantMessage() {
 
 function scrollToLastMessage() {
 
-    if (getIsScrolling()) {
+    // if (getIsScrolling()) {
         responsesElem.scrollTo({
             top: responsesElem.scrollHeight,
             behavior: 'smooth'
         });
-    }
+    // }
 }
 
 /**
  * Scroll to the bottom of the responses element
  * If mutation observer is triggered, scroll to the bottom
  */
-const observer = new MutationObserver((mutationList, observer) => {
-    const lastAssistantMessage = responsesElem.querySelector('.assistant-message:last-child');
-    if (lastAssistantMessage) {
-        const distance = lastAssistantMessage.getBoundingClientRect().top - responsesElem.getBoundingClientRect().top;
-        if (distance < 40) {
-            setIsScrolling(false);
-        }
-    }
+// const observer = new MutationObserver((mutationList, observer) => {
+//     const lastAssistantMessage = responsesElem.querySelector('.assistant-message:last-child');
+//     if (lastAssistantMessage) {
+//         const distance = lastAssistantMessage.getBoundingClientRect().top - responsesElem.getBoundingClientRect().top;
+//         if (distance < 40) {
+//             setIsScrolling(false);
+//         }
+//     }
 
-    for (const mutation of mutationList) {
-        if (mutation.type === "childList") {
-            if (mutation.removedNodes.length > 0) {
-                return;
-            }
-        }
+//     for (const mutation of mutationList) {
+//         if (mutation.type === "childList") {
+//             if (mutation.removedNodes.length > 0) {
+//                 return;
+//             }
+//         }
 
-        if (mutation.type === "characterData") {
-            // return;
-        }
-        if (mutation.type === "subtree") {
-            return;
-        }
+//         if (mutation.type === "characterData") {
+//             // return;
+//         }
+//         if (mutation.type === "subtree") {
+//             return;
+//         }
 
-        scrollToLastMessage();
+//         scrollToLastMessage();
 
-    }
-});
+//     }
+// });
 
-observer.observe(responsesElem, {
-    childList: true,
-    subtree: true,
-    characterData: true,
-    // attributes: true,
-});
+// const observer = new MutationObserver(() => {
+//     requestAnimationFrame(() => {
+//         const threshold = 40;
+//         const distanceToBottom = responsesElem.scrollHeight - responsesElem.scrollTop - responsesElem.clientHeight;
+
+//         if (distanceToBottom <= threshold) {
+//             setIsScrolling(false);
+//         }
+
+//         scrollToLastMessage();
+//     });
+// });
+
+// observer.observe(responsesElem, {
+//     childList: true,
+//     subtree: true,
+//     characterData: true,
+//     // attributes: true,
+// });
 
 
 function checkScroll() {
