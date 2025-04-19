@@ -1,22 +1,31 @@
 import { Flash } from '/static/js/flash.js';
 import { mdNoHTML } from '/static/js/markdown.js';
 import { createDialog, getMessages, createMessage, getConfig, isLoggedInOrRedirect } from '/static/js/app-dialog.js';
-import { responsesElem, messageElem, sendButtonElem, newButtonElem, abortButtonElem, selectModelElem, loadingSpinner } from '/static/js/app-elements.js';
-import { getIsScrolling, setIsScrolling } from '/static/js/app-events.js';
+import { responsesElem, messageElem, sendButtonElem, newButtonElem, abortButtonElem, selectModelElem, loadingSpinner, scrollToBottom } from '/static/js/app-elements.js';
+import { } from '/static/js/app-events.js';
 import { addCopyButtons } from '/static/js/app-copy-buttons.js';
 import { logError } from '/static/js/error-log.js';
 import { dd } from '/static/js/diff-dom.js';
 import { modifySteamedText } from '/static/js/utils.js';
+import { copyIcon, checkIcon, generatingIcon } from '/static/js/app-icons.js';
 
 const config = await getConfig();
 
 // Math rendering
 const useKatex = config.use_katex;
 
-// Copy icon and check icon
-const copyIcon = `<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e3e3e3"><path d="M360-240q-33 0-56.5-23.5T280-320v-480q0-33 23.5-56.5T360-880h360q33 0 56.5 23.5T800-800v480q0 33-23.5 56.5T720-240H360Zm0-80h360v-480H360v480ZM200-80q-33 0-56.5-23.5T120-160v-560h80v560h440v80H200Zm160-240v-480 480Z"/></svg>`;
+// Regarding scrolling
+let isScrolling = false;
+function getIsScrolling() {
+    if (isScrolling) {
+        return true;
+    }
+    return false;
+}
 
-const checkIcon = `<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e3e3e3"><path d="M382-240 154-468l57-57 171 171 367-367 57 57-424 424Z"/></svg>`;
+function setIsScrolling(value) {
+    isScrolling = value;
+}
 
 // States
 let isStreaming = false;
@@ -108,7 +117,7 @@ function renderCopyMessageButton(container, message) {
     const messageActions = container.querySelector('.message-actions');
     messageActions.classList.remove('hidden');
     messageActions.querySelector('.copy-message').addEventListener('click', () => {
-        console.log('Copying message to clipboard');
+        // Notice this will only work in secure contexts (HTTPS)
         navigator.clipboard.writeText(message);
 
         // Alter icon to check icon for 3 seconds
@@ -314,7 +323,7 @@ async function renderAssistantMessage() {
     contentElement.classList.add('content');
 
     const selectModel = selectModelElem.value;
-    
+
     setIsScrolling(true);
     // Stream processing function
     const processStream = async (reader, decoder) => {
@@ -339,7 +348,6 @@ async function renderAssistantMessage() {
             }
         } catch (error) {
             loader.classList.add('hidden');
-            clearStreaming();
             handleStreamError(error);
         }
     };
@@ -371,11 +379,9 @@ async function renderAssistantMessage() {
 
             if (finishReason) {
                 updateContentDiff(contentElement, hiddenContentElem, streamedResponseText);
-                clearStreaming();
             }
         } catch (error) {
             console.log("Error in processChunk:", error);
-            clearStreaming();
             controller.abort();
         }
     };
@@ -418,9 +424,11 @@ async function renderAssistantMessage() {
     } catch (error) {
         loader.classList.add('hidden');
         console.error("Error in renderAssistantMessage:", error);
-        clearStreaming();
+
         Flash.setMessage('An error occurred. Please try again.', 'error');
     }
+
+    clearStreaming();
 
     // Enable buttons
     await addCopyButtons(contentElement, config);
@@ -436,7 +444,7 @@ async function renderAssistantMessage() {
 
 
 function scrollToLastMessage() {
-   
+
     if (getIsScrolling()) {
         responsesElem.scrollTo({
             top: responsesElem.scrollHeight,
@@ -453,7 +461,6 @@ const observer = new MutationObserver((mutationList, observer) => {
     const lastAssistantMessage = responsesElem.querySelector('.assistant-message:last-child');
     if (lastAssistantMessage) {
         const distance = lastAssistantMessage.getBoundingClientRect().top - responsesElem.getBoundingClientRect().top;
-        console.log(distance)
         if (distance < 40) {
             setIsScrolling(false);
         }
@@ -472,7 +479,7 @@ const observer = new MutationObserver((mutationList, observer) => {
         if (mutation.type === "subtree") {
             return;
         }
-        
+
         console.log('Mutation type:', mutation.type);
         console.log('Mutation:', mutation);
 
@@ -486,6 +493,31 @@ observer.observe(responsesElem, {
     subtree: true,
     characterData: true,
     // attributes: true,
+});
+
+
+function checkScroll() {
+    const threshold = 2; // px tolerance for floating-point errors
+    const atBottom = Math.abs(responsesElem.scrollHeight - responsesElem.scrollTop - responsesElem.clientHeight) <= threshold;
+    const hasScrollbar = responsesElem.scrollHeight > responsesElem.clientHeight;
+  
+    if (hasScrollbar && !atBottom && !getIsScrolling()) {
+      scrollToBottom.style.display = 'flex';
+    } else {
+      scrollToBottom.style.display = 'none';
+    }
+  }
+
+// Listen for scrolls and content changes
+responsesElem.addEventListener('scroll', checkScroll);
+new MutationObserver(checkScroll).observe(responsesElem, { childList: true, subtree: true });
+
+scrollToBottom.addEventListener('click', () => {
+    responsesElem.scrollTo({
+        top: responsesElem.scrollHeight,
+        behavior: 'smooth'
+    });
+    // scrollToBottom.style.display = 'none';
 });
 
 /**

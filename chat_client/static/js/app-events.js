@@ -1,4 +1,4 @@
-import { responsesElem, messageElem, sendButtonElem, newButtonElem, abortButtonElem, selectModelElem, chatContainer } from '/static/js/app-elements.js';
+import { responsesElem, messageElem, sendButtonElem, newButtonElem, abortButtonElem, selectModelElem, chatContainer, scrollToBottom } from '/static/js/app-elements.js';
 
 const SCROLL_THRESHOLD = 200;
 const TOUCH_THRESHOLD = 10;
@@ -15,50 +15,6 @@ function getIsScrolling() {
 function setIsScrolling(value) {
     isScrolling = value;
 }
-
-/** 
- * Add event listner to the textarea. isScrolling indicates if text is being generated
- * and is scrolling to the bottom. The user can scroll up to stop the auto-scrolling.
- */
-function handleScrollEvent(event) {
-    if (event.deltaY < 0) {
-        console.log('Wheel up to go up in messages');
-        setIsScrolling(false);
-    } else if (event.deltaY > 0) {
-        if (responsesElem.scrollTop + responsesElem.clientHeight >= responsesElem.scrollHeight - SCROLL_THRESHOLD) {
-            setIsScrolling(true);
-        }
-    }
-}
-
-responsesElem.addEventListener('wheel', handleScrollEvent, { passive: true });
-
-/**
- * Add event listener to the touch events. isScrolling indicates if text is being generated
- */
-let startY = 0;
-
-function handleTouchStart(event) {
-    startY = event.touches[0].clientY;
-}
-
-function handleTouchMove(event) {
-    let deltaY = event.touches[0].clientY - startY;
-
-    if (deltaY > -TOUCH_THRESHOLD) {
-        console.log('Swiping down to go up in messages');
-        setIsScrolling(false);
-    } else if (deltaY < TOUCH_THRESHOLD) {
-        if (responsesElem.scrollTop + responsesElem.clientHeight >= responsesElem.scrollHeight - SCROLL_THRESHOLD) {
-            console.log('Swiping up to go down in messages and auto-scroll again');
-            setIsScrolling(true);
-        }
-    }
-}
-
-document.addEventListener('touchstart', handleTouchStart, { passive: true });
-document.addEventListener('touchmove', handleTouchMove, { passive: true });
-
 
 // sendButtonElem is disabled by default
 sendButtonElem.setAttribute('disabled', true);

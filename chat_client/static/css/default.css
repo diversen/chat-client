@@ -112,10 +112,11 @@ nav svg {
     /* Take up all available space */
     overflow: auto;
     padding: 0 20px;
-    scrollbar-width: none;
+    scrollbar-width: thin;
     white-space: normal;
     margin-top: var(--main-menu-top);
     margin-bottom: 5px;
+    scrollbar-color: var(--text-muted) transparent;
 }
 
 
@@ -268,6 +269,25 @@ pre code {
     font-size: 0.9em;
     overflow-x: auto;
     scrollbar-width: thin;
+}
+
+#scroll-to-bottom {
+    justify-content: center;
+    align-items: center;
+    display: none;
+    position: absolute;
+    bottom: 150px;
+    cursor: pointer;
+}
+
+#scroll-to-bottom svg {
+    background-color: var(--background-body);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    border: 0px solid transparent;
+    fill: var(--button-base);
+
 }
 
 #message {
