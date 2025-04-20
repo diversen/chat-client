@@ -28,7 +28,6 @@ PROVIDERS = getattr(config, "PROVIDERS", {})
 TOOL_REGISTRY = getattr(config, "TOOL_REGISTRY", {})
 TOOLS = getattr(config, "TOOLS", [])
 TOOL_MODELS = getattr(config, "TOOL_MODELS", [])
-OPTIONS = getattr(config, "OPTIONS", {})
 
 
 async def chat_page(request: Request):
@@ -152,7 +151,6 @@ async def _chat_response_stream(request: Request, messages, model, logged_in):
             chat_args = {
                 "model": model,
                 "messages": messages,
-                "options": OPTIONS,
                 "stream": True,
             }
 
