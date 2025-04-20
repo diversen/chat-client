@@ -17,9 +17,9 @@ def generate_import_map(base_dirs):
     return json.dumps(import_map, indent=4)
 
 
-base_directories = ["ollama_client/static/js", "ollama_client/static/dist"]
+base_directories = ["chat_client/static/js", "chat_client/static/dist"]
 import_map = generate_import_map(base_directories)
 import_map_html = f'<script type="importmap">\n{import_map}\n</script>'
 
-with open("ollama_client/templates/includes/importmap.html", "w") as f:
+with open("chat_client/templates/includes/importmap.html", "w") as f:
     f.write(import_map_html)
