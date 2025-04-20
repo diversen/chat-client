@@ -96,6 +96,7 @@ nav svg {
     width: 100%;
     height: calc(100vh - 61px);/* initial height - will be altered by js */ 
     overflow: hidden;
+    overflow-wrap: anywhere;
 }
 
 #responses,
