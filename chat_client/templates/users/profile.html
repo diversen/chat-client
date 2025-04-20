@@ -12,10 +12,10 @@
 
     <form method="post" action="/user/profile" class="profile-form">
         <label for="username">Your Username</label>
-        <input type="text" id="username" name="username" placeholder="Your username" aria-label="Username" value="{{ profile.username }}">
+        <input type="text" id="username" name="username" placeholder="Your username" aria-label="Username" value="{{ profile.username }}" autocomplete="off" required>
         <div class="checkbox-container">
-            <label for="dark_mode">Dark theme</label>
-            <input type="checkbox" aria-label="Dark mode" value="1" id="dark_theme" name="dark_mode" {% if profile.dark_theme %}checked{% endif %}>
+            <label for="dark_theme">Dark theme</label>
+            <input type="checkbox" aria-label="Dark mode" value="1" id="dark_theme" name="dark_theme" {% if profile.dark_theme %}checked{% endif %}>
         </div>
         <label for="system_message">Define system message of the chat</label>
         <textarea id="system_message" name="system_message" placeholder="Set system message" aria-label="System message">{{ profile.system_message }}</textarea>
