@@ -191,7 +191,7 @@ async function sendUserMessage() {
 
         // Scroll so that last user message is visible
         scrollToLastMessage();
-        
+
 
         await renderAssistantMessage(message);
     } catch (error) {
@@ -301,8 +301,6 @@ async function updateContentDiff(contentElement, hiddenContentElem, streamedResp
         console.log("Error in diffDOMExec:", error);
     }
 }
-
-
 
 /**
  * Render assistant message with streaming
@@ -458,78 +456,25 @@ async function renderAssistantMessage() {
 
 function scrollToLastMessage() {
 
-    // if (getIsScrolling()) {
-        responsesElem.scrollTo({
-            top: responsesElem.scrollHeight,
-            behavior: 'smooth'
-        });
-    // }
+
+    responsesElem.scrollTo({
+        top: responsesElem.scrollHeight,
+        behavior: 'smooth'
+    });
+
 }
-
-/**
- * Scroll to the bottom of the responses element
- * If mutation observer is triggered, scroll to the bottom
- */
-// const observer = new MutationObserver((mutationList, observer) => {
-//     const lastAssistantMessage = responsesElem.querySelector('.assistant-message:last-child');
-//     if (lastAssistantMessage) {
-//         const distance = lastAssistantMessage.getBoundingClientRect().top - responsesElem.getBoundingClientRect().top;
-//         if (distance < 40) {
-//             setIsScrolling(false);
-//         }
-//     }
-
-//     for (const mutation of mutationList) {
-//         if (mutation.type === "childList") {
-//             if (mutation.removedNodes.length > 0) {
-//                 return;
-//             }
-//         }
-
-//         if (mutation.type === "characterData") {
-//             // return;
-//         }
-//         if (mutation.type === "subtree") {
-//             return;
-//         }
-
-//         scrollToLastMessage();
-
-//     }
-// });
-
-// const observer = new MutationObserver(() => {
-//     requestAnimationFrame(() => {
-//         const threshold = 40;
-//         const distanceToBottom = responsesElem.scrollHeight - responsesElem.scrollTop - responsesElem.clientHeight;
-
-//         if (distanceToBottom <= threshold) {
-//             setIsScrolling(false);
-//         }
-
-//         scrollToLastMessage();
-//     });
-// });
-
-// observer.observe(responsesElem, {
-//     childList: true,
-//     subtree: true,
-//     characterData: true,
-//     // attributes: true,
-// });
-
 
 function checkScroll() {
     const threshold = 2; // px tolerance for floating-point errors
     const atBottom = Math.abs(responsesElem.scrollHeight - responsesElem.scrollTop - responsesElem.clientHeight) <= threshold;
     const hasScrollbar = responsesElem.scrollHeight > responsesElem.clientHeight;
-  
+
     if (hasScrollbar && !atBottom /* && !getIsScrolling() */) {
-      scrollToBottom.style.display = 'flex';
+        scrollToBottom.style.display = 'flex';
     } else {
-      scrollToBottom.style.display = 'none';
+        scrollToBottom.style.display = 'none';
     }
-  }
+}
 
 // Listen for scrolls and content changes
 responsesElem.addEventListener('scroll', checkScroll);

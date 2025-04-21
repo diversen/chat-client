@@ -1,6 +1,6 @@
 :root {
     
-    --font-size: 16px;
+    --font-size: 17px;
     --font-family: ui-sans-serif, -apple-system, system-ui, Segoe UI, Helvetica, Apple Color Emoji, Arial, sans-serif, Segoe UI Emoji, Segoe UI Symbol;
    
 
@@ -26,7 +26,7 @@
     --form-text: #f7f4de;
     --variable: #d941e2;
     --highlight: #ffd700;
-    --width: 700px;
+    --width: 800px;
     --select-arrow: svg-load("./assets/select-arrow.svg", fill: #f7f4de);
 
     --flash-color: white;
