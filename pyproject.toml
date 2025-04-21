@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "chat-client"
-version = "0.0.7"
+version = "0.0.8"
 description = "A simple python frontend for serving LLM models supported by the openai api. E.g. ollama, openai, google models"
 readme = "README.md"
 requires-python = ">=3.10"
