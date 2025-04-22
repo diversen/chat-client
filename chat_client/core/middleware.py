@@ -9,7 +9,7 @@ from starlette.middleware.sessions import SessionMiddleware
 # from starlette.middleware.gzip import GZipMiddleware
 from starlette.responses import JSONResponse
 from starlette.requests import Request
-import config
+import data.config as config
 import logging
 
 logger: logging.Logger = logging.getLogger(__name__)

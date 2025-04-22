@@ -8,7 +8,7 @@ from chat_client.core.exceptions import exception_callbacks
 from chat_client.core.middleware import middleware
 import logging
 from chat_client import __version__, __program__
-import config
+import data.config as config
 from chat_client.core.templates import get_static_files
 from chat_client.core.logging import setup_logging
 

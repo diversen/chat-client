@@ -56,8 +56,8 @@ chat-client create-user
 chat-client server-dev
 ```
 
-The default configuration is stored in `./config.py` and the data is stored in `./data/` directory.
-You should checkout the `config.py` file and change the configuration to your needs. 
+All data is stored in `./data/` directory. E.g. `log files` and sqlite3 `database`.
+You should checkout the `./data/config.py` file and change the configuration to fit your needs. 
 
 ## Upgrade using pipx
 

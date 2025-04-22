@@ -7,7 +7,7 @@ from openai import OpenAIError
 import json
 from chat_client.core import base_context
 from chat_client.core import flash
-import config
+import data.config as config
 import logging
 from chat_client.core import session
 from chat_client.core.templates import get_templates

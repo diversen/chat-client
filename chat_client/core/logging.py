@@ -1,7 +1,7 @@
 import logging
 import os
 from pathlib import Path
-from config import DATA_DIR
+from data.config import DATA_DIR
 from concurrent_log_handler import ConcurrentRotatingFileHandler
 import typing
 

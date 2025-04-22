@@ -4,7 +4,7 @@ from chat_client import __version__
 from chat_client.core import flash
 from chat_client.core import session
 from chat_client.models import user_model
-import config
+import data.config as config
 
 
 logger: logging.Logger = logging.getLogger(__name__)

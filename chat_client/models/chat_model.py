@@ -39,7 +39,7 @@ from chat_client.database.database_utils import DatabaseConnection
 from chat_client.core.exceptions import UserValidate
 from chat_client.core import session
 from chat_client.core.exceptions import JSONError
-from config import DATABASE
+from data.config import DATABASE
 import uuid
 import logging
 

@@ -81,9 +81,16 @@ MODELS = {
 }
 
 # Add all ollama models to the list of models
-ollama_models = get_provider_models(PROVIDERS["ollama"])
-for ollama_model in ollama_models:
-    MODELS[ollama_model] = "ollama"
+try:
+    ollama_models = get_provider_models(PROVIDERS["ollama"])
+    for ollama_model in ollama_models:
+        MODELS[ollama_model] = "ollama"
+except Exception as e:
+    print(f"Error getting ollama provided models: {e}")
+    print("You can try to fix this by:")
+    print("a) Install and run the ollama server")
+    print("b) Edit the config.py file and remove the provier ollama")
+    exit()
 
 
 TOOL_MODELS = ["gpt-40-mini"]

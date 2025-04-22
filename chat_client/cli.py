@@ -11,7 +11,7 @@ from chat_client.database.database_utils import DatabaseConnection
 from chat_client.models.user_model import _password_hash
 from chat_client.database.migration import Migration
 from chat_client.migrations import migrations
-from config import DATA_DIR, LOG_LEVEL, DATABASE
+from data.config import DATA_DIR, LOG_LEVEL, DATABASE
 from chat_client import __version__, __program__
 from chat_client.core.logging import setup_logging
 

@@ -1,6 +1,6 @@
 import subprocess
 import tempfile
-import config
+import data.config as config
 import logging
 from logging import Logger
 

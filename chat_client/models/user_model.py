@@ -7,7 +7,7 @@ from chat_client.core.exceptions import UserValidate
 from chat_client.core import session
 from chat_client.models import token_model
 from chat_client.core.templates import get_template_content
-from config import HOSTNAME_WITH_SCHEME, SITE_NAME, DATABASE
+from data.config import HOSTNAME_WITH_SCHEME, SITE_NAME, DATABASE
 import bcrypt
 import logging
 import secrets

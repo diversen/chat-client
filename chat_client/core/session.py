@@ -4,7 +4,7 @@ from starlette.requests import Request
 import logging
 from chat_client.database.crud import CRUD
 from chat_client.database.database_utils import DatabaseConnection
-from config import DATABASE
+from data.config import DATABASE
 
 
 logger: logging.Logger = logging.getLogger(__name__)

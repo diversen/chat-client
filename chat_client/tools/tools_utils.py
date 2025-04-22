@@ -1,6 +1,6 @@
 import logging
 from logging import Logger
-import config
+import data.config as config
 
 
 logger: Logger = logging.getLogger(__name__)
