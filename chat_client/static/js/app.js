@@ -14,19 +14,6 @@ const config = await getConfig();
 // Math rendering
 const useKatex = config.use_katex;
 
-// Regarding scrolling
-let isScrolling = false;
-function getIsScrolling() {
-    if (isScrolling) {
-        return true;
-    }
-    return false;
-}
-
-function setIsScrolling(value) {
-    isScrolling = value;
-}
-
 // States
 let isStreaming = false;
 let currentDialogMessages = [];
@@ -65,8 +52,13 @@ abortButtonElem.addEventListener('click', () => {
 messageElem.addEventListener('keydown', async (e) => {
     if (e.key === 'Enter') {
         if (e.ctrlKey) {
-            // If Ctrl+Enter is pressed, add a new line
-            messageElem.value += '\n';
+            // If Ctrl+Enter is pressed, add a new line at the point of the cursor
+            e.preventDefault();
+            const start = messageElem.selectionStart;
+            const end = messageElem.selectionEnd;
+            messageElem.value = messageElem.value.substring(0, start) + '\n' + messageElem.value.substring(end);
+            messageElem.selectionStart = messageElem.selectionEnd = start + 1;
+            
         } else {
             // If only Enter is pressed, prevent the default behavior and send the message
             e.preventDefault();
@@ -328,7 +320,6 @@ async function renderAssistantMessage() {
 
     const selectModel = selectModelElem.value;
 
-    // setIsScrolling(true);
     // Stream processing function
     const processStream = async (reader, decoder) => {
         try {
@@ -455,8 +446,6 @@ async function renderAssistantMessage() {
 
 
 function scrollToLastMessage() {
-
-
     responsesElem.scrollTo({
         top: responsesElem.scrollHeight,
         behavior: 'smooth'
@@ -469,7 +458,7 @@ function checkScroll() {
     const atBottom = Math.abs(responsesElem.scrollHeight - responsesElem.scrollTop - responsesElem.clientHeight) <= threshold;
     const hasScrollbar = responsesElem.scrollHeight > responsesElem.clientHeight;
 
-    if (hasScrollbar && !atBottom /* && !getIsScrolling() */) {
+    if (hasScrollbar && !atBottom) {
         scrollToBottom.style.display = 'flex';
     } else {
         scrollToBottom.style.display = 'none';

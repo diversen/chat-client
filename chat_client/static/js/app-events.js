@@ -1,21 +1,5 @@
 import { responsesElem, messageElem, sendButtonElem, newButtonElem, abortButtonElem, selectModelElem, chatContainer, scrollToBottom } from '/static/js/app-elements.js';
 
-const SCROLL_THRESHOLD = 200;
-const TOUCH_THRESHOLD = 10;
-
-let isScrolling = false;
-
-function getIsScrolling() {
-    if (isScrolling) {
-        return true;
-    }
-    return false;
-}
-
-function setIsScrolling(value) {
-    isScrolling = value;
-}
-
 // sendButtonElem is disabled by default
 sendButtonElem.setAttribute('disabled', true);
 
@@ -28,15 +12,15 @@ messageElem.addEventListener('input', () => {
     }
 });
 
-// Focus on the message input when the page loads
-messageElem.focus();
-
 /**
  * On select model change save the selected model in local storage
  */
 selectModelElem.addEventListener('change', () => {
     const selectedModel = selectModelElem.value;
     localStorage.setItem('selectedModel', selectedModel);
+
+    // Focus on the message input when the model is changed
+    messageElem.focus();
 });
 
 
@@ -56,7 +40,6 @@ window.addEventListener('load', () => {
     setChatContainerHeight();
     let selectedModel = localStorage.getItem('selectedModel');
     if (selectedModel) {
-        console.log('Selected model:', selectedModel);
 
         // Check if the selected model is in the list of available models
         const modelOptions = Array.from(selectModelElem.options).map(option => option.value);
@@ -64,10 +47,15 @@ window.addEventListener('load', () => {
             selectModelElem.value = selectedModel;
         }
     }
+
+    // Remove hidden class from the message input
     messageElem.style.display = 'unset';
+
+    // Focus on the message input when the page loads
+    messageElem.focus();
+
     selectModelElem.style.display = 'block';
 });
-
 
 window.addEventListener('resize', () => {
     setChatContainerHeight();
@@ -81,4 +69,6 @@ scrollToBottom.addEventListener('click', () => {
     });
 });
 
-export { getIsScrolling, setIsScrolling };
+
+
+export { };
