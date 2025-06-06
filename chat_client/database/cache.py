@@ -1,51 +1,67 @@
-import sqlite3
+# chat_client/cache.py
+
 import json
 import time
 from typing import Any
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, delete
 
+from chat_client._models import Cache
 
 class DatabaseCache:
-    def __init__(self, connection: sqlite3.Connection):
+    def __init__(self, session: AsyncSession):
         """
-        Initialize the DatabaseCache with a connection.
-        The connection is expected to be managed externally (e.g., with async with).
+        Initialize with an Async SQLAlchemy Session.
         """
-        self.connection = connection
+        self.session = session
 
     async def set(self, key: str, data: Any) -> bool:
         """
-        Set a cache value. This will always delete the old value and insert a new one.
+        Set a cache value. Delete old, insert new.
         """
-        json_data = json.dumps(data)
-        self.connection.execute("DELETE FROM cache WHERE key = :key", {"key": key})
-        self.connection.execute(
-            "INSERT INTO cache (key, value, unix_timestamp) VALUES (:key, :value, :timestamp)",
-            {"key": key, "value": json_data, "timestamp": int(time.time())},
+        # Delete existing
+        await self.session.execute(
+            delete(Cache).where(Cache.key == key)
         )
+        # Insert new
+        new_cache = Cache(
+            key=key,
+            value=json.dumps(data),
+            unix_timestamp=int(time.time())
+        )
+        self.session.add(new_cache)
+        await self.session.commit()
         return True
 
     async def get(self, key: str, expire_in: int = 0) -> Any:
         """
-        Will return the value if the key exists and is not expired.
-        Will return None if the key does not exist or if the key is expired.
-        If expire_in is 0, the value will never expire.
+        Get value by key, optionally check expiration.
         """
-        result = self.connection.execute("SELECT * FROM cache WHERE key = :key", {"key": key}).fetchone()
 
-        if result:
+        result = await self.session.execute(select(Cache).where(Cache.key == key))
+        cache_row = result.scalar_one_or_none()
+
+        if cache_row:
             if expire_in == 0:
-                return json.loads(result["value"])
+                return json.loads(cache_row.value)
 
             current_time = int(time.time())
-            if current_time - result["unix_timestamp"] < expire_in:
-                return json.loads(result["value"])
+            if current_time - cache_row.unix_timestamp < expire_in:
+                return json.loads(cache_row.value)
             else:
-                self.connection.execute("DELETE FROM cache WHERE id = :id", {"id": result["id"]})
+                # Expired — delete
+                await self.session.execute(
+                    delete(Cache).where(Cache.cache_id == cache_row.cache_id)
+                )
+                await self.session.commit()
         return None
 
-    async def delete(self, id: int) -> None:
+    async def delete(self, cache_id: int) -> None:
         """
-        Delete a cache value by id
+        Delete a cache value by cache_id.
         """
-        self.connection.execute("DELETE FROM cache WHERE id = :id", {"id": id})
+        await self.session.execute(
+            delete(Cache).where(Cache.cache_id == cache_id)
+        )
+        await self.session.commit()
         return None

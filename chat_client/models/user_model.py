@@ -1,22 +1,24 @@
 from starlette.requests import Request
-from chat_client.database.crud import CRUD
-from chat_client.database.database_utils import DatabaseConnection
 from chat_client.database.cache import DatabaseCache
 from chat_client.core.send_mail import send_smtp_message
 from chat_client.core.exceptions import UserValidate
-from chat_client.core import session
+from chat_client.core import user_session
 from chat_client.models import token_model
 from chat_client.core.templates import get_template_content
-from data.config import HOSTNAME_WITH_SCHEME, SITE_NAME, DATABASE
+from chat_client._models import User, UserToken
+from data.config import HOSTNAME_WITH_SCHEME, SITE_NAME
 import bcrypt
 import logging
 import secrets
 import re
 
+from sqlalchemy import select
+from chat_client.database.db_session import async_session
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
+# Utility Functions
 def _password_hash(password: str, cost: int = 12) -> str:
     salt = bcrypt.gensalt(rounds=cost)
     hashed = bcrypt.hashpw(password.encode(), salt)
@@ -30,12 +32,11 @@ def _check_password(entered_password: str, stored_hashed_password: str) -> bool:
 def _verify_password(password: str, password_2: str):
     if password != password_2:
         raise UserValidate("Passwords do not match")
-
     if len(password) < 8:
         raise UserValidate("Password is too short")
 
 
-def _is_valid_email(email):
+def _is_valid_email(email: str):
     pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
     if not re.match(pattern, email):
         raise UserValidate("Invalid email")
@@ -43,138 +44,110 @@ def _is_valid_email(email):
 
 async def _validate_captcha(request: Request):
     form = await request.form()
-
     captcha = str(form.get("captcha")).lower()
     captcha_session = str(request.session.get("captcha")).lower()
-
     if captcha != captcha_session:
         raise UserValidate("Invalid CAPTCHA")
 
 
+# Main Logic
 async def create_user(request: Request):
     form = await request.form()
-
     password = str(form.get("password"))
     password_2 = str(form.get("password_2"))
     email = str(form.get("email"))
 
-    # validate form values
     _is_valid_email(email)
     _verify_password(password, password_2)
     await _validate_captcha(request)
 
-    password_hash = _password_hash(password)
-    database_connection = DatabaseConnection(DATABASE)
-    async with database_connection.async_transaction_scope() as connection:
-        crud = CRUD(connection)
+    password_hashed = _password_hash(password)
 
-        # Check if user with email already exists
-        values = {"email": email}
-        if await crud.exists("users", values):
+    async with async_session() as session:
+        stmt = select(User).where(User.email == email)
+        result = await session.execute(stmt)
+        existing_user = result.scalar_one_or_none()
+
+        if existing_user:
             raise UserValidate("User already exists. Please login or reset your password.")
 
-        # Generate random token
-        token = await token_model.create_token(crud, "VERIFY")
+        token = await token_model.create_token(session, "VERIFY")
 
-        # Insert User
-        insert_values = {
-            "email": email,
-            "password_hash": password_hash,
-            "random": token,
-        }
+        new_user = User(email=email, password_hash=password_hashed, random=token)
+        session.add(new_user)
+        await session.commit()
 
-        await crud.insert("users", insert_values=insert_values)
-
-        # Get user
-        user_row = await crud.select_one("users", filters=values)
         context = {
             "subject": "Please verify your account",
             "email": email,
             "token": token,
-            "user_row": user_row,
+            "user_row": {"user_id": new_user.user_id, "email": new_user.email},
             "site_name": SITE_NAME,
             "hostname_with_scheme": HOSTNAME_WITH_SCHEME,
         }
         message = await get_template_content("mails/verify_user.html", context)
 
-        # Send email
         try:
             await send_smtp_message(email, context["subject"], message)
         except Exception:
             raise UserValidate("Failed to send reset email. Please try and sign up again later.")
 
-        return user_row
+        return {"user_id": new_user.user_id, "email": new_user.email}
 
 
-async def verify_user(request):
+async def verify_user(request: Request):
     form = await request.form()
     token = form.get("token")
 
-    # Update user
-    database_connection = DatabaseConnection(DATABASE)
-    async with database_connection.async_transaction_scope() as connection:
-        crud = CRUD(connection)
-
-        token_is_valid = await token_model.validate_token(crud, token, "VERIFY")
+    async with async_session() as session:
+        token_is_valid = await token_model.validate_token(session, token, "VERIFY")
         if not token_is_valid:
             raise UserValidate("Token is expired. Please request a new password in order to verify your account.")
 
-        user_row = await crud.select_one(
-            "users",
-            filters={
-                "random": token,
-            },
-        )
+        stmt = select(User).where(User.random == token)
+        result = await session.execute(stmt)
+        user = result.scalar_one_or_none()
 
-        if not user_row:
+        if not user:
             raise UserValidate("User does not exist")
-
-        if user_row["verified"] == 1:
+        if user.verified == 1:
             raise UserValidate("User is already verified")
 
-        update_values = {"verified": 1}
-        filters = {"user_id": user_row["user_id"]}
-        await crud.update("users", update_values, filters=filters)
+        user.verified = 1
+        await session.commit()
 
 
 async def login_user(request: Request):
-    database_connection = DatabaseConnection(DATABASE)
-    async with database_connection.async_transaction_scope() as connection:
-        crud = CRUD(connection)
+    json_data = await request.json()
+    email = json_data.get("email")
+    password = json_data.get("password")
 
-        json_data = await request.json()
-        email = json_data.get("email")
-        password = json_data.get("password")
+    logging.info(f"Login attempt for email: {email}")
 
-        # Get user
-        user_row = await crud.select_one(
-            "users",
-            filters={
-                "email": email,
-            },
-        )
+    async with async_session() as session:
+        stmt = select(User).where(User.email == email)
+        result = await session.execute(stmt)
+        user = result.scalar_one_or_none()
 
-        # check password
-        if not user_row:
+        if not user:
             raise UserValidate("User does not exist")
-        if user_row["verified"] == 0:
+        if user.verified == 0:
             raise UserValidate(
                 "Your account is not verified. In order to verify your account, "
                 "you should reset your password. When this is done, you are verified."
             )
-        if not _check_password(password, user_row["password_hash"]):
+        if not _check_password(password, user.password_hash):
             raise UserValidate("Invalid password")
 
-        # Get session token
         session_token = secrets.token_urlsafe(32)
-        insert_values = {
-            "token": session_token,
-            "user_id": user_row["user_id"],
-        }
-        await crud.insert("user_token", insert_values=insert_values)
-        session.set_user_session(request, user_row["user_id"], session_token)
 
-        return user_row
+        logging.info(f"User {user.user_id} logged in with session token: {session_token}")
+        new_token = UserToken(token=session_token, user_id=user.user_id)
+        session.add(new_token)
+        await session.commit()
+
+        user_session.set_user_session(request, user.user_id, session_token)
+        return {"user_id": user.user_id, "email": user.email}
 
 
 async def reset_password(request: Request):
@@ -184,36 +157,28 @@ async def reset_password(request: Request):
     _is_valid_email(email)
     await _validate_captcha(request)
 
-    database_connection = DatabaseConnection(DATABASE)
-    async with database_connection.async_transaction_scope() as connection:
-        crud = CRUD(connection)
+    async with async_session() as session:
+        stmt = select(User).where(User.email == email)
+        result = await session.execute(stmt)
+        user = result.scalar_one_or_none()
 
-        # Check if user already exists
-        values = {"email": email}
-        user_row = await crud.select_one("users", filters=values)
-        if not user_row:
+        if not user:
             raise UserValidate("User does not exist")
 
-        # Generate random token
-        token = await token_model.create_token(crud, "RESET")
+        token = await token_model.create_token(session, "RESET")
+        user.random = token
+        await session.commit()
 
-        # Update User
-        update_values = {"random": token}
-        filters = {"user_id": user_row["user_id"]}
-        await crud.update("users", update_values, filters=filters)
-
-        # Generate email message
         context = {
             "subject": "Please reset your password",
             "email": email,
             "token": token,
-            "user_row": user_row,
+            "user_row": {"user_id": user.user_id, "email": user.email},
             "site_name": SITE_NAME,
             "hostname_with_scheme": HOSTNAME_WITH_SCHEME,
         }
         message = await get_template_content("mails/reset_password.html", context)
 
-        # Send email
         try:
             await send_smtp_message(email, context["subject"], message)
         except Exception:
@@ -228,69 +193,47 @@ async def new_password(request: Request):
 
     _verify_password(password, password_2)
 
-    database_connection = DatabaseConnection(DATABASE)
-    async with database_connection.async_transaction_scope() as connection:
-        crud = CRUD(connection)
-
-        token_is_valid = await token_model.validate_token(crud, token, "RESET")
+    async with async_session() as session:
+        token_is_valid = await token_model.validate_token(session, token, "RESET")
         if not token_is_valid:
             raise UserValidate("Token is expired. Please request a new password again")
 
-        # Check if user already exists
-        user_row = await crud.select_one(
-            "users",
-            filters={
-                "random": token,
-            },
-        )
-        if not user_row:
+        stmt = select(User).where(User.random == token)
+        result = await session.execute(stmt)
+        user = result.scalar_one_or_none()
+
+        if not user:
             raise UserValidate("User does not exist")
 
-        # Update User
-        update_values = {
-            "password_hash": _password_hash(password),
-            "verified": 1,
-            "random": secrets.token_urlsafe(32),
-        }
-        filters = {"user_id": user_row["user_id"]}
-        await crud.update("users", update_values, filters=filters)
+        user.password_hash = _password_hash(password)
+        user.verified = 1
+        user.random = secrets.token_urlsafe(32)
+        await session.commit()
 
 
 async def update_profile(request: Request):
-    """
-    Update the user profile
-    """
-    user_id = await session.is_logged_in(request)
+    user_id = await user_session.is_logged_in(request)
     if not user_id:
         raise UserValidate("You must be logged in to update your profile")
 
     form_data = await request.json()
 
-    # allowed form fields
-    allowed_fields = ["username", "dark_theme", "system_message"]
-    if not set(allowed_fields).issuperset(form_data.keys()):
+    allowed_fields = {"username", "dark_theme", "system_message"}
+    if not allowed_fields.issuperset(form_data.keys()):
         raise UserValidate("Invalid form fields")
 
-    database_connection = DatabaseConnection(DATABASE)
-    async with database_connection.async_transaction_scope() as connection:
-        cache = DatabaseCache(connection)
-
+    async with async_session() as session:
+        cache = DatabaseCache(session)
         cache_key = f"user_{user_id}"
         await cache.set(cache_key, form_data)
 
 
 async def get_profile(user_id: int):
-    """
-    Get the user profile dict or an empty dict if the user is not logged in
-    """
-
     if not user_id:
         return {}
 
-    database_connection = DatabaseConnection(DATABASE)
-    async with database_connection.async_transaction_scope() as connection:
-        cache = DatabaseCache(connection)
-
+    async with async_session() as session:
+        cache = DatabaseCache(session)
         cache_key = f"user_{user_id}"
         profile = await cache.get(cache_key)
         if not profile:

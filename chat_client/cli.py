@@ -6,14 +6,16 @@ import logging
 import asyncio
 import secrets
 import chat_client.core.set_system_path  # noqa
-from chat_client.database.crud import CRUD
-from chat_client.database.database_utils import DatabaseConnection
 from chat_client.models.user_model import _password_hash
 from chat_client.database.migration import Migration
 from chat_client.migrations import migrations
-from data.config import DATA_DIR, LOG_LEVEL, DATABASE
+from data.config import DATA_DIR, LOG_LEVEL
 from chat_client import __version__, __program__
 from chat_client.core.logging import setup_logging
+from chat_client._models import User
+from chat_client.database.db_session import async_session
+from sqlalchemy import select
+from pathlib import Path
 
 
 setup_logging(LOG_LEVEL)
@@ -35,12 +37,13 @@ def _before_server_start():
     logger.info(f"Data directory: {DATA_DIR}")
     os.makedirs(DATA_DIR, exist_ok=True)
 
-    # Setup database
+    # Setup database path
     database_path = os.path.join(DATA_DIR, "database.db")
     logger.info(f"Database path: {database_path}")
 
-    # Run migrations
-    migration_manager = Migration(database_path, migrations)
+    # Setup migrations
+    migrations_path = str(Path(__file__).resolve().parent.parent / "migrations")
+    migration_manager = Migration(database_path, migrations_path)
     migration_manager.run_migrations()
     migration_manager.close()
 
@@ -119,25 +122,26 @@ def create_user(email: str, password: str):
 
 async def _create_user(email: str, password: str):
     password_hash = _password_hash(password)
-    database_connection = DatabaseConnection(DATABASE)
-    async with database_connection.async_transaction_scope() as connection:
-        crud = CRUD(connection)
 
+    async with async_session() as session:
         # Check if user with email already exists
-        values = {"email": email}
-        if await crud.exists("users", values):
+        stmt = select(User).where(User.email == email)
+        result = await session.execute(stmt)
+        existing_user = result.scalar_one_or_none()
+
+        if existing_user:
             logger.info("User already exists. Please login or reset your password.")
             return
 
-        # Insert User
-        insert_values = {
-            "email": email,
-            "password_hash": password_hash,
-            "verified": 1,
-            "random": secrets.token_urlsafe(32),
-        }
-
-        await crud.insert("users", insert_values=insert_values)
+        # Insert new user
+        new_user = User(
+            email=email,
+            password_hash=password_hash,
+            verified=1,
+            random=secrets.token_urlsafe(32),
+        )
+        session.add(new_user)
+        await session.commit()
 
 
 @cli.command(help="Init the system")

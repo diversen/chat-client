@@ -2,7 +2,7 @@ from starlette.requests import Request
 import logging
 from chat_client import __version__
 from chat_client.core import flash
-from chat_client.core import session
+from chat_client.core import user_session
 from chat_client.models import user_model
 import data.config as config
 
@@ -12,7 +12,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 async def get_context(request: Request, variables):
 
-    user_id = await session.is_logged_in(request)
+    user_id = await user_session.is_logged_in(request)
     profile = await user_model.get_profile(user_id)
     use_katex = getattr(config, "USE_KATEX", False)
 

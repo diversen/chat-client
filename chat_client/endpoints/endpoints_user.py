@@ -10,7 +10,7 @@ import io
 from chat_client.models import user_model, chat_model
 from chat_client.core import flash
 from chat_client.core.exceptions import UserValidate
-from chat_client.core import session
+from chat_client.core import user_session
 from chat_client.core.templates import get_templates
 from chat_client.core.base_context import get_context
 
@@ -41,7 +41,7 @@ async def signup_get(request: Request):
 async def signup_post(request: Request):
     try:
         user_row = await user_model.create_user(request)
-        session.set_session_variable(request, "user_id", user_row["user_id"])
+        user_session.set_session_variable(request, "user_id", user_row["user_id"])
         flash.set_success(
             request,
             "Your account was created successfully. " "Check your email in order to verify your account. After verification you may login.",
@@ -92,7 +92,7 @@ async def login_get(request: Request):
 async def login_post(request: Request):
     try:
         login_user = await user_model.login_user(request)
-        session.set_session_variable(request, "user_id", login_user["user_id"])
+        user_session.set_session_variable(request, "user_id", login_user["user_id"])
         flash.set_success(request, "You are now logged in")
         return JSONResponse({"error": False})
     except UserValidate as e:
@@ -121,12 +121,12 @@ async def captcha_(request):
 async def logout_get(request: Request):
     # check if query param logout is present
     if request.query_params.get("logout"):
-        await session.clear_user_session(request)
+        await user_session.clear_user_session(request)
         flash.set_success(request, "You are logged out")
         return RedirectResponse(url="/user/login")
 
     if request.query_params.get("logout_all"):
-        await session.clear_user_session(request, all=True)
+        await user_session.clear_user_session(request, all=True)
         flash.set_success(request, "You are logged out of all your devices")
         return RedirectResponse(url="/user/login")
 
@@ -207,7 +207,7 @@ async def list_dialogs(request: Request):
     Endpoint /user/dialogs
     """
 
-    user_id = await session.is_logged_in(request)
+    user_id = await user_session.is_logged_in(request)
     if not user_id:
         flash.set_notice(request, "You must be logged in to view your profile")
         return RedirectResponse(url="/user/login")
@@ -225,7 +225,7 @@ async def profile(request: Request):
     """
     List profile edit page
     """
-    user_id = await session.is_logged_in(request)
+    user_id = await user_session.is_logged_in(request)
     if not user_id:
         flash.set_notice(request, "You must be logged in to view your profile")
         return RedirectResponse(url="/user/login")
@@ -254,7 +254,7 @@ async def profile_post(request: Request):
 
 
 async def is_logged_in(request: Request):
-    user_id = await session.is_logged_in(request)
+    user_id = await user_session.is_logged_in(request)
     if not user_id:
         flash.set_notice(request, "You are logged out. Please login again.")
         return JSONResponse({"error": True, "redirect": "/user/login"})

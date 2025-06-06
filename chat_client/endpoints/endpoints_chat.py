@@ -9,7 +9,7 @@ from chat_client.core import base_context
 from chat_client.core import flash
 import data.config as config
 import logging
-from chat_client.core import session
+from chat_client.core import user_session
 from chat_client.core.templates import get_templates
 from chat_client.models import chat_model, user_model
 from chat_client.core.exceptions import UserValidate
@@ -34,7 +34,7 @@ async def chat_page(request: Request):
     """
     The GET chat page
     """
-    logged_in = await session.is_logged_in(request)
+    logged_in = await user_session.is_logged_in(request)
     if not logged_in:
         flash.set_notice(request, "You must be logged in to access the chat")
         return RedirectResponse("/user/login")
@@ -179,7 +179,7 @@ async def _chat_response_stream(request: Request, messages, model, logged_in):
 
 
 async def chat_response_stream(request: Request):
-    logged_in = await session.is_logged_in(request)
+    logged_in = await user_session.is_logged_in(request)
     if not logged_in:
         return JSONResponse({"error": True, "message": "You must be logged in to use the chat"}, status_code=401)
 
