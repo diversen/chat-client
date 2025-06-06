@@ -7,3 +7,4 @@ ollama-serv-data
 config.py
 data
 chat_client.egg-info
+prompt.md
