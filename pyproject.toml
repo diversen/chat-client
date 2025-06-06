@@ -36,7 +36,7 @@ exclude = [ "docs", "venv", ".venv", "tests", "bin-local",]
 include-package-data = true
 
 [tool.setuptools.package-data]
-chat_client = [ "templates/**", "static/**/**", "config-dist.py",]
+chat_client = [ "templates/**", "static/**", "config-dist.py", "migrations/**",]
 
 [tool.bump_version.replace_patterns.pipx]
 file = "README.md"
