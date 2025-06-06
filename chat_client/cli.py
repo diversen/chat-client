@@ -8,7 +8,6 @@ import secrets
 import chat_client.core.set_system_path  # noqa
 from chat_client.models.user_model import _password_hash
 from chat_client.database.migration import Migration
-from chat_client.migrations import migrations
 from data.config import DATA_DIR, LOG_LEVEL
 from chat_client import __version__, __program__
 from chat_client.core.logging import setup_logging
@@ -42,7 +41,7 @@ def _before_server_start():
     logger.info(f"Database path: {database_path}")
 
     # Setup migrations
-    migrations_path = str(Path(__file__).resolve().parent.parent / "migrations")
+    migrations_path = str(Path(__file__).resolve().parent / "migrations")
     migration_manager = Migration(database_path, migrations_path)
     migration_manager.run_migrations()
     migration_manager.close()
