@@ -58,7 +58,7 @@ messageElem.addEventListener('keydown', async (e) => {
             const end = messageElem.selectionEnd;
             messageElem.value = messageElem.value.substring(0, start) + '\n' + messageElem.value.substring(end);
             messageElem.selectionStart = messageElem.selectionEnd = start + 1;
-            
+
         } else {
             // If only Enter is pressed, prevent the default behavior and send the message
             e.preventDefault();
@@ -323,23 +323,18 @@ async function renderAssistantMessage() {
     // Stream processing function
     const processStream = async (reader, decoder) => {
         try {
-
             while (true) {
-
                 const { done, value } = await reader.read();
-
-                // If loader is not hidden, hide it
-                if (!loader.classList.contains('hidden')) {
-                    loader.classList.toggle('hidden');
-                }
-
                 if (done) break;
-                const decoded = decoder.decode(value, { stream: true });
-                let dataElems = decoded.split('data: ');
 
-                // Remove empty elements form the array
-                dataElems = dataElems.filter((data) => data.trim() !== '');
-                dataElems.forEach(await processChunk);
+                // hide the loader on first payload
+                loader.classList.add('hidden');
+
+                // Each decoded chunk may contain several SSE lines
+                decoder.decode(value, { stream: true })
+                    .split('\n')
+                    .filter(Boolean)   // remove empty lines
+                    .forEach(processChunk);
             }
         } catch (error) {
             loader.classList.add('hidden');
@@ -349,36 +344,37 @@ async function renderAssistantMessage() {
 
     // Function to handle chunk processing
     let totalTokenCount = 0;
-    const processChunk = async (dataPart) => {
+    const processChunk = async rawLine => {
+        // strip leading "data:" (if still there) and white-space
+        const line = rawLine.replace(/^data:\s*/, '').trim();
 
-        try {
-
-            const data = JSON.parse(dataPart);
-            const messagePart = data.choices[0].delta.content;
-            const finishReason = data.choices[0].finish_reason
-            const error = data.error;
-
-            if (error) {
-                throw new Error(error);
-            }
-
-            totalTokenCount += 1;
-
-            if (!finishReason) {
-                streamedResponseText += messagePart;
-            }
-
-            if (totalTokenCount % 1 === 0) {
-                await updateContentDiff(contentElement, hiddenContentElem, streamedResponseText);
-            }
-
-            if (finishReason) {
-                await updateContentDiff(contentElement, hiddenContentElem, streamedResponseText, true);
-            }
-        } catch (error) {
-            console.log("Error in processChunk:", error);
-            controller.abort();
+        // End-of-stream marker – just finish normally
+        if (line === '[DONE]') {
+            await updateContentDiff(contentElement, hiddenContentElem, streamedResponseText, true);
+            return;
         }
+
+        // Skip anything that is not valid JSON *without* killing the stream
+        let data;
+        try {
+            data = JSON.parse(line);
+        } catch (_) {
+            console.warn('Skipping non-JSON chunk:', line);
+            return;
+        }
+
+        // Normal OpenAI streaming payload
+        const delta = data.choices?.[0]?.delta ?? {};
+        const finishReason = data.choices?.[0]?.finish_reason;
+
+        if (delta.content) streamedResponseText += delta.content;
+
+        await updateContentDiff(
+            contentElement,
+            hiddenContentElem,
+            streamedResponseText,
+            Boolean(finishReason)        // force final diff when finish_reason is set
+        );
     };
 
     // Error handling for stream
