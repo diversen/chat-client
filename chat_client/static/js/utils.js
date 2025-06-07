@@ -10,7 +10,7 @@ function escapeKatexDelimiters(textToProcess) {
 /**
  * Substitute thinking tags
  */
-function modifySteamedText(textToProcess) {
+function modifyStreamedText(textToProcess) {
 
 
     textToProcess = textToProcess.replace(/<think>/g, '**Think begin**');
@@ -30,4 +30,4 @@ function modifySteamedText(textToProcess) {
     return textToProcess;
 }
 
-export { modifySteamedText };
+export { modifyStreamedText };

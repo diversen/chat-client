@@ -6,7 +6,7 @@ import { } from '/static/js/app-events.js';
 import { addCopyButtons } from '/static/js/app-copy-buttons.js';
 import { logError } from '/static/js/error-log.js';
 import { dd } from '/static/js/diff-dom.js';
-import { modifySteamedText } from '/static/js/utils.js';
+import { modifyStreamedText } from '/static/js/utils.js';
 import { copyIcon, checkIcon, generatingIcon } from '/static/js/app-icons.js';
 
 const config = await getConfig();
@@ -251,7 +251,7 @@ function renderKatex(contentElem) {
 async function renderSteamedResponseText(contentElement, streamedResponseText) {
     const startTime = performance.now();
 
-    streamedResponseText = modifySteamedText(streamedResponseText);
+    streamedResponseText = modifyStreamedText(streamedResponseText);
     contentElement.innerHTML = mdNoHTML.render(streamedResponseText);
 
     // Optimize highlightCodeInElement. And katex rendering
