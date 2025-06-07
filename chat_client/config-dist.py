@@ -69,6 +69,10 @@ PROVIDERS = {
     #     "base_url": "https://api.openai.com/v1",
     #     "api_key": "API_KEY",
     # },
+    "gemini": {
+        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
+        "api_key": "API_KEY",
+    },
     "ollama": {
         "base_url": "http://localhost:11434/v1",
         "api_key": "ollama",
@@ -78,6 +82,7 @@ PROVIDERS = {
 
 MODELS = {
     # "gpt-4o-mini": "openai",
+    # "gemma-3-27b-it": "gemini",
 }
 
 # Add all ollama models to the list of models
@@ -89,7 +94,7 @@ except Exception as e:
     print(f"Error getting ollama provided models: {e}")
     print("You can try to fix this by:")
     print("a) Install and run the ollama server")
-    print("b) Edit the config.py file and remove the provier ollama")
+    print("b) Edit the config.py file and remove the provider ollama")
     exit()
 
 

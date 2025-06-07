@@ -34,13 +34,14 @@ except ImportError:
     with open(config_path, "w") as f:
         f.write(config_content)
 
-    user_message = """A default 'config.py' file has been created in the current working directory.
-You may edit this file to e.g. allow users to register and login.
+    user_message = """A default 'config.py' file has been created in the 'data' dir or the current working directory.
+You may edit this file in order to e.g. allow users to register and login. Or add models and providers that supports the openai API.
+
 Create the database and run migrations with the command:
 
     chat-client init-system
 
-This will create a database in the data dir in the current working directory.
+This will create a database in the 'data' dir of the current working directory.
 You may then generate a single user with the command:
 
     chat-client create-user
