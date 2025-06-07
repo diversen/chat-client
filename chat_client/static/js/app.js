@@ -265,7 +265,7 @@ async function renderSteamedResponseText(contentElement, streamedResponseText) {
 
 let lastExecutionTime = 0;
 let pendingExecution = false;
-let executionInterval = 10
+let executionInterval = 20
 
 
 async function updateContentDiff(contentElement, hiddenContentElem, streamedResponseText, force = false) {
