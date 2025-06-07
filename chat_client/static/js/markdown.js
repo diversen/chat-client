@@ -1,12 +1,10 @@
 import { markdownItTable } from '/static/dist/markdown-it-table.js';
 
 /**
- * This a loaded script for markdown-it
+ * markdown-it is loaded in the head of the HTML file.
  */
 const md = markdownit('commonmark');
 const mdNoHTML = markdownit('commonmark', { html: false });
-
-
 
 md.use(markdownItTable);
 mdNoHTML.use(markdownItTable);
