@@ -79,18 +79,5 @@ uv pip install -r requirements.txt
 uv pip install -e .
 ```
 
-## Stack
-
-* starlette, 
-* jinja2 html templates
-* plain javascript.
-* sqlite3 for data storage
-* uvicorn or gunicorn for running a server
-
-## Notes
-
-Live log chat
-
-	journalctl -u chat --no-pager --follow
 
 MIT © [Dennis Iversen](https://github.com/diversen)
