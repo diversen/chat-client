@@ -263,129 +263,76 @@ async function renderSteamedResponseText(contentElement, streamedResponseText) {
     console.log(`Time spent: ${timeSpent} milliseconds`);
 }
 
-let lastExecutionTime = 0;
-let pendingExecution = false;
-let executionInterval = 10
+const updateDiff = (() => {
+    let scheduled = false;
+    const shadow = document.createElement('div');
+    shadow.classList.add('content');
+
+    return (contentElem, streamedText, force = false) => {
+        if (scheduled && !force) return;
+        scheduled = true;
+
+        requestAnimationFrame(() => {
+            scheduled = false;
+
+            renderSteamedResponseText(shadow, streamedText);
+
+            try {
+                const diff = dd.diff(contentElem, shadow);
+                if (diff.length) dd.apply(contentElem, diff);
+            } catch (err) {
+                console.error('diff-dom error:', err);
+            }
+        });
+    };
+})();
 
 
-async function updateContentDiff(contentElement, hiddenContentElem, streamedResponseText, force = false) {
-    const currentTime = performance.now();
-
-    if (!force && currentTime - lastExecutionTime < executionInterval) {
-        if (!pendingExecution) {
-            pendingExecution = true;
-            setTimeout(async () => {
-                pendingExecution = false;
-                await updateContentDiff(contentElement, hiddenContentElem, streamedResponseText);
-            }, executionInterval - (currentTime - lastExecutionTime));
-        }
-        return;
-    }
-
-    lastExecutionTime = currentTime;
-
-    renderSteamedResponseText(hiddenContentElem, streamedResponseText);
-
-    try {
-        const diff = dd.diff(contentElement, hiddenContentElem);
-        if (diff.length) dd.apply(contentElement, diff);
-    } catch (error) {
-        console.log("Error in diffDOMExec:", error);
-    }
-}
-
-/**
- * Render assistant message with streaming
- */
 async function renderAssistantMessage() {
 
-    // Create container for assistant message and content element
     const { container, contentElement, loader } = createMessageElement('Assistant');
     responsesElem.appendChild(container);
 
-    //  Show loader
     loader.classList.remove('hidden');
-
-    // Set streaming flag to true and disable buttons
     isStreaming = true;
     sendButtonElem.setAttribute('disabled', true);
     newButtonElem.setAttribute('disabled', true);
 
-    // Reset streamed response text, create hidden content element, and get selected model
     let streamedResponseText = '';
-    const hiddenContentElem = document.createElement('div');
-
-    hiddenContentElem.classList.add('content');
     contentElement.classList.add('content');
-
     const selectModel = selectModelElem.value;
 
-    // Stream processing function
-    const processStream = async (reader, decoder) => {
-        try {
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                // hide the loader on first payload
-                loader.classList.add('hidden');
-
-                // Each decoded chunk may contain several SSE lines
-                decoder.decode(value, { stream: true })
-                    .split('\n')
-                    .filter(Boolean)   // remove empty lines
-                    .forEach(processChunk);
-            }
-        } catch (error) {
-            loader.classList.add('hidden');
-            handleStreamError(error);
-        }
-    };
-
-    // Function to handle chunk processing
-    let totalTokenCount = 0;
-    const processChunk = async rawLine => {
-        // strip leading "data:" (if still there) and white-space
+    const processChunk = rawLine => {
         const line = rawLine.replace(/^data:\s*/, '').trim();
-
-        // End-of-stream marker – just finish normally
         if (line === '[DONE]') {
-            await updateContentDiff(contentElement, hiddenContentElem, streamedResponseText, true);
+            updateDiff(contentElement, streamedResponseText, true);
             return;
         }
 
-        // Skip anything that is not valid JSON *without* killing the stream
         let data;
         try {
             data = JSON.parse(line);
-        } catch (_) {
-            console.warn('Skipping non-JSON chunk:', line);
-            return;
+        }
+        catch {
+            console.warn('Skipping non-JSON chunk:', line); return;
         }
 
-        // Normal OpenAI streaming payload
         const delta = data.choices?.[0]?.delta ?? {};
         const finishReason = data.choices?.[0]?.finish_reason;
 
         if (delta.content) streamedResponseText += delta.content;
 
-        await updateContentDiff(
-            contentElement,
-            hiddenContentElem,
-            streamedResponseText,
-            Boolean(finishReason)        // force final diff when finish_reason is set
-        );
+        updateDiff(contentElement, streamedResponseText, Boolean(finishReason));
     };
 
-    // Error handling for stream
-    const handleStreamError = (error) => {
-        if (error.name === 'AbortError') {
+    const handleStreamError = err => {
+        if (err.name === 'AbortError') {
             Flash.setMessage('Request was aborted', 'notice');
-            console.log('Request was aborted');
         } else {
-            console.error("Error in processStream:", error);
-            Flash.setMessage('An error occurred while processing the stream.', 'error');
+            console.error('Error in processStream:', err);
+            Flash.setMessage('Stream error.', 'error');
         }
+        loader.classList.add('hidden');
     };
 
     try {
@@ -396,45 +343,34 @@ async function renderAssistantMessage() {
             signal: controller.signal,
         });
 
-        if (!response.ok) {
-            throw new Error(`Server returned error: ${response.status} ${response.statusText}`);
-        }
-        if (!response.body) {
-            throw new Error("Response body is empty. Try again later.");
-        }
+        if (!response.ok) throw new Error(`Server error: ${response.status} ${response.statusText}`);
+        if (!response.body) throw new Error('Empty response body.');
 
-        // Allow aborting
         abortButtonElem.removeAttribute('disabled');
 
-        // Process the stream
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
-        await processStream(reader, decoder);
 
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            loader.classList.add('hidden');
+            decoder.decode(value, { stream: true })
+                .split('\n').filter(Boolean)
+                .forEach(processChunk);
+        }
 
-    } catch (error) {
-        loader.classList.add('hidden');
-        console.error("Error in renderAssistantMessage:", error);
-
-        Flash.setMessage('An error occurred. Please try again.', 'error');
+    } catch (err) {
+        handleStreamError(err);
     } finally {
-
         clearStreaming();
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+        updateDiff(contentElement, streamedResponseText, true);
 
-        // wait for the next frame to render
-        // This is a workaround to ensure that the DOM is updated before executing the next code
-        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-
-        await updateContentDiff(contentElement, hiddenContentElem, streamedResponseText, true);
-
-        // Enable buttons
         await addCopyButtons(contentElement, config);
-
-        // Save message to the dialog
-        let assistantMessage = { role: 'assistant', content: streamedResponseText };
+        const assistantMessage = { role: 'assistant', content: streamedResponseText };
         await createMessage(currentDialogID, assistantMessage);
 
-        // Render copy message
         renderCopyMessageButton(container, streamedResponseText);
         currentDialogMessages.push(assistantMessage);
     }
