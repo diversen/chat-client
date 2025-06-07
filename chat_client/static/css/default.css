@@ -114,7 +114,7 @@ nav svg {
     white-space: normal;
     margin-top: var(--main-menu-top);
     margin-bottom: 5px;
-    scrollbar-color: var(--text-muted) transparent;
+    scrollbar-color: var(--nav-background) transparent;
 }
 
 #prompt {
