@@ -449,26 +449,25 @@ function scrollToLastMessage() {
 }
 
 
-/** 
- * State: runtime flags and debounce timer. */
+/** State: runtime flags and debounce timer. */
 let userIsScrolling = false;
-let userIsTouching = false;
+let pointerActive   = false;   // true while a finger or mouse button is down
 let scrollStopTimer;
 
-/** Touch handlers: hide the button on touch start and re-evaluate on touch end. */
-function handleTouchStart() {
-    userIsTouching = true;
+/** Pointer handlers: hide the button on any press and re-evaluate on release. */
+function handlePointerDown() {
+    pointerActive = true;
     scrollToBottom.style.display = 'none';
 }
 
-function handleTouchEnd() {
-    userIsTouching = false;
+function handlePointerUp() {
+    pointerActive = false;
     checkScroll();
 }
 
-responsesElem.addEventListener('touchstart', handleTouchStart, { passive: true });
-responsesElem.addEventListener('touchend', handleTouchEnd, { passive: true });
-responsesElem.addEventListener('touchcancel', handleTouchEnd, { passive: true });
+document.addEventListener('pointerdown',  handlePointerDown, { passive: true });
+document.addEventListener('pointerup',    handlePointerUp,   { passive: true });
+document.addEventListener('pointercancel', handlePointerUp,  { passive: true });
 
 /** Scroll handler: hide the button during active scrolling and show it 150 ms after momentum stops. */
 function handleUserScroll() {
@@ -481,6 +480,25 @@ function handleUserScroll() {
         checkScroll();
     }, 1000);
 }
+
+responsesElem.addEventListener('wheel',     handleUserScroll, { passive: true });
+responsesElem.addEventListener('touchmove', handleUserScroll, { passive: true });
+
+/** Visibility test for the “scroll to bottom” button. */
+function checkScroll() {
+    if (userIsScrolling || pointerActive) return;
+
+    const threshold    = 2;
+    const atBottom     =
+        Math.abs(responsesElem.scrollHeight - responsesElem.scrollTop - responsesElem.clientHeight) <= threshold;
+    const hasScrollbar = responsesElem.scrollHeight > responsesElem.clientHeight;
+
+    scrollToBottom.style.display = (hasScrollbar && !atBottom) ? 'flex' : 'none';
+}
+
+/** Observers: keep the button state in sync with scroll position and DOM changes. */
+responsesElem.addEventListener('scroll', checkScroll);
+new MutationObserver(checkScroll).observe(responsesElem, { childList: true, subtree: true });
 
 responsesElem.addEventListener('wheel', handleUserScroll, { passive: true });
 responsesElem.addEventListener('touchmove', handleUserScroll, { passive: true });
