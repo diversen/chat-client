@@ -466,11 +466,15 @@ window.addEventListener('wheel', () => {
 responsesElem.addEventListener('touchstart', () => {
     userInteracting = true;
     scrollToBottom.style.display = 'none';
+    clearTimeout(interactionTimeout); // clear if touchstart happens again
 });
 
 responsesElem.addEventListener('touchend', () => {
-    userInteracting = false;
-    checkScroll();
+    clearTimeout(interactionTimeout);
+    interactionTimeout = setTimeout(() => {
+        userInteracting = false;
+        checkScroll();
+    }, 1000);
 });
 
 function checkScroll() {
@@ -488,6 +492,7 @@ function checkScroll() {
 // Listen for scrolls and content changes
 responsesElem.addEventListener('scroll', checkScroll);
 new MutationObserver(checkScroll).observe(responsesElem, { childList: true, subtree: true });
+
 
 
 /**
