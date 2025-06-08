@@ -456,14 +456,17 @@ let scrollStopTimer;
 
 /** Hide the button as soon as a finger touches the screen */
 function handleTouchStart() {
+    console.log('Touch started');
     isTouchActive = true;
     scrollToBottom.style.display = 'none';
 }
 
 /** Re-evaluate visibility only after the finger is lifted */
 function handleTouchEnd() {
+    console.log('Touch ended');
     isTouchActive = false;
-    checkScroll();
+    // Let momentum finish first before checking scroll
+    setTimeout(checkScroll, 1000); // Wait same as scrollStopTimer
 }
 
 responsesElem.addEventListener('touchstart', handleTouchStart, { passive: true });
@@ -478,7 +481,7 @@ function handleActiveScroll() {
     scrollStopTimer = setTimeout(() => {
         isMomentum = false;
         checkScroll();
-    }, 150);
+    }, 1000);
 }
 
 responsesElem.addEventListener('touchmove', handleActiveScroll, { passive: true });
