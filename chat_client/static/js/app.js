@@ -448,64 +448,46 @@ function scrollToLastMessage() {
 
 }
 
+let userInteracting = false;
+let interactionTimeout;
 
-/** Flags and debounce timer */
-let isMomentum      = false;   // active inertial scroll
-let isTouchActive   = false;   // finger is currently on screen
-let scrollStopTimer;
-
-/** Hide the button as soon as a finger touches the screen */
-function handleTouchStart() {
-    console.log('Touch started');
-    isTouchActive = true;
+// Listen for wheel on window
+window.addEventListener('wheel', () => {
+    userInteracting = true;
     scrollToBottom.style.display = 'none';
-}
-
-/** Re-evaluate visibility only after the finger is lifted */
-function handleTouchEnd(event) {
-    if (event.touches && event.touches.length > 0) {
-        // Finger still on screen — ignore
-        return;
-    }
-
-    isTouchActive = false;
-    setTimeout(checkScroll, 1000);
-}
-
-responsesElem.addEventListener('touchstart', handleTouchStart, { passive: true });
-responsesElem.addEventListener('touchend',   handleTouchEnd,   { passive: true });
-
-/** Hide the button while scrolling and for 150 ms after momentum stops */
-function handleActiveScroll() {
-    isMomentum = true;
-    scrollToBottom.style.display = 'none';
-
-    clearTimeout(scrollStopTimer);
-    scrollStopTimer = setTimeout(() => {
-        isMomentum = false;
+    clearTimeout(interactionTimeout);
+    interactionTimeout = setTimeout(() => {
+        userInteracting = false;
         checkScroll();
     }, 1000);
-}
+});
 
-responsesElem.addEventListener('touchmove', handleActiveScroll, { passive: true });
-responsesElem.addEventListener('wheel',     handleActiveScroll, { passive: true });
+// Listen for touchstart and touchend on responsesElem
+responsesElem.addEventListener('touchstart', () => {
+    userInteracting = true;
+    scrollToBottom.style.display = 'none';
+});
 
-/** Decide whether the “scroll to bottom” button should be visible */
+responsesElem.addEventListener('touchend', () => {
+    userInteracting = false;
+    checkScroll();
+});
+
 function checkScroll() {
-    if (isTouchActive || isMomentum) return;
-
-    const threshold    = 2;
-    const atBottom     =
-        Math.abs(responsesElem.scrollHeight - responsesElem.scrollTop - responsesElem.clientHeight) <= threshold;
+    const threshold = 2; // px tolerance
+    const atBottom = Math.abs(responsesElem.scrollHeight - responsesElem.scrollTop - responsesElem.clientHeight) <= threshold;
     const hasScrollbar = responsesElem.scrollHeight > responsesElem.clientHeight;
 
-    scrollToBottom.style.display = (hasScrollbar && !atBottom) ? 'flex' : 'none';
+    if (hasScrollbar && !atBottom && !userInteracting) {
+        scrollToBottom.style.display = 'flex';
+    } else {
+        scrollToBottom.style.display = 'none';
+    }
 }
 
-/** Keep the button state in sync with scroll position and DOM changes */
+// Listen for scrolls and content changes
 responsesElem.addEventListener('scroll', checkScroll);
 new MutationObserver(checkScroll).observe(responsesElem, { childList: true, subtree: true });
-
 
 
 /**
