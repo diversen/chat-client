@@ -448,29 +448,28 @@ function scrollToLastMessage() {
 
 }
 
-let isTouching = false;
-let isWheeling = false;
-let wheelTimeout;
+let userInteracting = false;
+let interactionTimeout;
 
-// Wheel interaction
+// Listen for wheel on window
 window.addEventListener('wheel', () => {
-    isWheeling = true;
+    userInteracting = true;
     scrollToBottom.style.display = 'none';
-    clearTimeout(wheelTimeout);
-    wheelTimeout = setTimeout(() => {
-        isWheeling = false;
+    clearTimeout(interactionTimeout);
+    interactionTimeout = setTimeout(() => {
+        userInteracting = false;
         checkScroll();
-    }, 2500);
+    }, 1000);
 });
 
-// Touch interaction
+// Listen for touchstart and touchend on responsesElem
 responsesElem.addEventListener('touchstart', () => {
-    isTouching = true;
+    userInteracting = true;
     scrollToBottom.style.display = 'none';
 });
 
 responsesElem.addEventListener('touchend', () => {
-    isTouching = false;
+    userInteracting = false;
     checkScroll();
 });
 
@@ -479,7 +478,7 @@ function checkScroll() {
     const atBottom = Math.abs(responsesElem.scrollHeight - responsesElem.scrollTop - responsesElem.clientHeight) <= threshold;
     const hasScrollbar = responsesElem.scrollHeight > responsesElem.clientHeight;
 
-    if (hasScrollbar && !atBottom && !isTouching && !isWheeling) {
+    if (hasScrollbar && !atBottom && !userInteracting) {
         scrollToBottom.style.display = 'flex';
     } else {
         scrollToBottom.style.display = 'none';
@@ -489,6 +488,7 @@ function checkScroll() {
 // Listen for scrolls and content changes
 responsesElem.addEventListener('scroll', checkScroll);
 new MutationObserver(checkScroll).observe(responsesElem, { childList: true, subtree: true });
+
 
 /**
  * Load a saved conversation
