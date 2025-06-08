@@ -460,7 +460,7 @@ window.addEventListener('wheel', () => {
     wheelTimeout = setTimeout(() => {
         isWheeling = false;
         checkScroll();
-    }, 1000);
+    }, 2500);
 });
 
 // Touch interaction
