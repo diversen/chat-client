@@ -462,11 +462,14 @@ function handleTouchStart() {
 }
 
 /** Re-evaluate visibility only after the finger is lifted */
-function handleTouchEnd() {
-    console.log('Touch ended');
+function handleTouchEnd(event) {
+    if (event.touches && event.touches.length > 0) {
+        // Finger still on screen — ignore
+        return;
+    }
+
     isTouchActive = false;
-    // Let momentum finish first before checking scroll
-    setTimeout(checkScroll, 1000); // Wait same as scrollStopTimer
+    setTimeout(checkScroll, 1000);
 }
 
 responsesElem.addEventListener('touchstart', handleTouchStart, { passive: true });
