@@ -448,19 +448,45 @@ function scrollToLastMessage() {
 
 }
 
-function checkScroll() {
-    const threshold = 2; // px tolerance for floating-point errors
-    const atBottom = Math.abs(responsesElem.scrollHeight - responsesElem.scrollTop - responsesElem.clientHeight) <= threshold;
-    const hasScrollbar = responsesElem.scrollHeight > responsesElem.clientHeight;
 
-    if (hasScrollbar && !atBottom) {
-        scrollToBottom.style.display = 'flex';
-    } else {
-        scrollToBottom.style.display = 'none';
-    }
+let userIsScrolling = false;
+let scrollStopTimer;
+
+function handleUserScroll() {
+    userIsScrolling = true;
+    scrollToBottom.style.display = 'none';
+
+    clearTimeout(scrollStopTimer);
+    scrollStopTimer = setTimeout(() => {
+        userIsScrolling = false;
+        checkScroll();
+    }, 500);
 }
 
-// Listen for scrolls and content changes
+/**
+ * Add event listeners for user scroll
+ * These will hide the scrollToBottom button while the user is scrolling
+ */
+responsesElem.addEventListener('wheel', handleUserScroll, { passive: true });
+responsesElem.addEventListener('touchstart', handleUserScroll, { passive: true });
+responsesElem.addEventListener('touchmove', handleUserScroll, { passive: true });
+
+/**
+ * Check if the user is at the bottom of the responses element
+ * If not, show the scrollToBottom button
+ * If the user is at the bottom, hide the button
+ */
+function checkScroll() {
+    if (userIsScrolling) return;
+
+    const threshold = 2;
+    const distanceFromBottom = responsesElem.scrollHeight - responsesElem.scrollTop - responsesElem.clientHeight;
+    const atBottom = Math.abs(distanceFromBottom) <= threshold;
+    const hasScrollbar = responsesElem.scrollHeight > responsesElem.clientHeight;
+
+    scrollToBottom.style.display = (hasScrollbar && !atBottom) ? 'flex' : 'none';
+}
+
 responsesElem.addEventListener('scroll', checkScroll);
 new MutationObserver(checkScroll).observe(responsesElem, { childList: true, subtree: true });
 
