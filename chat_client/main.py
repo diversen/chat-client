@@ -4,6 +4,7 @@ from starlette.routing import Mount
 from chat_client.endpoints.chat_endpoints import routes_chat
 from chat_client.endpoints.user_endpoints import routes_user
 from chat_client.endpoints.error_endpoints import routes_error
+from chat_client.endpoints.prompt_endpoints import routes_prompt
 from chat_client.core.exceptions import exception_callbacks
 from chat_client.core.middleware import middleware
 import logging
@@ -36,6 +37,7 @@ all_routes = [
 all_routes.extend(routes_user)
 all_routes.extend(routes_chat)
 all_routes.extend(routes_error)
+all_routes.extend(routes_prompt)
 
 app = Starlette(
     debug=False,
