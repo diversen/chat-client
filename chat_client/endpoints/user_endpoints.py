@@ -244,7 +244,6 @@ async def profile(request: Request):
 async def profile_post(request: Request):
     try:
         await user_repository.update_profile(request)
-        flash.set_success(request, "Profile updated")
         return JSONResponse({"error": False, "message": "Profile updated"})
     except UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})
