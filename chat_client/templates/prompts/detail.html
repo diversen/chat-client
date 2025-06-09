@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+
+{% block content %}
+<main class="default-container">
+    <h3>{{ prompt.title }}</h3>
+    <pre>{{ prompt.prompt }}</pre>
+
+    <p>
+        <a href="/prompt/{{ prompt.prompt_id }}/edit">Edit</a> |
+        <button id="delete-btn">Delete</button> |
+        <a href="/prompt">Back to list</a>
+    </p>
+</main>
+
+<script type="module">
+    import { Flash } from '/static/js/flash.js';
+    import { Requests } from '/static/js/requests.js';
+
+    document.getElementById('delete-btn').addEventListener('click', async () => {
+        if (!confirm('Are you sure you want to delete this prompt?')) return;
+        const res = await Requests.asyncPostJson('/prompt/{{ prompt.prompt_id }}/delete', {});
+        if (res.error) {
+            Flash.setMessage(res.message, 'error');
+        } else {
+            window.location.href = '/prompt';
+        }
+    });
+</script>
+{% endblock content %}

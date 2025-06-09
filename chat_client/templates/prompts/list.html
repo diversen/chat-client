@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block content %}
+<main class="default-container">
+    <h3>Your Prompts</h3>
+
+    <p><a href="/prompt/create">Create new prompt</a></p>
+
+    {% if prompts %}
+    <ul>
+        {% for p in prompts %}
+        <li>
+            <a href="/prompt/{{ p.prompt_id }}">{{ p.title }}</a> (ID: {{ p.prompt_id }})
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p>You don't have any prompts yet.</p>
+    {% endif %}
+</main>
+{% endblock content %}

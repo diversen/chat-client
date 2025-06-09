@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+<main class="default-container">
+    <h3>Edit Prompt</h3>
+
+    <form id="edit-form">
+        <label for="title">Title</label>
+        <input id="title" type="text" name="title" maxlength="256" value="{{ prompt.title }}" required>
+
+        <label for="prompt">Prompt</label>
+        <textarea id="prompt" name="prompt" maxlength="8096" rows="10" required>{{ prompt.prompt }}</textarea>
+
+        <br>
+        <button id="save-btn">Update</button>
+    </form>
+</main>
+
+<script type="module">
+    import { Flash } from '/static/js/flash.js';
+    import { Requests } from '/static/js/requests.js';
+
+    document.getElementById('save-btn').addEventListener('click', async (event) => {
+        event.preventDefault();
+        const data = {
+            title: document.getElementById('title').value,
+            prompt: document.getElementById('prompt').value,
+        };
+        const res = await Requests.asyncPostJson('/prompt/{{ prompt.prompt_id }}/edit', data);
+        if (res.error) {
+            Flash.setMessage(res.message, 'error');
+        } else {
+            window.location.href = '/prompt/{{ prompt.prompt_id }}';
+        }
+    });
+</script>
+{% endblock content %}
