@@ -16,6 +16,9 @@ class ConfigSMTP:
 # Default model
 DEFAULT_MODEL = "deepseek-r1:14b"
 
+# Debug mode
+DEBUG = False
+
 # Logging
 LOG_LEVEL = logging.INFO
 
