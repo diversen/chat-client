@@ -73,8 +73,11 @@ async def _chat_response_stream(request: Request, messages, model, logged_in):
         system_message = profile["system_message"]
         logger.debug(f"System message: {system_message}")
 
+        # Note that the system message is prepended to the messages as the first message
+        # It is a user message with the role "user" because many models does not support 
+        # system messages
         system_message_dict = {
-            "role": "system",
+            "role": "user",
             "content": system_message,
         }
         messages.insert(0, system_message_dict)
