@@ -31,6 +31,10 @@ class NotFound(Exception):
 async def _500(request, exc):
     message = str(exc)
     error_code = 500
+
+    # Log the error
+    logger.error(f"Unhandled exception: {message}", exc_info=exc)
+
     if isinstance(exc, UserValidate):
         error_code = "400 Bad Request"
 
