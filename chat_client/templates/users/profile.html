@@ -44,7 +44,7 @@
             if (res.error) {
                 Flash.setMessage(res.message, 'error');
             } else {
-                window.location.href = '/user/profile';
+                Flash.setMessage("Your user information has been updated", 'success');
             }
         } catch (error) {
             console.error(error);
