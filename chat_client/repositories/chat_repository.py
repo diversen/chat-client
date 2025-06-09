@@ -3,7 +3,7 @@ from starlette.responses import JSONResponse
 from chat_client.core.exceptions import UserValidate
 from chat_client.core import user_session
 from chat_client.core.exceptions import JSONError
-from chat_client._models import Dialog, Message
+from chat_client.models import Dialog, Message
 from chat_client.database.db_session import async_session  # global session
 import uuid
 import logging

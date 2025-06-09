@@ -11,7 +11,7 @@ from chat_client.database.migration import Migration
 from data.config import DATA_DIR, LOG_LEVEL
 from chat_client import __version__, __program__
 from chat_client.core.logging import setup_logging
-from chat_client._models import User
+from chat_client.models import User
 from chat_client.database.db_session import async_session
 from sqlalchemy import select
 from pathlib import Path

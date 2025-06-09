@@ -5,7 +5,7 @@ from chat_client.core.exceptions import UserValidate
 from chat_client.core import user_session
 from chat_client.repositories import token_repository
 from chat_client.core.templates import get_template_content
-from chat_client._models import User, UserToken
+from chat_client.models import User, UserToken
 from data.config import HOSTNAME_WITH_SCHEME, SITE_NAME
 import bcrypt
 import logging

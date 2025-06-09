@@ -19,7 +19,7 @@ if config.config_file_name is not None:
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
 # target_metadata = None
-from chat_client._models import Base  # Adjust import according to your structure
+from chat_client.models import Base  # Adjust import according to your structure
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,

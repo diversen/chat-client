@@ -2,7 +2,7 @@ import time
 from typing import Any, Optional
 from starlette.requests import Request
 import logging
-from chat_client._models import UserToken
+from chat_client.models import UserToken
 
 # from data.config import SESSION_EXPIRE_TIME_IN_SECONDS  # optional future config
 from sqlalchemy.ext.asyncio import AsyncSession

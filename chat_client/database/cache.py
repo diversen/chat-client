@@ -6,7 +6,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 
-from chat_client._models import Cache
+from chat_client.models import Cache
 
 class DatabaseCache:
     def __init__(self, session: AsyncSession):

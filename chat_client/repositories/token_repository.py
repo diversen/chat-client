@@ -1,4 +1,4 @@
-from chat_client._models import Token
+from chat_client.models import Token
 import secrets
 import arrow
 from sqlalchemy.ext.asyncio import AsyncSession
