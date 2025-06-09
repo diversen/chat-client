@@ -3,8 +3,6 @@ import secrets
 import arrow
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from sqlalchemy.exc import NoResultFound
-import logging
 
 EXPIRE_TIME_IN_MINUTES = 10
 

@@ -7,7 +7,7 @@ import random
 from captcha.image import ImageCaptcha
 import string
 import io
-from chat_client.models import user_model, chat_model
+from chat_client.repositories import chat_repository, user_repository
 from chat_client.core import flash
 from chat_client.core.exceptions import UserValidate
 from chat_client.core import user_session
@@ -40,7 +40,7 @@ async def signup_get(request: Request):
 
 async def signup_post(request: Request):
     try:
-        user_row = await user_model.create_user(request)
+        user_row = await user_repository.create_user(request)
         user_session.set_session_variable(request, "user_id", user_row["user_id"])
         flash.set_success(
             request,
@@ -69,7 +69,7 @@ async def verify_get(request: Request):
 
 async def verify_post(request: Request):
     try:
-        await user_model.verify_user(request)
+        await user_repository.verify_user(request)
         flash.set_success(request, "Your account has been verified successfully")
         return JSONResponse({"error": False})
     except UserValidate as e:
@@ -91,7 +91,7 @@ async def login_get(request: Request):
 
 async def login_post(request: Request):
     try:
-        login_user = await user_model.login_user(request)
+        login_user = await user_repository.login_user(request)
         user_session.set_session_variable(request, "user_id", login_user["user_id"])
         flash.set_success(request, "You are now logged in")
         return JSONResponse({"error": False})
@@ -152,7 +152,7 @@ async def reset_password_get(request: Request):
 
 async def reset_password_post(request: Request):
     try:
-        await user_model.reset_password(request)
+        await user_repository.reset_password(request)
         flash.set_success(
             request,
             "A password reset email has been sent. "
@@ -181,7 +181,7 @@ async def new_password_get(request: Request):
 
 async def new_password_post(request: Request):
     try:
-        await user_model.new_password(request)
+        await user_repository.new_password(request)
         flash.set_success(request, "Password has been updated. You can now login.")
         return JSONResponse({"error": False, "message": "Password reset email sent"})
     except UserValidate as e:
@@ -197,7 +197,7 @@ async def list_dialogs_json(request: Request):
     Endpoint /user/dialogs
     """
 
-    dialogs_info = await chat_model.get_dialogs_info(request)
+    dialogs_info = await chat_repository.get_dialogs_info(request)
     return JSONResponse({"error": False, "dialogs_info": dialogs_info})
 
 
@@ -230,7 +230,7 @@ async def profile(request: Request):
         flash.set_notice(request, "You must be logged in to view your profile")
         return RedirectResponse(url="/user/login")
 
-    profile = await user_model.get_profile(user_id)
+    profile = await user_repository.get_profile(user_id)
     context = {
         "request": request,
         "title": "Profile",
@@ -243,7 +243,7 @@ async def profile(request: Request):
 
 async def profile_post(request: Request):
     try:
-        await user_model.update_profile(request)
+        await user_repository.update_profile(request)
         flash.set_success(request, "Profile updated")
         return JSONResponse({"error": False, "message": "Profile updated"})
     except UserValidate as e:

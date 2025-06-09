@@ -3,7 +3,7 @@ from chat_client.database.cache import DatabaseCache
 from chat_client.core.send_mail import send_smtp_message
 from chat_client.core.exceptions import UserValidate
 from chat_client.core import user_session
-from chat_client.models import token_model
+from chat_client.repositories import token_repository
 from chat_client.core.templates import get_template_content
 from chat_client._models import User, UserToken
 from data.config import HOSTNAME_WITH_SCHEME, SITE_NAME
@@ -71,7 +71,7 @@ async def create_user(request: Request):
         if existing_user:
             raise UserValidate("User already exists. Please login or reset your password.")
 
-        token = await token_model.create_token(session, "VERIFY")
+        token = await token_repository.create_token(session, "VERIFY")
 
         new_user = User(email=email, password_hash=password_hashed, random=token)
         session.add(new_user)
@@ -100,7 +100,7 @@ async def verify_user(request: Request):
     token = form.get("token")
 
     async with async_session() as session:
-        token_is_valid = await token_model.validate_token(session, token, "VERIFY")
+        token_is_valid = await token_repository.validate_token(session, token, "VERIFY")
         if not token_is_valid:
             raise UserValidate("Token is expired. Please request a new password in order to verify your account.")
 
@@ -165,7 +165,7 @@ async def reset_password(request: Request):
         if not user:
             raise UserValidate("User does not exist")
 
-        token = await token_model.create_token(session, "RESET")
+        token = await token_repository.create_token(session, "RESET")
         user.random = token
         await session.commit()
 
@@ -194,7 +194,7 @@ async def new_password(request: Request):
     _verify_password(password, password_2)
 
     async with async_session() as session:
-        token_is_valid = await token_model.validate_token(session, token, "RESET")
+        token_is_valid = await token_repository.validate_token(session, token, "RESET")
         if not token_is_valid:
             raise UserValidate("Token is expired. Please request a new password again")
 

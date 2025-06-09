@@ -6,7 +6,7 @@ import logging
 import asyncio
 import secrets
 import chat_client.core.set_system_path  # noqa
-from chat_client.models.user_model import _password_hash
+from chat_client.repositories.user_repository import _password_hash
 from chat_client.database.migration import Migration
 from data.config import DATA_DIR, LOG_LEVEL
 from chat_client import __version__, __program__

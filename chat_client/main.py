@@ -1,9 +1,9 @@
 from contextlib import asynccontextmanager
 from starlette.applications import Starlette
 from starlette.routing import Mount
-from chat_client.endpoints.endpoints_chat import routes_chat
-from chat_client.endpoints.endpoints_user import routes_user
-from chat_client.endpoints.endpoints_error import routes_error
+from chat_client.endpoints.chat_endpoints import routes_chat
+from chat_client.endpoints.user_endpoints import routes_user
+from chat_client.endpoints.error_endpoints import routes_error
 from chat_client.core.exceptions import exception_callbacks
 from chat_client.core.middleware import middleware
 import logging

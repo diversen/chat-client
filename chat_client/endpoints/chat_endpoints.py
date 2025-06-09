@@ -11,7 +11,7 @@ import data.config as config
 import logging
 from chat_client.core import user_session
 from chat_client.core.templates import get_templates
-from chat_client.models import chat_model, user_model
+from chat_client.repositories import chat_repository, user_repository
 from chat_client.core.exceptions import UserValidate
 
 # Logger
@@ -68,7 +68,7 @@ def _execute_tool(tool_call):
 
 
 async def _chat_response_stream(request: Request, messages, model, logged_in):
-    profile = await user_model.get_profile(logged_in)
+    profile = await user_repository.get_profile(logged_in)
     if "system_message" in profile and profile["system_message"]:
         system_message = profile["system_message"]
         logger.debug(f"System message: {system_message}")
@@ -266,7 +266,7 @@ async def create_dialog(request: Request):
     Save dialog to database
     """
     try:
-        dialog_id = await chat_model.create_dialog(request)
+        dialog_id = await chat_repository.create_dialog(request)
         return JSONResponse({"error": False, "dialog_id": dialog_id, "message": "Dialog saved"})
     except UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})
@@ -280,7 +280,7 @@ async def create_message(request: Request):
     Save message to database
     """
     try:
-        message_id = await chat_model.create_message(request)
+        message_id = await chat_repository.create_message(request)
         return JSONResponse({"message_id": message_id})
     except UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})
@@ -294,7 +294,7 @@ async def get_dialog(request: Request):
     Get dialog from database
     """
     try:
-        dialog = await chat_model.get_dialog(request)
+        dialog = await chat_repository.get_dialog(request)
         return JSONResponse(dialog)
     except UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})
@@ -308,7 +308,7 @@ async def get_messages(request: Request):
     Get messages from database
     """
     try:
-        messages = await chat_model.get_messages(request)
+        messages = await chat_repository.get_messages(request)
         return JSONResponse(messages)
     except UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})
@@ -322,7 +322,7 @@ async def delete_dialog(request: Request):
     Delete dialog from database
     """
     try:
-        await chat_model.delete_dialog(request)
+        await chat_repository.delete_dialog(request)
         return JSONResponse({"error": False})
     except UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})
