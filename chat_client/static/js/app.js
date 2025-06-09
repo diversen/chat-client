@@ -493,8 +493,6 @@ function checkScroll() {
 responsesElem.addEventListener('scroll', checkScroll);
 new MutationObserver(checkScroll).observe(responsesElem, { childList: true, subtree: true });
 
-
-
 /**
  * Load a saved conversation
  */
