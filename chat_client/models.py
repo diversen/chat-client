@@ -1,11 +1,9 @@
-from sqlalchemy import (
-    Table, Column, Integer, String, Text, ForeignKey, Index,
-    TIMESTAMP, create_engine
-)
+from sqlalchemy import Table, Column, Integer, String, Text, ForeignKey, Index, TIMESTAMP, create_engine
 from sqlalchemy.orm import declarative_base
 from sqlalchemy.sql import func
 
 Base = declarative_base()
+
 
 class User(Base):
     __tablename__ = "users"
@@ -24,6 +22,7 @@ class User(Base):
     random = Column(Text, nullable=False)
     locked = Column(Integer, default=0)
 
+
 class UserToken(Base):
     __tablename__ = "user_token"
     __table_args__ = (
@@ -38,6 +37,7 @@ class UserToken(Base):
     last_login = Column(TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False)
     expires = Column(Integer, default=0)
 
+
 class Token(Base):
     __tablename__ = "token"
     __table_args__ = {"sqlite_autoincrement": True}
@@ -46,6 +46,7 @@ class Token(Base):
     token = Column(Text, nullable=False)
     type = Column(Text, nullable=False)
     created = Column(TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False)
+
 
 class ACL(Base):
     __tablename__ = "acl"
@@ -61,6 +62,7 @@ class ACL(Base):
     user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     entity_id = Column(Integer, nullable=True)
 
+
 class Cache(Base):
     __tablename__ = "cache"
     __table_args__ = {"sqlite_autoincrement": True}
@@ -69,6 +71,7 @@ class Cache(Base):
     key = Column(Text, nullable=False, index=True)
     value = Column(Text, nullable=True)
     unix_timestamp = Column(Integer, default=0)
+
 
 class Dialog(Base):
     __tablename__ = "dialog"
@@ -82,6 +85,7 @@ class Dialog(Base):
     title = Column(Text, nullable=False)
     created = Column(TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False)
     public = Column(Integer, default=0)
+
 
 class Message(Base):
     __tablename__ = "message"
@@ -97,3 +101,16 @@ class Message(Base):
     role = Column(Text, nullable=False)
     content = Column(Text, nullable=False)
     created = Column(TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False)
+
+
+class Prompt(Base):
+    __tablename__ = "prompt"
+    __table_args__ = (
+        Index("idx_prompt_user_id", "user_id"),
+        {"sqlite_autoincrement": True},
+    )
+
+    prompt_id = Column(Integer, primary_key=True, autoincrement=True)
+    title = Column(Text(length=256), nullable=False)
+    prompt = Column(Text(length=8096), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
