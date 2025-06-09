@@ -34,7 +34,7 @@ class UserToken(Base):
 
     user_token_id = Column(Integer, primary_key=True)
     token = Column(Text, nullable=False)
-    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     last_login = Column(TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False)
     expires = Column(Integer, default=0)
 
@@ -58,7 +58,7 @@ class ACL(Base):
 
     acl_id = Column(Integer, primary_key=True)
     role = Column(Text, nullable=False)
-    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     entity_id = Column(Integer, nullable=True)
 
 class Cache(Base):
@@ -78,7 +78,7 @@ class Dialog(Base):
     )
 
     dialog_id = Column(String, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     title = Column(Text, nullable=False)
     created = Column(TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False)
     public = Column(Integer, default=0)
@@ -93,7 +93,7 @@ class Message(Base):
 
     message_id = Column(Integer, primary_key=True)
     dialog_id = Column(String, ForeignKey("dialog.dialog_id", ondelete="CASCADE"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.user_id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     role = Column(Text, nullable=False)
     content = Column(Text, nullable=False)
     created = Column(TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False)
