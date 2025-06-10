@@ -46,7 +46,7 @@ async def chat_page(request: Request):
         "model_names": model_names,
         "default_model": getattr(config, "DEFAULT_MODEL", ""),
         "request": request,
-        "title": "Ollama Chat",
+        "title": "Chat",
     }
 
     context = await base_context.get_context(request, context)
