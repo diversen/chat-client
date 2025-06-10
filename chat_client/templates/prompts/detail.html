@@ -3,13 +3,16 @@
 {% block content %}
 <main class="default-container">
     <h3>{{ prompt.title }}</h3>
-    <pre>{{ prompt.prompt }}</pre>
-
+    
     <p>
-        <a href="/prompt/{{ prompt.prompt_id }}/edit">Edit</a> |
-        <button id="delete-btn">Delete</button> |
-        <a href="/prompt">Back to list</a>
+        {{ prompt.prompt }}
     </p>
+
+    <div class="action-links">
+        <a class="action-link" href="/prompt/{{ prompt.prompt_id }}/edit">Edit</a>
+        <a class="action-link" id="delete-btn">Delete</a>
+        <a class="action-link" href="/prompt">Back to list</a>
+    </div>
 </main>
 
 <script type="module">

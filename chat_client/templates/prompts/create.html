@@ -34,7 +34,7 @@
             if (res.error) {
                 Flash.setMessage(res.message, 'error');
             } else {
-                window.location.href = `/prompt/${res.prompt_id}`;
+                window.location.href = `/prompt`;
             }
         } catch (e) {
             Flash.setMessage('An error occurred. Try again later.', 'error');
