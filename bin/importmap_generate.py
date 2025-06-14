@@ -6,8 +6,9 @@ import json
 def generate_import_map(base_dirs):
     import_map = {"imports": {}}
     for base_dir in base_dirs:
-        # import_dir is base_dir without 'ollama_client'
-        import_dir = "/" + base_dir.split("ollama_client/")[-1]
+        # Strip "chat_client" or any top-level prefix
+        relative_dir = base_dir.split("chat_client/")[-1]  # removes "chat_client/"
+        import_dir = f"/{relative_dir}"  # ensures leading slash
 
         js_files = [f for f in os.listdir(base_dir) if f.endswith(".js")]
         for js_file in js_files:
