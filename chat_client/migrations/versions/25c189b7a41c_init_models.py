@@ -1,8 +1,8 @@
-"""Initial
+"""Init models
 
-Revision ID: f63982f263eb
+Revision ID: 25c189b7a41c
 Revises: 
-Create Date: 2025-06-09 12:53:34.749898
+Create Date: 2025-06-14 18:19:11.136064
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = 'f63982f263eb'
+revision: str = '25c189b7a41c'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -25,13 +25,13 @@ def upgrade() -> None:
     sa.Column('cache_id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('key', sa.Text(), nullable=False),
     sa.Column('value', sa.Text(), nullable=True),
-    sa.Column('unix_timestamp', sa.Integer(), nullable=True),
+    sa.Column('unix_timestamp', sa.Integer(), nullable=False),
     sa.PrimaryKeyConstraint('cache_id'),
     sqlite_autoincrement=True
     )
     op.create_index(op.f('ix_cache_key'), 'cache', ['key'], unique=False)
     op.create_table('token',
-    sa.Column('token_id', sa.Integer(), nullable=False),
+    sa.Column('token_id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('token', sa.Text(), nullable=False),
     sa.Column('type', sa.Text(), nullable=False),
     sa.Column('created', sa.TIMESTAMP(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
@@ -39,13 +39,13 @@ def upgrade() -> None:
     sqlite_autoincrement=True
     )
     op.create_table('users',
-    sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.Column('user_id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('password_hash', sa.Text(), nullable=False),
     sa.Column('email', sa.Text(), nullable=False),
-    sa.Column('created', sa.TIMESTAMP(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
-    sa.Column('verified', sa.Integer(), nullable=True),
     sa.Column('random', sa.Text(), nullable=False),
-    sa.Column('locked', sa.Integer(), nullable=True),
+    sa.Column('created', sa.TIMESTAMP(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
+    sa.Column('verified', sa.Integer(), nullable=False),
+    sa.Column('locked', sa.Integer(), nullable=False),
     sa.PrimaryKeyConstraint('user_id'),
     sa.UniqueConstraint('email'),
     sqlite_autoincrement=True
@@ -54,7 +54,7 @@ def upgrade() -> None:
     op.create_index('idx_users_password_hash', 'users', ['password_hash'], unique=False)
     op.create_index('idx_users_random', 'users', ['random'], unique=False)
     op.create_table('acl',
-    sa.Column('acl_id', sa.Integer(), nullable=False),
+    sa.Column('acl_id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('role', sa.Text(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
     sa.Column('entity_id', sa.Integer(), nullable=True),
@@ -70,18 +70,28 @@ def upgrade() -> None:
     sa.Column('user_id', sa.Integer(), nullable=False),
     sa.Column('title', sa.Text(), nullable=False),
     sa.Column('created', sa.TIMESTAMP(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
-    sa.Column('public', sa.Integer(), nullable=True),
+    sa.Column('public', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['user_id'], ['users.user_id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('dialog_id'),
     sqlite_autoincrement=True
     )
     op.create_index('dialog_user_id', 'dialog', ['user_id'], unique=False)
+    op.create_table('prompt',
+    sa.Column('prompt_id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('title', sa.Text(length=256), nullable=False),
+    sa.Column('prompt', sa.Text(length=8096), nullable=False),
+    sa.Column('user_id', sa.Integer(), nullable=False),
+    sa.ForeignKeyConstraint(['user_id'], ['users.user_id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('prompt_id'),
+    sqlite_autoincrement=True
+    )
+    op.create_index('idx_prompt_user_id', 'prompt', ['user_id'], unique=False)
     op.create_table('user_token',
-    sa.Column('user_token_id', sa.Integer(), nullable=False),
+    sa.Column('user_token_id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('token', sa.Text(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
     sa.Column('last_login', sa.TIMESTAMP(timezone=True), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
-    sa.Column('expires', sa.Integer(), nullable=True),
+    sa.Column('expires', sa.Integer(), nullable=False),
     sa.ForeignKeyConstraint(['user_id'], ['users.user_id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('user_token_id'),
     sqlite_autoincrement=True
@@ -89,7 +99,7 @@ def upgrade() -> None:
     op.create_index('idx_user_token_token', 'user_token', ['token'], unique=False)
     op.create_index('idx_user_token_user_id', 'user_token', ['user_id'], unique=False)
     op.create_table('message',
-    sa.Column('message_id', sa.Integer(), nullable=False),
+    sa.Column('message_id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('dialog_id', sa.String(), nullable=False),
     sa.Column('user_id', sa.Integer(), nullable=False),
     sa.Column('role', sa.Text(), nullable=False),
@@ -114,6 +124,8 @@ def downgrade() -> None:
     op.drop_index('idx_user_token_user_id', table_name='user_token')
     op.drop_index('idx_user_token_token', table_name='user_token')
     op.drop_table('user_token')
+    op.drop_index('idx_prompt_user_id', table_name='prompt')
+    op.drop_table('prompt')
     op.drop_index('dialog_user_id', table_name='dialog')
     op.drop_table('dialog')
     op.drop_index('idx_acl_user_id', table_name='acl')
