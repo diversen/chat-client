@@ -85,7 +85,7 @@ version_file = "chat_client/__init__.py"
 line-length = 140
 
 [tool.mypy]
-exclude = ["docs", "venv", ".venv", "tests", "bin-local"]
+exclude = ["docs", "venv", ".venv", "tests", "bin-local", "chat_client/migrations"]
 
 [tool.setuptools]
 include-package-data = true

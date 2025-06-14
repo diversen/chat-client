@@ -1,6 +1,6 @@
 [flake8]
 exclude = .git, __pycache__, .mypy_cache, .pytest_cache, .venv, .github, \
-    stadsarkiv_client/templates,stadsarkiv_client/locales, generate_client, tests, \
+    chat_client/templates, generate_client, tests, chat_client/migrations, \
     example-config-aarhus, example-config-simple, example-config-teater, build, \
     bin-local
 ignore = E203, W503, E402, E231
