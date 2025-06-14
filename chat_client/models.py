@@ -1,8 +1,26 @@
-from sqlalchemy import Table, Column, Integer, String, Text, ForeignKey, Index, TIMESTAMP, create_engine
-from sqlalchemy.orm import declarative_base
+from datetime import datetime
+from sqlalchemy import Text, String, ForeignKey, TIMESTAMP, Index
 from sqlalchemy.sql import func
+from sqlalchemy.orm import DeclarativeBase, MappedAsDataclass, Mapped, mapped_column
 
-Base = declarative_base()
+
+class Base(MappedAsDataclass, DeclarativeBase):
+    pass
+
+
+created: Mapped[datetime | None] = mapped_column(
+    TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False, init=False
+)
+
+
+class Cache(Base):
+    __tablename__ = "cache"
+    __table_args__ = {"sqlite_autoincrement": True}
+
+    cache_id: Mapped[int | None] = mapped_column(primary_key=True, autoincrement=True, init=False)
+    key: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    value: Mapped[str | None] = mapped_column(Text, nullable=True)
+    unix_timestamp: Mapped[int] = mapped_column(default=0)
 
 
 class User(Base):
@@ -14,13 +32,15 @@ class User(Base):
         {"sqlite_autoincrement": True},
     )
 
-    user_id = Column(Integer, primary_key=True)
-    password_hash = Column(Text, nullable=False)
-    email = Column(Text, nullable=False, unique=True)
-    created = Column(TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False)
-    verified = Column(Integer, default=0)
-    random = Column(Text, nullable=False)
-    locked = Column(Integer, default=0)
+    user_id: Mapped[int | None] = mapped_column(primary_key=True, autoincrement=True, init=False)
+    password_hash: Mapped[str] = mapped_column(Text, nullable=False)
+    email: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
+    random: Mapped[str] = mapped_column(Text, nullable=False)
+    created: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False, init=False
+    )
+    verified: Mapped[int] = mapped_column(default=0)
+    locked: Mapped[int] = mapped_column(default=0)
 
 
 class UserToken(Base):
@@ -31,21 +51,25 @@ class UserToken(Base):
         {"sqlite_autoincrement": True},
     )
 
-    user_token_id = Column(Integer, primary_key=True)
-    token = Column(Text, nullable=False)
-    user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
-    last_login = Column(TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False)
-    expires = Column(Integer, default=0)
+    user_token_id: Mapped[int | None] = mapped_column(primary_key=True, autoincrement=True, init=False)
+    token: Mapped[str] = mapped_column(Text, nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    last_login: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False, init=False
+    )
+    expires: Mapped[int] = mapped_column(default=0)
 
 
 class Token(Base):
     __tablename__ = "token"
     __table_args__ = {"sqlite_autoincrement": True}
 
-    token_id = Column(Integer, primary_key=True)
-    token = Column(Text, nullable=False)
-    type = Column(Text, nullable=False)
-    created = Column(TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False)
+    token_id: Mapped[int | None] = mapped_column(primary_key=True, autoincrement=True, init=False)
+    token: Mapped[str] = mapped_column(Text, nullable=False)
+    type: Mapped[str] = mapped_column(Text, nullable=False)
+    created: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False, init=False
+    )
 
 
 class ACL(Base):
@@ -57,20 +81,10 @@ class ACL(Base):
         {"sqlite_autoincrement": True},
     )
 
-    acl_id = Column(Integer, primary_key=True)
-    role = Column(Text, nullable=False)
-    user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
-    entity_id = Column(Integer, nullable=True)
-
-
-class Cache(Base):
-    __tablename__ = "cache"
-    __table_args__ = {"sqlite_autoincrement": True}
-
-    cache_id = Column(Integer, primary_key=True, autoincrement=True)
-    key = Column(Text, nullable=False, index=True)
-    value = Column(Text, nullable=True)
-    unix_timestamp = Column(Integer, default=0)
+    acl_id: Mapped[int | None] = mapped_column(primary_key=True, autoincrement=True)
+    role: Mapped[str] = mapped_column(Text, nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    entity_id: Mapped[int | None] = mapped_column(nullable=True)
 
 
 class Dialog(Base):
@@ -80,11 +94,13 @@ class Dialog(Base):
         {"sqlite_autoincrement": True},
     )
 
-    dialog_id = Column(String, primary_key=True)
-    user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
-    title = Column(Text, nullable=False)
-    created = Column(TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False)
-    public = Column(Integer, default=0)
+    dialog_id: Mapped[str] = mapped_column(String, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    title: Mapped[str] = mapped_column(Text, nullable=False)
+    created: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False, init=False
+    )
+    public: Mapped[int] = mapped_column(default=0)
 
 
 class Message(Base):
@@ -95,12 +111,14 @@ class Message(Base):
         {"sqlite_autoincrement": True},
     )
 
-    message_id = Column(Integer, primary_key=True)
-    dialog_id = Column(String, ForeignKey("dialog.dialog_id", ondelete="CASCADE"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
-    role = Column(Text, nullable=False)
-    content = Column(Text, nullable=False)
-    created = Column(TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False)
+    message_id: Mapped[int | None] = mapped_column(primary_key=True, autoincrement=True, init=False)
+    dialog_id: Mapped[str] = mapped_column(ForeignKey("dialog.dialog_id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    role: Mapped[str] = mapped_column(Text, nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    created: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False, init=False
+    )
 
 
 class Prompt(Base):
@@ -110,7 +128,7 @@ class Prompt(Base):
         {"sqlite_autoincrement": True},
     )
 
-    prompt_id = Column(Integer, primary_key=True, autoincrement=True)
-    title = Column(Text(length=256), nullable=False)
-    prompt = Column(Text(length=8096), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    prompt_id: Mapped[int | None] = mapped_column(primary_key=True, autoincrement=True, init=False)
+    title: Mapped[str] = mapped_column(Text(length=256), nullable=False)
+    prompt: Mapped[str] = mapped_column(Text(length=8096), nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
