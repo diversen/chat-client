@@ -11,7 +11,7 @@ import data.config as config
 import logging
 from chat_client.core import user_session
 from chat_client.core.templates import get_templates
-from chat_client.repositories import chat_repository, user_repository
+from chat_client.repositories import chat_repository, user_repository, prompt_repository
 from chat_client.core.exceptions import UserValidate
 
 # Logger
@@ -34,12 +34,13 @@ async def chat_page(request: Request):
     """
     The GET chat page
     """
-    logged_in = await user_session.is_logged_in(request)
-    if not logged_in:
+    user_id = await user_session.is_logged_in(request)
+    if not user_id:
         flash.set_notice(request, "You must be logged in to access the chat")
         return RedirectResponse("/user/login")
 
     model_names = await _get_model_names()
+    prompts = await prompt_repository.list_prompts(user_id)
 
     context = {
         "chat": True,
@@ -47,6 +48,7 @@ async def chat_page(request: Request):
         "default_model": getattr(config, "DEFAULT_MODEL", ""),
         "request": request,
         "title": "Chat",
+        "prompts": prompts,
     }
 
     context = await base_context.get_context(request, context)
