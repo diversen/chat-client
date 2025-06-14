@@ -544,7 +544,13 @@ async function initializeFromPrompt(promtpID) {
 
         // Create a new dialog with the prompt text
         currentDialogID = await createDialog(promptText);
+
+        // Save the prompt message to the dialog
+        const promptMessage = { role: 'user', content: promptText };
+        await createMessage(currentDialogID, promptMessage);
+
         currentDialogMessages.push({ role: 'user', content: promptText });
+        console.log('Current dialog ID after prompt:', currentDialogMessages);
 
     } catch (error) {
         console.error("Error in initializeFromPrompt:", error);
