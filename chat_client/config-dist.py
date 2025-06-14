@@ -13,8 +13,8 @@ class ConfigSMTP:
     DEFAULT_FROM = "Chat <mail@10kilobyte.com>"
 
 
-# Default model
-DEFAULT_MODEL = "deepseek-r1:14b"
+# Set a Default model
+# DEFAULT_MODEL = "deepseek-r1:14b"
 
 # Logging
 LOG_LEVEL = logging.INFO
@@ -34,10 +34,10 @@ SITE_NAME = "home.10kilobyte.com"
 SESSION_SECRET_KEY = "SECRET_KEY_SADFDFREQ2134324AADFDGFFGMIESDF"
 
 # Session HTTPS only
-SESSION_HTTPS_ONLY = False  # Set to True if using HTTPS
+SESSION_HTTPS_ONLY = True  # Set to True if using HTTPS
 
 # Use mathjax for rendering math
-USE_KATEX = False
+USE_KATEX = True
 
 # Tools that can be called from the frontend
 #
