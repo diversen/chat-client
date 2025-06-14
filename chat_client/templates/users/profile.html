@@ -12,13 +12,13 @@
 
     <form method="post" action="/user/profile" class="profile-form">
         <label for="username">Your Username</label>
-        <input type="text" id="username" name="username" placeholder="Your username" aria-label="Username" value="{{ profile.username }}" autocomplete="off" required>
+        <input type="text" id="username" name="username" placeholder="Your username" aria-label="Username"
+            value="{{ profile.username }}" autocomplete="off" required>
         <div class="checkbox-container">
             <label for="dark_theme">Dark theme</label>
-            <input type="checkbox" aria-label="Dark mode" value="1" id="dark_theme" name="dark_theme" {% if profile.dark_theme %}checked{% endif %}>
+            <input type="checkbox" aria-label="Dark mode" value="1" id="dark_theme" name="dark_theme" {% if
+                profile.dark_theme %}checked{% endif %}>
         </div>
-        <label for="system_message">Define system message of the chat</label>
-        <textarea id="system_message" name="system_message" placeholder="Set system message" aria-label="System message">{{ profile.system_message }}</textarea>
         <button id="save">Save</button>
     </form>
 </main>
@@ -29,25 +29,29 @@
     import { Requests } from '/static/js/requests.js';
 
     document.getElementById('save').addEventListener('click', async (event) => {
-        event.preventDefault();
+
         const spinner = document.querySelector('.loading-spinner');
         spinner.classList.toggle('hidden');
-
-        let jsonData = {
-            username: document.getElementById('username').value,
-            dark_theme: document.getElementById('dark_theme').checked,
-            system_message: document.getElementById('system_message').value
-        };
-
         try {
+
+            event.preventDefault();
+
+            let jsonData = {
+                username: document.getElementById('username').value,
+                dark_theme: document.getElementById('dark_theme').checked,
+            };
+
             const res = await Requests.asyncPostJson('/user/profile', jsonData);
             if (res.error) {
                 Flash.setMessage(res.message, 'error');
             } else {
-                Flash.setMessage("Your user information has been updated", 'success');
+                // Reload the page using JS to reflect changes
+                window.location.reload();
+
             }
         } catch (error) {
             console.error(error);
+            Flash.setMessage('An error occurred while saving your profile.', 'error');
         } finally {
             spinner.classList.toggle('hidden');
         }

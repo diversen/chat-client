@@ -13,6 +13,7 @@ import bcrypt
 import logging
 import secrets
 import re
+from chat_client.core import flash
 
 from sqlalchemy import select
 from chat_client.database.db_session import async_session
