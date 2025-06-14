@@ -5,8 +5,12 @@ import time
 from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
-
+import logging
 from chat_client.models import Cache
+
+
+logger: logging.Logger = logging.getLogger(__name__)
+
 
 class DatabaseCache:
     def __init__(self, session: AsyncSession):
@@ -20,15 +24,9 @@ class DatabaseCache:
         Set a cache value. Delete old, insert new.
         """
         # Delete existing
-        await self.session.execute(
-            delete(Cache).where(Cache.key == key)
-        )
+        await self.session.execute(delete(Cache).where(Cache.key == key))
         # Insert new
-        new_cache = Cache(
-            key=key,
-            value=json.dumps(data),
-            unix_timestamp=int(time.time())
-        )
+        new_cache = Cache(key=key, value=json.dumps(data), unix_timestamp=int(time.time()))
         self.session.add(new_cache)
         await self.session.commit()
         return True
@@ -37,31 +35,28 @@ class DatabaseCache:
         """
         Get value by key, optionally check expiration.
         """
-
         result = await self.session.execute(select(Cache).where(Cache.key == key))
         cache_row = result.scalar_one_or_none()
 
-        if cache_row:
-            if expire_in == 0:
-                return json.loads(cache_row.value)
+        if cache_row is None or cache_row.value is None:
+            return None
 
-            current_time = int(time.time())
-            if current_time - cache_row.unix_timestamp < expire_in:
-                return json.loads(cache_row.value)
-            else:
-                # Expired — delete
-                await self.session.execute(
-                    delete(Cache).where(Cache.cache_id == cache_row.cache_id)
-                )
-                await self.session.commit()
+        if expire_in == 0:
+            return json.loads(cache_row.value)
+
+        current_time = int(time.time())
+        if current_time - cache_row.unix_timestamp < expire_in:
+            return json.loads(cache_row.value)
+        else:
+            await self.session.execute(delete(Cache).where(Cache.cache_id == cache_row.cache_id))
+            await self.session.commit()
+
         return None
 
     async def delete(self, cache_id: int) -> None:
         """
         Delete a cache value by cache_id.
         """
-        await self.session.execute(
-            delete(Cache).where(Cache.cache_id == cache_id)
-        )
+        await self.session.execute(delete(Cache).where(Cache.cache_id == cache_id))
         await self.session.commit()
         return None

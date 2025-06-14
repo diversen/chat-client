@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 from starlette.applications import Starlette
-from starlette.routing import Mount
+from starlette.routing import Mount, BaseRoute
 from chat_client.endpoints.chat_endpoints import routes_chat
 from chat_client.endpoints.user_endpoints import routes_user
 from chat_client.endpoints.error_endpoints import routes_error
@@ -30,7 +30,7 @@ async def lifespan(app):
     logger.info("End of lifespan")
 
 
-all_routes = [
+all_routes: list[BaseRoute] = [
     Mount("/static", app=static_files, name="static"),
 ]
 

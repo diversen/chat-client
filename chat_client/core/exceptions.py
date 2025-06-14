@@ -2,30 +2,12 @@ from chat_client.core import base_context
 import logging
 from starlette.responses import JSONResponse
 from chat_client.core.templates import get_templates
+from chat_client.core import exceptions_validation
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
 templates = get_templates()
-
-
-# Generate a UserValidate Exception
-class UserValidate(Exception):
-    pass
-
-
-class JSONError(Exception):
-    def __init__(self, message: str, status_code: int = 400):
-        super().__init__(message)
-        self.status_code = status_code
-
-
-class NotAuthorized(Exception):
-    pass
-
-
-class NotFound(Exception):
-    pass
 
 
 async def _500(request, exc):
@@ -35,10 +17,10 @@ async def _500(request, exc):
     # Log the error
     logger.error(f"Unhandled exception: {message}", exc_info=exc)
 
-    if isinstance(exc, UserValidate):
+    if isinstance(exc, exceptions_validation.UserValidate):
         error_code = "400 Bad Request"
 
-    if isinstance(exc, NotAuthorized):
+    if isinstance(exc, exceptions_validation.NotAuthorized):
         error_code = "401 Unauthorized"
 
     context = {
@@ -75,6 +57,6 @@ async def _json_error_handler(request, exc):
 exception_callbacks = {
     404: _400,  # Catch 404 errors
     500: _500,  # Catch 500 errors
-    JSONError: _json_error_handler,  # Catch JSON errors
+    exceptions_validation.JSONError: _json_error_handler,  # Catch JSON errors
     Exception: _500,  # Catch all unhandled exceptions
 }

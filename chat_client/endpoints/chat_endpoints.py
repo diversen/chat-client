@@ -12,7 +12,7 @@ import logging
 from chat_client.core import user_session
 from chat_client.core.templates import get_templates
 from chat_client.repositories import chat_repository, user_repository, prompt_repository
-from chat_client.core.exceptions import UserValidate
+from chat_client.core import exceptions_validation
 
 # Logger
 logger: logging.Logger = logging.getLogger(__name__)
@@ -76,7 +76,7 @@ async def _chat_response_stream(request: Request, messages, model, logged_in):
         logger.debug(f"System message: {system_message}")
 
         # Note that the system message is prepended to the messages as the first message
-        # It is a user message with the role "user" because many models does not support 
+        # It is a user message with the role "user" because many models does not support
         # system messages
         system_message_dict = {
             "role": "user",
@@ -270,7 +270,7 @@ async def create_dialog(request: Request):
     try:
         dialog_id = await chat_repository.create_dialog(request)
         return JSONResponse({"error": False, "dialog_id": dialog_id, "message": "Dialog saved"})
-    except UserValidate as e:
+    except exceptions_validation.UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})
     except Exception:
         logger.exception("Error saving dialog")
@@ -284,7 +284,7 @@ async def create_message(request: Request):
     try:
         message_id = await chat_repository.create_message(request)
         return JSONResponse({"message_id": message_id})
-    except UserValidate as e:
+    except exceptions_validation.UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})
     except Exception:
         logger.exception("Error saving message")
@@ -298,7 +298,7 @@ async def get_dialog(request: Request):
     try:
         dialog = await chat_repository.get_dialog(request)
         return JSONResponse(dialog)
-    except UserValidate as e:
+    except exceptions_validation.UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})
     except Exception:
         logger.exception("Error getting dialog")
@@ -312,7 +312,7 @@ async def get_messages(request: Request):
     try:
         messages = await chat_repository.get_messages(request)
         return JSONResponse(messages)
-    except UserValidate as e:
+    except exceptions_validation.UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})
     except Exception:
         logger.exception("Error getting messages")
@@ -326,7 +326,7 @@ async def delete_dialog(request: Request):
     try:
         await chat_repository.delete_dialog(request)
         return JSONResponse({"error": False})
-    except UserValidate as e:
+    except exceptions_validation.UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})
     except Exception:
         logger.exception("Error deleting dialog")

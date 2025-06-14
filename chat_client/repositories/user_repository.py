@@ -1,7 +1,9 @@
 from starlette.requests import Request
 from chat_client.database.cache import DatabaseCache
 from chat_client.core.send_mail import send_smtp_message
-from chat_client.core.exceptions import UserValidate
+
+# from chat_client.core.exceptions import UserValidate
+from chat_client.core import exceptions_validation
 from chat_client.core import user_session
 from chat_client.repositories import token_repository
 from chat_client.core.templates import get_template_content
@@ -31,15 +33,15 @@ def _check_password(entered_password: str, stored_hashed_password: str) -> bool:
 
 def _verify_password(password: str, password_2: str):
     if password != password_2:
-        raise UserValidate("Passwords do not match")
+        raise exceptions_validation.UserValidate("Passwords do not match")
     if len(password) < 8:
-        raise UserValidate("Password is too short")
+        raise exceptions_validation.UserValidate("Password is too short")
 
 
 def _is_valid_email(email: str):
     pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
     if not re.match(pattern, email):
-        raise UserValidate("Invalid email")
+        raise exceptions_validation.UserValidate("Invalid email")
 
 
 async def _validate_captcha(request: Request):
@@ -47,7 +49,7 @@ async def _validate_captcha(request: Request):
     captcha = str(form.get("captcha")).lower()
     captcha_session = str(request.session.get("captcha")).lower()
     if captcha != captcha_session:
-        raise UserValidate("Invalid CAPTCHA")
+        raise exceptions_validation.UserValidate("Invalid CAPTCHA")
 
 
 # Main Logic
@@ -69,7 +71,7 @@ async def create_user(request: Request):
         existing_user = result.scalar_one_or_none()
 
         if existing_user:
-            raise UserValidate("User already exists. Please login or reset your password.")
+            raise exceptions_validation.UserValidate("User already exists. Please login or reset your password.")
 
         token = await token_repository.create_token(session, "VERIFY")
 
@@ -90,28 +92,28 @@ async def create_user(request: Request):
         try:
             await send_smtp_message(email, context["subject"], message)
         except Exception:
-            raise UserValidate("Failed to send reset email. Please try and sign up again later.")
+            raise exceptions_validation.UserValidate("Failed to send reset email. Please try and sign up again later.")
 
         return {"user_id": new_user.user_id, "email": new_user.email}
 
 
 async def verify_user(request: Request):
     form = await request.form()
-    token = form.get("token")
+    token = str(form.get("token"))
 
     async with async_session() as session:
         token_is_valid = await token_repository.validate_token(session, token, "VERIFY")
         if not token_is_valid:
-            raise UserValidate("Token is expired. Please request a new password in order to verify your account.")
+            raise exceptions_validation.UserValidate("Token is expired. Please request a new password in order to verify your account.")
 
         stmt = select(User).where(User.random == token)
         result = await session.execute(stmt)
         user = result.scalar_one_or_none()
 
         if not user:
-            raise UserValidate("User does not exist")
+            raise exceptions_validation.UserValidate("User does not exist")
         if user.verified == 1:
-            raise UserValidate("User is already verified")
+            raise exceptions_validation.UserValidate("User is already verified")
 
         user.verified = 1
         await session.commit()
@@ -130,19 +132,19 @@ async def login_user(request: Request):
         user = result.scalar_one_or_none()
 
         if not user:
-            raise UserValidate("User does not exist")
+            raise exceptions_validation.UserValidate("User does not exist")
         if user.verified == 0:
-            raise UserValidate(
+            raise exceptions_validation.UserValidate(
                 "Your account is not verified. In order to verify your account, "
                 "you should reset your password. When this is done, you are verified."
             )
         if not _check_password(password, user.password_hash):
-            raise UserValidate("Invalid password")
+            raise exceptions_validation.UserValidate("Invalid password")
 
         session_token = secrets.token_urlsafe(32)
-
-        logging.info(f"User {user.user_id} logged in with session token: {session_token}")
+        assert user.user_id is not None
         new_token = UserToken(token=session_token, user_id=user.user_id)
+
         session.add(new_token)
         await session.commit()
 
@@ -152,7 +154,7 @@ async def login_user(request: Request):
 
 async def reset_password(request: Request):
     form = await request.form()
-    email = form.get("email")
+    email = str(form.get("email"))
 
     _is_valid_email(email)
     await _validate_captcha(request)
@@ -163,7 +165,7 @@ async def reset_password(request: Request):
         user = result.scalar_one_or_none()
 
         if not user:
-            raise UserValidate("User does not exist")
+            raise exceptions_validation.UserValidate("User does not exist")
 
         token = await token_repository.create_token(session, "RESET")
         user.random = token
@@ -182,7 +184,7 @@ async def reset_password(request: Request):
         try:
             await send_smtp_message(email, context["subject"], message)
         except Exception:
-            raise UserValidate("Failed to send reset email. Please try and sign up again later.")
+            raise exceptions_validation.UserValidate("Failed to send reset email. Please try and sign up again later.")
 
 
 async def new_password(request: Request):
@@ -196,14 +198,14 @@ async def new_password(request: Request):
     async with async_session() as session:
         token_is_valid = await token_repository.validate_token(session, token, "RESET")
         if not token_is_valid:
-            raise UserValidate("Token is expired. Please request a new password again")
+            raise exceptions_validation.UserValidate("Token is expired. Please request a new password again")
 
         stmt = select(User).where(User.random == token)
         result = await session.execute(stmt)
         user = result.scalar_one_or_none()
 
         if not user:
-            raise UserValidate("User does not exist")
+            raise exceptions_validation.UserValidate("User does not exist")
 
         user.password_hash = _password_hash(password)
         user.verified = 1
@@ -214,13 +216,13 @@ async def new_password(request: Request):
 async def update_profile(request: Request):
     user_id = await user_session.is_logged_in(request)
     if not user_id:
-        raise UserValidate("You must be logged in to update your profile")
+        raise exceptions_validation.UserValidate("You must be logged in to update your profile")
 
     form_data = await request.json()
 
     allowed_fields = {"username", "dark_theme", "system_message"}
     if not allowed_fields.issuperset(form_data.keys()):
-        raise UserValidate("Invalid form fields")
+        raise exceptions_validation.UserValidate("Invalid form fields")
 
     async with async_session() as session:
         cache = DatabaseCache(session)

@@ -3,7 +3,7 @@ import logging
 from chat_client import __version__
 from chat_client.core import flash
 from chat_client.core import user_session
-from chat_client.repositories import user_repository
+from chat_client.repositories import user_repository, prompt_repository
 import data.config as config
 
 
@@ -23,6 +23,7 @@ async def get_context(request: Request, variables):
         "request": request,
         "version": __version__,
         "use_katex": use_katex,
+        "prompts": await prompt_repository.list_prompts(user_id),
         "flash_messages": flash.get_messages(request=request),
     }
 

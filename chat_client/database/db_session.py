@@ -12,12 +12,14 @@ engine = create_async_engine(
     echo=False,
 )
 
+
 # Enable foreign keys on SQLite
 @event.listens_for(engine.sync_engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.close()
+
 
 async_session = async_sessionmaker(engine, expire_on_commit=False)
 

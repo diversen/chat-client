@@ -526,6 +526,32 @@ async function initializeDialog(dialogID) {
     }
 }
 
+async function initializeFromPrompt(promtpID) {
+    console.log('Initializing from prompt ID:', promtpID);
+
+    try {
+        const response = await fetch(`/prompt/${promtpID}/json`);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch prompt: ${response.status} ${response.statusText}`);
+        }
+
+        const promptData = await response.json();
+        console.log('Prompt data:', promptData);
+        const promptText = promptData.prompt.prompt;
+
+        // Render the prompt text as a user message
+        renderStaticUserMessage(promptText);
+
+        // Create a new dialog with the prompt text
+        currentDialogID = await createDialog(promptText);
+        currentDialogMessages.push({ role: 'user', content: promptText });
+
+    } catch (error) {
+        console.error("Error in initializeFromPrompt:", error);
+        Flash.setMessage('An error occurred while initializing from prompt.', 'error');
+    }
+}
+
 /**
  * Get the dialog ID from the URL and load the conversation
  * This only happens on page load
@@ -541,4 +567,9 @@ if (dialogID) {
     await initializeDialog(currentDialogID);
 
     loadingSpinner.classList.add('hidden');
+}
+
+const promtpID = url.searchParams.get('id');
+if (promtpID) {
+    await initializeFromPrompt(promtpID);
 }

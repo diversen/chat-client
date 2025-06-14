@@ -1,6 +1,5 @@
 from alembic.config import Config
 from alembic import command
-from pathlib import Path
 import logging
 
 logger: logging.Logger = logging.getLogger(__name__)

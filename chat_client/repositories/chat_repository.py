@@ -1,10 +1,10 @@
 from starlette.requests import Request
 from starlette.responses import JSONResponse
-from chat_client.core.exceptions import UserValidate
+from chat_client.core import exceptions_validation
 from chat_client.core import user_session
-from chat_client.core.exceptions import JSONError
+
 from chat_client.models import Dialog, Message
-from chat_client.database.db_session import async_session  # global session
+from chat_client.database.db_session import async_session
 import uuid
 import logging
 from sqlalchemy import select, func
@@ -38,7 +38,7 @@ async def create_dialog(request: Request):
 async def create_message(request: Request):
     form_data = await request.json()
 
-    dialog_id = request.path_params.get("dialog_id")
+    dialog_id = str(request.path_params.get("dialog_id"))
     content = str(form_data.get("content"))
     role = str(form_data.get("role"))
     user_id = await user_session.is_logged_in(request)
@@ -62,7 +62,7 @@ async def get_dialog(request: Request):
     user_id = await user_session.is_logged_in(request)
 
     if not user_id:
-        raise UserValidate("You must be logged in to get a dialog")
+        raise exceptions_validation.UserValidate("You must be logged in to get a dialog")
 
     async with async_session() as session:
         stmt = select(Dialog).where(Dialog.dialog_id == dialog_id, Dialog.user_id == user_id)
@@ -70,7 +70,9 @@ async def get_dialog(request: Request):
         dialog = result.scalar_one_or_none()
 
         if not dialog:
-            raise UserValidate("Dialog not found or not owned by user")
+            raise exceptions_validation.UserValidate("Dialog not found or not owned by user")
+
+        assert dialog.created is not None
 
         return {
             "dialog_id": str(dialog.dialog_id),
@@ -91,15 +93,19 @@ async def get_messages(request: Request):
         result = await session.execute(stmt)
         messages = result.scalars().all()
 
-        return [
-            {
-                "message_id": str(m.message_id),
-                "role": m.role,
-                "content": m.content,
-                "created": m.created.isoformat(),
-            }
-            for m in messages
-        ]
+        return_list = []
+        for m in messages:
+            assert m.created is not None
+            return_list.append(
+                {
+                    "message_id": str(m.message_id),
+                    "role": m.role,
+                    "content": m.content,
+                    "created": m.created.isoformat(),
+                }
+            )
+
+        return return_list
 
 
 async def delete_dialog(request: Request):
@@ -107,7 +113,7 @@ async def delete_dialog(request: Request):
     dialog_id = request.path_params.get("dialog_id")
 
     if not user_id:
-        raise UserValidate("You must be logged in to delete a dialog")
+        raise exceptions_validation.UserValidate("You must be logged in to delete a dialog")
 
     async with async_session() as session:
         stmt = select(Dialog).where(Dialog.dialog_id == dialog_id, Dialog.user_id == user_id)
@@ -115,7 +121,7 @@ async def delete_dialog(request: Request):
         dialog = result.scalar_one_or_none()
 
         if not dialog:
-            raise UserValidate("Dialog is not connected to user. You can't delete it")
+            raise exceptions_validation.UserValidate("Dialog is not connected to user. You can't delete it")
 
         await session.delete(dialog)
         await session.commit()
@@ -126,7 +132,7 @@ async def get_dialogs_info(request: Request):
     user_id = await user_session.is_logged_in(request)
 
     if not user_id:
-        raise JSONError("It seems you have been logged out. Log in again", status_code=200)
+        raise exceptions_validation.JSONError("It seems you have been logged out. Log in again", status_code=200)
 
     async with async_session() as session:
 
@@ -153,6 +159,17 @@ async def get_dialogs_info(request: Request):
 
         logger.warning(f"Dialogs for user {user_id}: {len(dialogs)} found on page {current_page}")
 
+        dialogs_list = []
+        for d in dialogs:
+            assert d.created is not None  # helps both Mypy and sanity
+            dialogs_list.append(
+                {
+                    "dialog_id": str(d.dialog_id),
+                    "title": d.title,
+                    "created": d.created.isoformat(),
+                }
+            )
+
         return {
             "current_page": current_page,
             "per_page": DIALOGS_PER_PAGE,
@@ -160,13 +177,6 @@ async def get_dialogs_info(request: Request):
             "has_next": has_next,
             "prev_page": prev_page,
             "next_page": next_page,
-            "dialogs": [
-                {
-                    "dialog_id": str(d.dialog_id),  # UUID -> string
-                    "title": d.title,
-                    "created": d.created.isoformat(),  # datetime -> ISO string
-                }
-                for d in dialogs
-            ],
+            "dialogs": dialogs_list,
             "num_dialogs": num_dialogs,
         }

@@ -9,7 +9,9 @@ import string
 import io
 from chat_client.repositories import chat_repository, user_repository
 from chat_client.core import flash
-from chat_client.core.exceptions import UserValidate
+
+# from chat_client.core.exceptions import UserValidate
+from chat_client.core import exceptions_validation
 from chat_client.core import user_session
 from chat_client.core.templates import get_templates
 from chat_client.core.base_context import get_context
@@ -48,7 +50,7 @@ async def signup_post(request: Request):
         )
 
         return JSONResponse({"error": False, "message": "Your account has been created"})
-    except UserValidate as e:
+    except exceptions_validation.UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})
     except Exception as e:
         logger.exception(e)
@@ -72,7 +74,7 @@ async def verify_post(request: Request):
         await user_repository.verify_user(request)
         flash.set_success(request, "Your account has been verified successfully")
         return JSONResponse({"error": False})
-    except UserValidate as e:
+    except exceptions_validation.UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})
     except Exception as e:
         logger.exception(e)
@@ -95,7 +97,7 @@ async def login_post(request: Request):
         user_session.set_session_variable(request, "user_id", login_user["user_id"])
         flash.set_success(request, "You are now logged in")
         return JSONResponse({"error": False})
-    except UserValidate as e:
+    except exceptions_validation.UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})
     except Exception as e:
         logger.exception(e)
@@ -160,7 +162,7 @@ async def reset_password_post(request: Request):
             "Then you can login with your new password.",
         )
         return JSONResponse({"error": False, "message": "A password reset email has been sent."})
-    except UserValidate as e:
+    except exceptions_validation.UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})
     except Exception as e:
         logger.exception(e)
@@ -184,7 +186,7 @@ async def new_password_post(request: Request):
         await user_repository.new_password(request)
         flash.set_success(request, "Password has been updated. You can now login.")
         return JSONResponse({"error": False, "message": "Password reset email sent"})
-    except UserValidate as e:
+    except exceptions_validation.UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})
     except Exception as e:
         logger.exception(e)
@@ -245,7 +247,7 @@ async def profile_post(request: Request):
     try:
         await user_repository.update_profile(request)
         return JSONResponse({"error": False, "message": "Profile updated"})
-    except UserValidate as e:
+    except exceptions_validation.UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})
     except Exception as e:
         logger.exception(e)
