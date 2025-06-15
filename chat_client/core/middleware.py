@@ -3,10 +3,13 @@ Middleware for the application
 """
 
 from starlette.middleware import Middleware
+
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
+# from starlette.middleware.cors import CORSMiddleware
 # from starlette.middleware.gzip import GZipMiddleware
+# NOTE: GZIP cannot be used with streaming responses
 from starlette.responses import JSONResponse
 from starlette.requests import Request
 import data.config as config
