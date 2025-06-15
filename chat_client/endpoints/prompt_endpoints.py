@@ -10,11 +10,12 @@ from chat_client.core import user_session
 # from chat_client.core.exceptions import UserValidate
 from chat_client.core import exceptions_validation
 from chat_client.repositories import prompt_repository
+from chat_client.core import flash
 
 templates = get_templates()
 
 
-async def prompt_list(request: Request):
+async def prompt_list_get(request: Request):
     user_id = await user_session.is_logged_in(request)
     if not user_id:
         return RedirectResponse("/user/login")
@@ -45,7 +46,7 @@ async def prompt_list_json(request: Request):
     return JSONResponse({"error": False, "prompts": data})
 
 
-async def prompt_create_form(request: Request):
+async def prompt_create_get(request: Request):
     if not await user_session.is_logged_in(request):
         return RedirectResponse("/user/login")
     context = {
@@ -57,13 +58,14 @@ async def prompt_create_form(request: Request):
     return templates.TemplateResponse("prompts/create.html", context)
 
 
-async def prompt_create(request: Request):
+async def prompt_create_post(request: Request):
     try:
         user_id = await user_session.is_logged_in(request)
         if not user_id:
             return JSONResponse({"error": True, "message": "Not authenticated"}, status_code=401)
 
         result = await prompt_repository.create_prompt(user_id, request)
+        flash.set_success(request, "Prompt created successfully")
         return JSONResponse({"error": False, "prompt_id": result["prompt_id"]})
     except exceptions_validation.UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})
@@ -105,7 +107,7 @@ async def prompt_detail_json(request: Request):
     return JSONResponse({"error": False, "prompt": data})
 
 
-async def prompt_edit_form(request: Request):
+async def prompt_edit_get(request: Request):
     prompt_id = int(request.path_params["prompt_id"])
     user_id = await user_session.is_logged_in(request)
     if not user_id:
@@ -124,7 +126,7 @@ async def prompt_edit_form(request: Request):
     return templates.TemplateResponse("prompts/edit.html", context)
 
 
-async def prompt_edit(request: Request):
+async def prompt_edit_post(request: Request):
 
     prompt_id = int(request.path_params["prompt_id"])
     user_id = await user_session.is_logged_in(request)
@@ -137,12 +139,13 @@ async def prompt_edit(request: Request):
 
     try:
         await prompt_repository.update_prompt(request, prompt_id)
+        flash.set_success(request, "Prompt updated successfully")
         return JSONResponse({"error": False})
     except exceptions_validation.UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})
 
 
-async def prompt_delete(request: Request):
+async def prompt_delete_post(request: Request):
     prompt_id = int(request.path_params["prompt_id"])
     user_id = await user_session.is_logged_in(request)
     if not user_id:
@@ -153,19 +156,20 @@ async def prompt_delete(request: Request):
         return JSONResponse({"error": True, "message": "Prompt not found"}, status_code=404)
     try:
         await prompt_repository.delete_prompt(request, prompt_id)
+        flash.set_success(request, "Prompt deleted successfully")
         return JSONResponse({"error": False})
     except exceptions_validation.UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})
 
 
 routes_prompt = [
-    Route("/prompt", prompt_list, methods=["GET"]),
+    Route("/prompt", prompt_list_get, methods=["GET"]),
     Route("/prompt/json", prompt_list_json, methods=["GET"]),
-    Route("/prompt/create", prompt_create_form, methods=["GET"]),
-    Route("/prompt/create", prompt_create, methods=["POST"]),
+    Route("/prompt/create", prompt_create_get, methods=["GET"]),
+    Route("/prompt/create", prompt_create_post, methods=["POST"]),
     Route("/prompt/{prompt_id:int}", prompt_detail, methods=["GET"]),
-    Route("/prompt/{prompt_id:int}/edit", prompt_edit_form, methods=["GET"]),
-    Route("/prompt/{prompt_id:int}/edit", prompt_edit, methods=["POST"]),
-    Route("/prompt/{prompt_id:int}/delete", prompt_delete, methods=["POST"]),
+    Route("/prompt/{prompt_id:int}/edit", prompt_edit_get, methods=["GET"]),
+    Route("/prompt/{prompt_id:int}/edit", prompt_edit_post, methods=["POST"]),
+    Route("/prompt/{prompt_id:int}/delete", prompt_delete_post, methods=["POST"]),
     Route("/prompt/{prompt_id:int}/json", prompt_detail_json, methods=["GET"]),
 ]
