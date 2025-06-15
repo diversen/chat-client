@@ -1,6 +1,6 @@
 #!/bin/sh
 echo "Running black ..."
-black . --config pyproject.toml
+black . --config pyproject.toml --extend-exclude '/chat_client/migrations/'
 
 echo "Running mypy ..."
 mypy  --config-file pyproject.toml chat_client
