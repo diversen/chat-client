@@ -198,8 +198,12 @@ async def list_dialogs_json(request: Request):
     Get user dialogs from database
     Endpoint /user/dialogs
     """
+    user_id = await user_session.is_logged_in(request)
 
-    dialogs_info = await chat_repository.get_dialogs_info(request)
+    if not user_id:
+        raise exceptions_validation.JSONError("It seems you have been logged out. Log in again", status_code=200)
+
+    dialogs_info = await chat_repository.get_dialogs_info(user_id, request)
     return JSONResponse({"error": False, "dialogs_info": dialogs_info})
 
 

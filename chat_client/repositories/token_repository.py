@@ -7,10 +7,10 @@ from sqlalchemy import select
 EXPIRE_TIME_IN_MINUTES = 10
 
 
-async def create_token(session: AsyncSession, type: str) -> str:
+async def create_token(session: AsyncSession, token_type: str) -> str:
 
     token_value = secrets.token_urlsafe(32)
-    token = Token(token=token_value, type="RESET")
+    token = Token(token=token_value, type=token_type)
     token.created = arrow.utcnow().datetime
 
     session.add(token)

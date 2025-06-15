@@ -59,7 +59,11 @@ async def prompt_create_form(request: Request):
 
 async def prompt_create(request: Request):
     try:
-        result = await prompt_repository.create_prompt(request)
+        user_id = await user_session.is_logged_in(request)
+        if not user_id:
+            return JSONResponse({"error": True, "message": "Not authenticated"}, status_code=401)
+
+        result = await prompt_repository.create_prompt(user_id, request)
         return JSONResponse({"error": False, "prompt_id": result["prompt_id"]})
     except exceptions_validation.UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})

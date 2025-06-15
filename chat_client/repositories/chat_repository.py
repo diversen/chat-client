@@ -1,7 +1,5 @@
 from starlette.requests import Request
-from starlette.responses import JSONResponse
 from chat_client.core import exceptions_validation
-from chat_client.core import user_session
 
 from chat_client.models import Dialog, Message
 from chat_client.database.db_session import async_session
@@ -14,13 +12,9 @@ logger: logging.Logger = logging.getLogger(__name__)
 DIALOGS_PER_PAGE = 10
 
 
-async def create_dialog(request: Request):
+async def create_dialog(user_id: int, request: Request):
     form_data = await request.json()
     title = str(form_data.get("title"))
-    user_id = await user_session.is_logged_in(request)
-
-    if not user_id:
-        return JSONResponse({"error": "You must be logged in to save a dialog"})
 
     async with async_session() as session:
         dialog_id = str(uuid.uuid4())
@@ -35,16 +29,12 @@ async def create_dialog(request: Request):
         return dialog_id
 
 
-async def create_message(request: Request):
+async def create_message(user_id: int, request: Request):
     form_data = await request.json()
 
     dialog_id = str(request.path_params.get("dialog_id"))
     content = str(form_data.get("content"))
     role = str(form_data.get("role"))
-    user_id = await user_session.is_logged_in(request)
-
-    if not user_id:
-        return JSONResponse({"error": True, "message": "You must be logged in to save a message"})
 
     async with async_session() as session:
         new_message = Message(
@@ -57,12 +47,8 @@ async def create_message(request: Request):
         await session.commit()
 
 
-async def get_dialog(request: Request):
+async def get_dialog(user_id: int, request: Request):
     dialog_id = request.path_params.get("dialog_id")
-    user_id = await user_session.is_logged_in(request)
-
-    if not user_id:
-        raise exceptions_validation.UserValidate("You must be logged in to get a dialog")
 
     async with async_session() as session:
         stmt = select(Dialog).where(Dialog.dialog_id == dialog_id, Dialog.user_id == user_id)
@@ -81,12 +67,8 @@ async def get_dialog(request: Request):
         }
 
 
-async def get_messages(request: Request):
+async def get_messages(user_id: int, request: Request):
     dialog_id = request.path_params.get("dialog_id")
-    user_id = await user_session.is_logged_in(request)
-
-    if not user_id:
-        return JSONResponse({"error": "You must be logged in to get messages"})
 
     async with async_session() as session:
         stmt = select(Message).where(Message.dialog_id == dialog_id, Message.user_id == user_id).order_by(Message.created.asc()).limit(1000)
@@ -108,12 +90,8 @@ async def get_messages(request: Request):
         return return_list
 
 
-async def delete_dialog(request: Request):
-    user_id = await user_session.is_logged_in(request)
+async def delete_dialog(user_id: int, request: Request):
     dialog_id = request.path_params.get("dialog_id")
-
-    if not user_id:
-        raise exceptions_validation.UserValidate("You must be logged in to delete a dialog")
 
     async with async_session() as session:
         stmt = select(Dialog).where(Dialog.dialog_id == dialog_id, Dialog.user_id == user_id)
@@ -127,12 +105,8 @@ async def delete_dialog(request: Request):
         await session.commit()
 
 
-async def get_dialogs_info(request: Request):
+async def get_dialogs_info(user_id: int, request: Request):
     current_page = int(request.query_params.get("page", 1))
-    user_id = await user_session.is_logged_in(request)
-
-    if not user_id:
-        raise exceptions_validation.JSONError("It seems you have been logged out. Log in again", status_code=200)
 
     async with async_session() as session:
 

@@ -23,10 +23,7 @@ async def _validate(title: str, prompt_text: str):
         raise exceptions_validation.UserValidate(f"Prompt must be ≤ {MAX_PROMPT_LEN} characters")
 
 
-async def create_prompt(request: Request):
-    user_id = await user_session.is_logged_in(request)
-    if not user_id:
-        raise exceptions_validation.UserValidate("You must be logged in to create prompts")
+async def create_prompt(user_id: int, request: Request):
 
     form = await request.json()
     title = str(form.get("title", ""))

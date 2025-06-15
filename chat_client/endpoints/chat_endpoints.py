@@ -199,7 +199,7 @@ async def chat_response_stream(request: Request):
 
 async def config_(request: Request):
     """
-    Get frontend configuration
+    GET frontend configuration
     """
     config_ = {
         "default_model": getattr(config, "DEFAULT_MODEL", ""),
@@ -212,6 +212,8 @@ async def config_(request: Request):
 
 async def json_tools(request: Request):
     """
+    POST endpoint for calling tools
+
     A tool can call this endpoint using JSON data.
     The server will then call a function
     The JSON data is in the form of which specify the tool to call
@@ -222,6 +224,10 @@ async def json_tools(request: Request):
     }
 
     """
+
+    logged_in = await user_session.is_logged_in(request)
+    if not logged_in:
+        return JSONResponse({"error": True, "message": "You must be logged in to use tools"}, status_code=401)
 
     # Get JSON data
     data = await request.json()
@@ -258,6 +264,9 @@ async def _get_model_names():
 
 
 async def list_models(request: Request):
+    """
+    GET avalialbe models
+    """
 
     model_names = await _get_model_names()
     return JSONResponse({"model_names": model_names})
@@ -268,13 +277,17 @@ async def create_dialog(request: Request):
     Save dialog to database
     """
     try:
-        dialog_id = await chat_repository.create_dialog(request)
+        user_id = await user_session.is_logged_in(request)
+        if not user_id:
+            return JSONResponse({"error": True, "message": "You must be logged in to save a dialog"}, status_code=401)
+
+        dialog_id = await chat_repository.create_dialog(user_id, request)
         return JSONResponse({"error": False, "dialog_id": dialog_id, "message": "Dialog saved"})
     except exceptions_validation.UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})
     except Exception:
         logger.exception("Error saving dialog")
-        return JSONResponse({"error": True, "message": "Error saving dialog"})
+        return JSONResponse({"error": True, "message": "Error saving dialog"}, status_code=500)
 
 
 async def create_message(request: Request):
@@ -282,13 +295,18 @@ async def create_message(request: Request):
     Save message to database
     """
     try:
-        message_id = await chat_repository.create_message(request)
+
+        user_id = await user_session.is_logged_in(request)
+        if not user_id:
+            return JSONResponse({"error": True, "message": "You must be logged in create a message"}, status_code=401)
+
+        message_id = await chat_repository.create_message(user_id, request)
         return JSONResponse({"message_id": message_id})
     except exceptions_validation.UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})
     except Exception:
         logger.exception("Error saving message")
-        return JSONResponse({"error": True, "message": "Error saving message"})
+        return JSONResponse({"error": True, "message": "Error saving message"}, status_code=500)
 
 
 async def get_dialog(request: Request):
@@ -296,13 +314,18 @@ async def get_dialog(request: Request):
     Get dialog from database
     """
     try:
-        dialog = await chat_repository.get_dialog(request)
+
+        user_id = await user_session.is_logged_in(request)
+        if not user_id:
+            return JSONResponse({"error": True, "message": "You must be logged in to get a dialog"}, status_code=401)
+
+        dialog = await chat_repository.get_dialog(user_id, request)
         return JSONResponse(dialog)
     except exceptions_validation.UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})
     except Exception:
         logger.exception("Error getting dialog")
-        return JSONResponse({"error": True, "message": "Error getting dialog"})
+        return JSONResponse({"error": True, "message": "Error getting dialog"}, status_code=500)
 
 
 async def get_messages(request: Request):
@@ -310,13 +333,18 @@ async def get_messages(request: Request):
     Get messages from database
     """
     try:
-        messages = await chat_repository.get_messages(request)
+
+        user_id = await user_session.is_logged_in(request)
+        if not user_id:
+            return JSONResponse({"error": True, "message": "You must be logged in to get a dialog"}, status_code=401)
+
+        messages = await chat_repository.get_messages(user_id, request)
         return JSONResponse(messages)
     except exceptions_validation.UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})
     except Exception:
         logger.exception("Error getting messages")
-        return JSONResponse({"error": True, "message": "Error getting messages"})
+        return JSONResponse({"error": True, "message": "Error getting messages"}, status_code=500)
 
 
 async def delete_dialog(request: Request):
@@ -324,13 +352,18 @@ async def delete_dialog(request: Request):
     Delete dialog from database
     """
     try:
-        await chat_repository.delete_dialog(request)
+
+        user_id = await user_session.is_logged_in(request)
+        if not user_id:
+            return JSONResponse({"error": True, "message": "You must be logged in to delete a dialog"}, status_code=401)
+
+        await chat_repository.delete_dialog(user_id, request)
         return JSONResponse({"error": False})
     except exceptions_validation.UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})
     except Exception:
         logger.exception("Error deleting dialog")
-        return JSONResponse({"error": True, "message": "Error deleting dialog"})
+        return JSONResponse({"error": True, "message": "Error deleting dialog"}, status_code=500)
 
 
 routes_chat: list = [

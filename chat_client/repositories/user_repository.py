@@ -13,7 +13,6 @@ import bcrypt
 import logging
 import secrets
 import re
-from chat_client.core import flash
 
 from sqlalchemy import select
 from chat_client.database.db_session import async_session
@@ -21,7 +20,6 @@ from chat_client.database.db_session import async_session
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-# Utility Functions
 def _password_hash(password: str, cost: int = 12) -> str:
     salt = bcrypt.gensalt(rounds=cost)
     hashed = bcrypt.hashpw(password.encode(), salt)
@@ -53,7 +51,6 @@ async def _validate_captcha(request: Request):
         raise exceptions_validation.UserValidate("Invalid CAPTCHA")
 
 
-# Main Logic
 async def create_user(request: Request):
     form = await request.form()
     password = str(form.get("password"))
@@ -75,7 +72,7 @@ async def create_user(request: Request):
             raise exceptions_validation.UserValidate("User already exists. Please login or reset your password.")
 
         token = await token_repository.create_token(session, "VERIFY")
-
+        logger.info(f"Generated verification token: {token}")
         new_user = User(email=email, password_hash=password_hashed, random=token)
         session.add(new_user)
         await session.commit()
