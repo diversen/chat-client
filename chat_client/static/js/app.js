@@ -55,7 +55,14 @@ messageElem.addEventListener('keydown', async (e) => {
         return;
     } else if (e.key === 'Enter') {
         e.preventDefault();
-        await sendUserMessage();
+
+        // Trim the input value
+        messageElem.value = messageElem.value.trim();
+
+        // Only send if there's something left after trimming
+        if (messageElem.value !== '') {
+            await sendUserMessage();
+        }
     }
 });
 
