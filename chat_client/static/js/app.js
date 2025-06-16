@@ -55,16 +55,10 @@ messageElem.addEventListener('keydown', async (e) => {
         return;
     } else if (e.key === 'Enter') {
         e.preventDefault();
-
-        // Trim the input value
-        messageElem.value = messageElem.value.trim();
-
-        // Only send if there's something left after trimming
-        if (messageElem.value !== '') {
-            await sendUserMessage();
-        }
+        await sendUserMessage();
     }
 });
+
 
 /**
  * Helper function: Highlight code in a given element
@@ -110,6 +104,8 @@ function renderCopyMessageButton(container, message) {
     messageActions.classList.remove('hidden');
     messageActions.querySelector('.copy-message').addEventListener('click', () => {
         // Notice this will only work in secure contexts (HTTPS)
+        // Trim the message to avoid copying extra whitespace
+        message = message.trim();
         navigator.clipboard.writeText(message);
 
         // Alter icon to check icon for 3 seconds
