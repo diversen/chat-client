@@ -49,23 +49,26 @@ abortButtonElem.addEventListener('click', () => {
 /**
  * Shortcut to send message when user presses Enter + Ctrl
  */
-let isPasting = false;
+// This variable will store the timestamp of the last paste event.
+let lastPasteTime = 0;
 
 messageElem.addEventListener('paste', () => {
-    isPasting = true;
-    // Use a minimal timeout to reset the flag after the paste event has been processed.
-    setTimeout(() => {
-        isPasting = false;
-    }, 50);
+    // Record the exact time the paste occurred.
+    lastPasteTime = Date.now();
 });
 
 messageElem.addEventListener('keydown', async (e) => {
-    // If a paste is in progress, do not proceed with the Enter key logic.
-    if (isPasting) {
-        return;
-    }
-
     if (e.key === 'Enter') {
+        // Check if the Enter key was pressed within 100ms of a paste.
+        // This is a reliable way to detect the problematic "paste-and-submit" keyboard action.
+        if (Date.now() - lastPasteTime < 100) {
+            // If so, prevent the default action (like adding a newline) and
+            // stop further execution. This ignores the 'Enter' press.
+            e.preventDefault();
+            return;
+        }
+        
+        // The original logic remains for actual user key presses.
         if (e.ctrlKey) {
             // If Ctrl+Enter is pressed, add a new line at the point of the cursor
             e.preventDefault();
@@ -75,7 +78,8 @@ messageElem.addEventListener('keydown', async (e) => {
             messageElem.selectionStart = messageElem.selectionEnd = start + 1;
 
         } else {
-            // If only Enter is pressed, prevent the default behavior and send the message
+            // If only Enter is pressed (and it wasn't immediately after a paste),
+            // prevent the default behavior and send the message
             e.preventDefault();
             await sendUserMessage();
         }
