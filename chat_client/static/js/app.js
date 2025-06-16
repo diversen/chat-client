@@ -49,16 +49,38 @@ abortButtonElem.addEventListener('click', () => {
 /**
  * Shortcut to send message when user presses Enter + Ctrl
  */
-messageElem.addEventListener('keydown', async (e) => {
-    if (e.key === 'Enter' && e.shiftKey) {
-        // Allow line break with Shift+Enter
-        return;
-    } else if (e.key === 'Enter') {
-        e.preventDefault();
-        await sendUserMessage();
-    }
+let isPasting = false;
+
+messageElem.addEventListener('paste', () => {
+    isPasting = true;
+    // Use a minimal timeout to reset the flag after the paste event has been processed.
+    setTimeout(() => {
+        isPasting = false;
+    }, 50);
 });
 
+messageElem.addEventListener('keydown', async (e) => {
+    // If a paste is in progress, do not proceed with the Enter key logic.
+    if (isPasting) {
+        return;
+    }
+
+    if (e.key === 'Enter') {
+        if (e.ctrlKey) {
+            // If Ctrl+Enter is pressed, add a new line at the point of the cursor
+            e.preventDefault();
+            const start = messageElem.selectionStart;
+            const end = messageElem.selectionEnd;
+            messageElem.value = messageElem.value.substring(0, start) + '\n' + messageElem.value.substring(end);
+            messageElem.selectionStart = messageElem.selectionEnd = start + 1;
+
+        } else {
+            // If only Enter is pressed, prevent the default behavior and send the message
+            e.preventDefault();
+            await sendUserMessage();
+        }
+    }
+});
 
 /**
  * Helper function: Highlight code in a given element
@@ -104,8 +126,6 @@ function renderCopyMessageButton(container, message) {
     messageActions.classList.remove('hidden');
     messageActions.querySelector('.copy-message').addEventListener('click', () => {
         // Notice this will only work in secure contexts (HTTPS)
-        // Trim the message to avoid copying extra whitespace
-        message = message.trim();
         navigator.clipboard.writeText(message);
 
         // Alter icon to check icon for 3 seconds
