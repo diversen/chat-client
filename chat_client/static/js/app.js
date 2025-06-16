@@ -52,20 +52,26 @@ abortButtonElem.addEventListener('click', () => {
 messageElem.addEventListener('keydown', async (e) => {
     if (e.key === 'Enter') {
         if (e.ctrlKey) {
-            // If Ctrl+Enter is pressed, add a new line at the point of the cursor
             e.preventDefault();
             const start = messageElem.selectionStart;
             const end = messageElem.selectionEnd;
             messageElem.value = messageElem.value.substring(0, start) + '\n' + messageElem.value.substring(end);
             messageElem.selectionStart = messageElem.selectionEnd = start + 1;
-
         } else {
-            // If only Enter is pressed, prevent the default behavior and send the message
             e.preventDefault();
             await sendUserMessage();
         }
     }
 });
+
+// Prevent accidental submission from mobile or pasting newlines
+messageElem.addEventListener('beforeinput', (e) => {
+    if (e.inputType === 'insertParagraph' && !e.ctrlKey) {
+        // Could conditionally prevent based on platform or context
+        e.preventDefault();
+    }
+});
+
 /**
  * Helper function: Highlight code in a given element
  */
