@@ -50,25 +50,12 @@ abortButtonElem.addEventListener('click', () => {
  * Shortcut to send message when user presses Enter + Ctrl
  */
 messageElem.addEventListener('keydown', async (e) => {
-    if (e.key === 'Enter') {
-        if (e.ctrlKey) {
-            e.preventDefault();
-            const start = messageElem.selectionStart;
-            const end = messageElem.selectionEnd;
-            messageElem.value = messageElem.value.substring(0, start) + '\n' + messageElem.value.substring(end);
-            messageElem.selectionStart = messageElem.selectionEnd = start + 1;
-        } else {
-            e.preventDefault();
-            await sendUserMessage();
-        }
-    }
-});
-
-// Prevent accidental submission from mobile or pasting newlines
-messageElem.addEventListener('beforeinput', (e) => {
-    if (e.inputType === 'insertParagraph' && !e.ctrlKey) {
-        // Could conditionally prevent based on platform or context
+    if (e.key === 'Enter' && e.shiftKey) {
+        // Allow line break with Shift+Enter
+        return;
+    } else if (e.key === 'Enter') {
         e.preventDefault();
+        await sendUserMessage();
     }
 });
 
