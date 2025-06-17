@@ -50,10 +50,14 @@ abortButtonElem.addEventListener('click', () => {
  * Shortcut to send message when user presses Enter + Ctrl
  */
 messageElem.addEventListener('keydown', async (e) => {
+    if (!e.isTrusted) {
+        return;
+    }
     if (e.key === 'Enter') {
+        e.preventDefault();
         if (e.ctrlKey) {
             // If Ctrl+Enter is pressed, add a new line at the point of the cursor
-            e.preventDefault();
+            
             const start = messageElem.selectionStart;
             const end = messageElem.selectionEnd;
             messageElem.value = messageElem.value.substring(0, start) + '\n' + messageElem.value.substring(end);
@@ -61,8 +65,6 @@ messageElem.addEventListener('keydown', async (e) => {
 
         } else {
             // If only Enter is pressed, prevent the default behavior and send the message
-            console.log('Sending message');
-            e.preventDefault();
             await sendUserMessage();
         }
     }
