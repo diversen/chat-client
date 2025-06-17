@@ -79,12 +79,15 @@ messageElem.addEventListener('paste', async (e) => {
     // Get the pasted text from the clipboard
     const clipboardData = e.clipboardData || window.clipboardData;
     const pastedText = clipboardData.getData('text/plain');
+
+    // Trim the pasted text to remove leading/trailing whitespace
+    const trimmedText = pastedText.trim();
     
     // Just add the pasted text to the messageElem
     const start = messageElem.selectionStart;
     const end = messageElem.selectionEnd;
-    messageElem.value = messageElem.value.substring(0, start) + pastedText + messageElem.value.substring(end);
-    messageElem.selectionStart = messageElem.selectionEnd = start + pastedText.length;
+    messageElem.value = messageElem.value.substring(0, start) + trimmedText + messageElem.value.substring(end);
+    messageElem.selectionStart = messageElem.selectionEnd = start + trimmedText.length;
 
 })
 
