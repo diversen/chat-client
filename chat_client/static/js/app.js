@@ -61,11 +61,33 @@ messageElem.addEventListener('keydown', async (e) => {
 
         } else {
             // If only Enter is pressed, prevent the default behavior and send the message
+            console.log('Sending message');
             e.preventDefault();
             await sendUserMessage();
         }
     }
 });
+
+
+/**
+ * event listener for messageElem 'paste' event
+ */
+messageElem.addEventListener('paste', async (e) => {
+    // Prevent the default paste behavior
+    e.preventDefault();
+    
+    // Get the pasted text from the clipboard
+    const clipboardData = e.clipboardData || window.clipboardData;
+    const pastedText = clipboardData.getData('text/plain');
+    
+    // Just add the pasted text to the messageElem
+    const start = messageElem.selectionStart;
+    const end = messageElem.selectionEnd;
+    messageElem.value = messageElem.value.substring(0, start) + pastedText + messageElem.value.substring(end);
+    messageElem.selectionStart = messageElem.selectionEnd = start + pastedText.length;
+
+})
+
 /**
  * Helper function: Highlight code in a given element
  */
