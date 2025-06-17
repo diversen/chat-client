@@ -49,27 +49,40 @@ abortButtonElem.addEventListener('click', () => {
 /**
  * Shortcut to send message when user presses Enter + Ctrl
  */
+let justPasted = false;
+
+messageElem.addEventListener('paste', () => {
+    justPasted = true;
+    setTimeout(() => {
+        justPasted = false;
+    }, 100);
+});
+
 messageElem.addEventListener('keydown', async (e) => {
     if (!e.isTrusted) {
         return;
     }
+
     if (e.key === 'Enter') {
+        if (justPasted) {
+            e.preventDefault();
+            return;
+        }
+
         e.preventDefault();
+
         if (e.ctrlKey) {
-            // If Ctrl+Enter is pressed, add a new line at the point of the cursor
-            
+            // Add a new line on Ctrl+Enter
             const start = messageElem.selectionStart;
             const end = messageElem.selectionEnd;
             messageElem.value = messageElem.value.substring(0, start) + '\n' + messageElem.value.substring(end);
             messageElem.selectionStart = messageElem.selectionEnd = start + 1;
-
         } else {
-            // If only Enter is pressed, prevent the default behavior and send the message
+            // Send message on Enter
             await sendUserMessage();
         }
     }
 });
-
 
 /**
  * event listener for messageElem 'paste' event
@@ -77,14 +90,14 @@ messageElem.addEventListener('keydown', async (e) => {
 messageElem.addEventListener('paste', async (e) => {
     // Prevent the default paste behavior
     e.preventDefault();
-    
+
     // Get the pasted text from the clipboard
     const clipboardData = e.clipboardData || window.clipboardData;
     const pastedText = clipboardData.getData('text/plain');
 
     // Trim the pasted text to remove leading/trailing whitespace
     const trimmedText = pastedText.trim();
-    
+
     // Just add the pasted text to the messageElem
     const start = messageElem.selectionStart;
     const end = messageElem.selectionEnd;
