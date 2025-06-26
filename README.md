@@ -23,7 +23,7 @@ Example are e.g. `ollama` or `openai` etc.
 * load and continue saved dialogs
 * tool support (if enabled)
 * python execution (if enabled)
-* supports chat and openai models (and others that can use the openai api)
+* supports ollama and openai models (and others that models that support the openai api)
 * easily enable all chat models (or any other provider that can use the openai api)
 
 ## Installation using pipx
