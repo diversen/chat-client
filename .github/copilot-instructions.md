@@ -157,6 +157,194 @@ chat_client/
    - Handle mathematical expressions with MathJax
    - Implement conversation history management
 
+## Getting Started for Development
+
+### Quick Start (Complete Setup from Scratch)
+
+1. **Clone and Setup Environment**:
+   ```bash
+   git clone https://github.com/diversen/chat-client.git
+   cd chat-client
+   
+   # Install uv if not already installed
+   pip install uv
+   
+   # Create virtual environment and install dependencies
+   uv venv
+   source .venv/bin/activate
+   uv pip install -e .
+   ```
+
+2. **Initialize the System**:
+   ```bash
+   # This creates data/config.py with default configuration
+   chat-client
+   
+   # Run database migrations
+   chat-client init-system
+   
+   # Create a user account (interactive prompts for email/password)
+   chat-client create-user
+   ```
+
+3. **Configure LLM Providers** (choose one option):
+   
+   **Option A: With Ollama (requires ollama running on localhost:11434)**:
+   ```bash
+   # Install and start ollama first, then the default config will work
+   # The system will automatically detect available ollama models
+   ```
+   
+   **Option B: Without Ollama (for testing/development)**:
+   Edit `data/config.py` and comment out the ollama provider:
+   ```python
+   PROVIDERS = {
+       # "ollama": {
+       #     "base_url": "http://localhost:11434/v1",
+       #     "api_key": "ollama",
+       # },
+   }
+   
+   MODELS = {
+       "test-model": "test",  # For testing without real models
+   }
+   
+   # Comment out the ollama model discovery section (lines 89-98)
+   ```
+   
+   **Option C: With OpenAI or other providers**:
+   Edit `data/config.py`:
+   ```python
+   PROVIDERS = {
+       "openai": {
+           "base_url": "https://api.openai.com/v1",
+           "api_key": "your-api-key-here",
+       },
+   }
+   
+   MODELS = {
+       "gpt-4o-mini": "openai",
+   }
+   ```
+
+4. **Start Development Server**:
+   ```bash
+   chat-client server-dev
+   # Server will be available at http://localhost:8000
+   # Supports hot reloading for development
+   ```
+
+### Common Setup Issues and Solutions
+
+1. **"Error getting ollama provided models: Connection error"**:
+   - **Solution A**: Install and start ollama: `ollama serve` 
+   - **Solution B**: Edit `data/config.py` to remove or comment out ollama provider
+   - **Solution C**: Configure different providers (OpenAI, etc.)
+
+2. **Virtual Environment Issues**:
+   - Always activate the virtual environment: `source .venv/bin/activate`
+   - If uv commands fail: `pip install uv` first
+   - Check Python version: requires 3.10+
+
+3. **Database Migration Errors**:
+   - Ensure `data/` directory exists and is writable
+   - Run `chat-client init-system` before starting server
+   - Database file will be created at `data/database.db`
+
+4. **Port Already in Use**:
+   - Use different port: `chat-client server-dev --port 8080`
+   - Check for existing processes: `lsof -i :8000`
+
+### Development Workflow
+
+1. **Code Style and Linting**:
+   ```bash
+   # Format code (140 character line length)
+   black chat_client/
+   
+   # Check for issues
+   flake8 chat_client/
+   
+   # Type checking
+   mypy chat_client/
+   ```
+
+2. **Testing**:
+   ```bash
+   # Run individual test files
+   python tests/test_password_methods.py
+   
+   # Test specific functionality
+   python tests/test_tools.py
+   ```
+
+3. **Database Changes**:
+   ```bash
+   # After modifying models.py, generate migration
+   alembic revision --autogenerate -m "Description of changes"
+   
+   # Apply migrations
+   chat-client init-system
+   ```
+
+4. **Server Options**:
+   ```bash
+   # Development server with custom settings
+   chat-client server-dev --port 8080 --host 0.0.0.0
+   
+   # Production server (Linux/Mac only)
+   chat-client server-prod --workers 3
+   ```
+
+### Configuration Deep Dive
+
+1. **Key Configuration Files**:
+   - `data/config.py` - Main configuration (created automatically)
+   - `data/database.db` - SQLite database
+   - `data/main.log` - Application logs
+
+2. **Essential Configuration Options**:
+   ```python
+   # In data/config.py:
+   LOG_LEVEL = logging.DEBUG        # For development
+   SESSION_HTTPS_ONLY = False       # For local development
+   RELOAD = True                    # Enable hot reloading
+   
+   # For development without HTTPS
+   SESSION_SECRET_KEY = "your-secret-key"
+   ```
+
+3. **Environment Variables** (alternative to editing config.py):
+   ```bash
+   export OPENAI_API_KEY="your-key"
+   export CHAT_CLIENT_LOG_LEVEL="DEBUG"
+   ```
+
+### Debugging and Development Tips
+
+1. **Log Files**: Check `data/main.log` for detailed application logs
+2. **Database Inspection**: Use SQLite browser or CLI to inspect `data/database.db`
+3. **Hot Reloading**: Development server automatically reloads on file changes
+4. **Network Testing**: Server binds to `0.0.0.0` by default, accessible from network
+5. **Session Management**: Sessions are stored in database, clear with user logout
+
+### Testing the System
+
+1. **Web Interface Testing**:
+   - Navigate to http://localhost:8000 in browser
+   - Login with created user credentials
+   - Test chat functionality (if models configured)
+
+2. **API Testing**:
+   ```bash
+   # Test login endpoint
+   curl -X POST http://localhost:8000/auth/login \
+        -d "email=test@example.com&password=testpassword"
+   
+   # Test health check
+   curl http://localhost:8000/health
+   ```
+
 ## Common Development Tasks
 
 ### Adding New Features
@@ -255,5 +443,33 @@ except SpecificException as e:
 2. **Monitoring**: Implement proper logging and error tracking
 3. **Migrations**: Handle database migrations in production deployments
 4. **Configuration**: Use environment-specific configuration files
+
+## Development Environment Setup (Step-by-Step)
+
+### First Time Setup Checklist
+- [ ] Clone repository
+- [ ] Install uv package manager (`pip install uv`)
+- [ ] Create virtual environment (`uv venv`)
+- [ ] Activate virtual environment (`source .venv/bin/activate`)
+- [ ] Install in development mode (`uv pip install -e .`)
+- [ ] Run initial setup (`chat-client` - this creates config.py)
+- [ ] Configure LLM providers (edit `data/config.py`)
+- [ ] Initialize database (`chat-client init-system`)
+- [ ] Create user account (`chat-client create-user`)
+- [ ] Start development server (`chat-client server-dev`)
+- [ ] Test web interface (http://localhost:8000)
+
+### Dependencies and Tools
+- **Python**: 3.10+ required
+- **Package Manager**: uv (preferred) or pip
+- **Database**: SQLite (no external setup needed)
+- **Server**: Uvicorn (development) / Gunicorn (production)
+- **Code Quality**: Black (formatting), Flake8 (linting), MyPy (type checking)
+
+### IDE Setup Recommendations
+- Configure Black formatter with 140 character line length
+- Enable Flake8 linting with project's .flake8 config
+- Set up MyPy type checking (excludes tests, docs, migrations)
+- Use Python 3.10+ interpreter from virtual environment
 
 This project aims to provide a simple, extensible chat interface for LLMs while maintaining clean, maintainable code that follows Python best practices.
