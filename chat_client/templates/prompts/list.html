@@ -30,7 +30,7 @@
                 </svg>
             </a>
             </span>
-            <span class="prompt-title">{{ p.title }}</span>
+            <a href="/?id={{ p.prompt_id }}" class="prompt-title">{{ p.title }}</a>
         </div>
         {% endfor %}
     </div>
@@ -72,6 +72,12 @@
         overflow: hidden;
         text-overflow: ellipsis;
         max-width: 90%;
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .prompt-title:hover {
+        text-decoration: underline;
     }
 
     .prompt {

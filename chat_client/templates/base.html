@@ -73,18 +73,8 @@
         <a href="/user/logout">Log out</a>
         <a href="/user/profile">Profile</a>
         <a href="/prompt">Custom Prompts</a>
-        {% if prompts %}
-        <div class="user-prompts">
-            <hr>
-            <h2>System Prompt</h2>
-            <a href="/">Default</a>
-            {% for prompt in prompts %}
-            <a href="/?id={{ prompt.prompt_id }}">{{ prompt.title }}</a>
-            {% endfor %}
-        </div>
         <hr>
         <a>Version: {{ version }}</a>
-        {% endif %}
     </div>
     {% endif %}
 
