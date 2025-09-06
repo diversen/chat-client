@@ -104,50 +104,11 @@ function createMessageElement(role) {
     return { container: messageContainer, contentElement: contentElement, loader: loaderSpan };
 }
 
-/**
- * Render copy and edit buttons for user messages
- */
-function renderUserMessageButtons(container, message, messageId) {
-    const messageActions = container.querySelector('.message-actions');
-    messageActions.classList.remove('hidden');
-    
-    // Add edit button next to copy button
-    const editButton = document.createElement('a');
-    editButton.href = '#';
-    editButton.className = 'edit-message';
-    editButton.title = 'Edit message';
-    editButton.innerHTML = editIcon;
-    messageActions.appendChild(editButton);
-    
-    // Add copy button functionality
-    messageActions.querySelector('.copy-message').addEventListener('click', (e) => {
-        e.preventDefault();
-        // Notice this will only work in secure contexts (HTTPS)
-        navigator.clipboard.writeText(message);
-
-        // Alter icon to check icon for 3 seconds
-        const copyButton = messageActions.querySelector('.copy-message');
-        copyButton.innerHTML = checkIcon;
-        setTimeout(() => {
-            copyButton.innerHTML = copyIcon;
-        }, 2000);
-    });
-    
-    // Add edit button functionality
-    editButton.addEventListener('click', (e) => {
-        e.preventDefault();
-        showEditForm(container, message, messageId);
-    });
-}
-
-/**
- * Render copy button for assistant messages
- */
 function renderCopyMessageButton(container, message) {
+
     const messageActions = container.querySelector('.message-actions');
     messageActions.classList.remove('hidden');
-    messageActions.querySelector('.copy-message').addEventListener('click', (e) => {
-        e.preventDefault();
+    messageActions.querySelector('.copy-message').addEventListener('click', () => {
         // Notice this will only work in secure contexts (HTTPS)
         navigator.clipboard.writeText(message);
 
@@ -158,155 +119,20 @@ function renderCopyMessageButton(container, message) {
             copyButton.innerHTML = copyIcon;
         }, 2000);
     });
-}
-
-/**
- * Show inline edit form for a message
- */
-function showEditForm(container, originalMessage, messageId) {
-    const contentElement = container.querySelector('.content');
-    
-    // Hide the original content
-    contentElement.style.display = 'none';
-    
-    // Create edit form
-    const editForm = document.createElement('div');
-    editForm.className = 'edit-form';
-    editForm.innerHTML = `
-        <textarea class="edit-textarea" placeholder="Edit your message...">${originalMessage}</textarea>
-        <div class="edit-actions">
-            <button class="cancel-edit" type="button">Cancel</button>
-            <button class="save-edit" type="button">Send</button>
-        </div>
-    `;
-    
-    // Insert edit form after content
-    contentElement.parentNode.insertBefore(editForm, contentElement.nextSibling);
-    
-    // Focus on textarea and select all text
-    const textarea = editForm.querySelector('.edit-textarea');
-    textarea.focus();
-    textarea.select();
-    
-    // Handle cancel button
-    editForm.querySelector('.cancel-edit').addEventListener('click', () => {
-        hideEditForm(container);
-    });
-    
-    // Handle save button
-    editForm.querySelector('.save-edit').addEventListener('click', () => {
-        const newMessage = textarea.value.trim();
-        if (newMessage && newMessage !== originalMessage) {
-            saveEditedMessage(messageId, newMessage, container);
-        } else {
-            hideEditForm(container);
-        }
-    });
-    
-    // Handle Enter key to save (unless Shift+Enter for new line)
-    textarea.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            const newMessage = textarea.value.trim();
-            if (newMessage && newMessage !== originalMessage) {
-                saveEditedMessage(messageId, newMessage, container);
-            }
-        }
-    });
-}
-
-/**
- * Hide the edit form and show original content
- */
-function hideEditForm(container) {
-    const contentElement = container.querySelector('.content');
-    const editForm = container.querySelector('.edit-form');
-    
-    // Show original content
-    contentElement.style.display = '';
-    
-    // Remove edit form
-    if (editForm) {
-        editForm.remove();
-    }
-}
-
-/**
- * Save the edited message to the server
- */
-async function saveEditedMessage(messageId, newMessage, container) {
-    try {
-        const response = await fetch(`/chat/update-message/${messageId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ content: newMessage }),
-        });
-
-        if (!response.ok) {
-            throw new Error(`Server returned error: ${response.status} ${response.statusText}`);
-        }
-
-        const result = await response.json();
-        
-        if (result.error) {
-            throw new Error(result.message);
-        }
-
-        // Update the content in the DOM
-        const contentElement = container.querySelector('.content');
-        contentElement.innerText = newMessage;
-        
-        // Hide edit form
-        hideEditForm(container);
-        
-        // If messages were deactivated, reload the dialog to show current state
-        if (result.deactivated_count > 0) {
-            // Remove all messages that come after this one in the DOM
-            let nextElement = container.nextElementSibling;
-            while (nextElement) {
-                const elementToRemove = nextElement;
-                nextElement = nextElement.nextElementSibling;
-                elementToRemove.remove();
-            }
-            
-            // Update current dialog messages to only include messages up to the edited one
-            // This is a bit crude but ensures consistency
-            const updatedMessages = [];
-            for (const msg of currentDialogMessages) {
-                updatedMessages.push(msg);
-                if (msg.content === newMessage) {
-                    break;
-                }
-            }
-            currentDialogMessages = updatedMessages;
-            
-            // Trigger AI response with the updated dialog
-            await renderAssistantMessage();
-        }
-        
-    } catch (error) {
-        console.error("Error saving edited message:", error);
-        Flash.setMessage('Failed to save edited message. Please try again.', 'error');
-        hideEditForm(container);
-    }
 }
 
 
 /**
  * Render user message to the DOM
  */
-function renderStaticUserMessage(message, messageId = null) {
+function renderStaticUserMessage(message) {
     const { container, contentElement } = createMessageElement('User');
 
     contentElement.style.whiteSpace = 'pre-wrap';
     contentElement.innerText = message;
 
-    // Render copy and edit buttons only for user messages with message ID
-    if (messageId) {
-        renderUserMessageButtons(container, message, messageId);
-    } else {
-        renderCopyMessageButton(container, message);
-    }
+    // Render copy message
+    renderCopyMessageButton(container, message);
 
     responsesElem.appendChild(container);
 }
@@ -678,8 +504,7 @@ async function loadDialog(savedMessages) {
     for (const msg of currentDialogMessages) {
         if (msg.role === 'user') {
             const message = msg.content;
-            const messageId = msg.message_id;
-            renderStaticUserMessage(message, messageId);
+            renderStaticUserMessage(message);
         } else {
             const message = msg.content;
             await renderStaticAssistantMessage(message, 'Assistant');
