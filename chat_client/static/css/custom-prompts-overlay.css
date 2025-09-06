@@ -5,18 +5,14 @@
     display: none;
     position: fixed;
     top: calc(var(--main-menu-top) + 2px);
-    right: 60px; /* Position to the left of the main menu */
+    right: 0px;
     background-color: rgba(var(--nav-background-rgb), 0.975);
-    font-size: 0.9rem;
-    min-width: 200px;
-    max-width: 300px;
-    max-height: 70vh;
+    min-width: 250px;
+    max-height: 80vh;
     overflow-y: auto;
     scrollbar-width: none;
     z-index: 110;
     padding: 10px;
-    border-radius: 6px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .custom-prompts-overlay::-webkit-scrollbar {

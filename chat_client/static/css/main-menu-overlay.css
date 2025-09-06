@@ -8,8 +8,7 @@
     top: calc(var(--main-menu-top) + 2px);
     right: 0px;
     background-color: rgba(var(--nav-background-rgb), 0.975);
-    font-size: 0.9rem;
-    min-width: 175px;
+    min-width: 250px;
     max-height: 80vh;
     overflow-y: auto;
     scrollbar-width: none;
