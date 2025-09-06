@@ -7,6 +7,7 @@
 
     <script type="module">
         import '/static/js/main-menu-overlay.js'
+        import '/static/js/custom-prompts-overlay.js'
         import { Flash } from '/static/js/flash.js'
         import { } from '/static/js/short-cuts.js'
 
@@ -84,6 +85,13 @@
         <a href="/prompt">Custom Prompts</a>
         <hr>
         <a>Version: {{ version }}</a>
+    </div>
+    
+    <div class="custom-prompts-overlay">
+        <div class="overlay-header">Select a Custom Prompt</div>
+        <div class="prompts-list">
+            <!-- Prompts will be loaded dynamically -->
+        </div>
     </div>
     {% endif %}
 
