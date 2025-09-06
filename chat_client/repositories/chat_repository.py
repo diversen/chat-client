@@ -5,7 +5,7 @@ from chat_client.models import Dialog, Message
 from chat_client.database.db_session import async_session
 import uuid
 import logging
-from sqlalchemy import select, func
+from sqlalchemy import select, func, update
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -71,7 +71,12 @@ async def get_messages(user_id: int, request: Request):
     dialog_id = request.path_params.get("dialog_id")
 
     async with async_session() as session:
-        stmt = select(Message).where(Message.dialog_id == dialog_id, Message.user_id == user_id).order_by(Message.created.asc()).limit(1000)
+        stmt = (
+            select(Message)
+            .where(Message.dialog_id == dialog_id, Message.user_id == user_id, Message.active == 1)
+            .order_by(Message.created.asc())
+            .limit(1000)
+        )
         result = await session.execute(stmt)
         messages = result.scalars().all()
 
@@ -153,4 +158,48 @@ async def get_dialogs_info(user_id: int, request: Request):
             "next_page": next_page,
             "dialogs": dialogs_list,
             "num_dialogs": num_dialogs,
+        }
+
+
+async def update_message(user_id: int, request: Request):
+    """
+    Update a message and deactivate newer messages in the same dialog
+    """
+    message_id = int(request.path_params.get("message_id"))
+    form_data = await request.json()
+    new_content = str(form_data.get("content", "")).strip()
+
+    if not new_content:
+        raise exceptions_validation.UserValidate("Message content cannot be empty")
+
+    async with async_session() as session:
+        # First, get the message to update and verify ownership
+        stmt = select(Message).where(Message.message_id == message_id, Message.user_id == user_id)
+        result = await session.execute(stmt)
+        message = result.scalar_one_or_none()
+
+        if not message:
+            raise exceptions_validation.UserValidate("Message not found or not owned by user")
+
+        # Update the message content
+        message.content = new_content
+
+        # Deactivate all messages in the same dialog that were created after this message
+        deactivate_stmt = (
+            update(Message)
+            .where(
+                Message.dialog_id == message.dialog_id,
+                Message.created > message.created,
+                Message.user_id == user_id
+            )
+            .values(active=0)
+        )
+        await session.execute(deactivate_stmt)
+
+        await session.commit()
+
+        return {
+            "message_id": message_id,
+            "content": new_content,
+            "updated": True
         }
