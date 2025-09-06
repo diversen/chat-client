@@ -116,7 +116,6 @@ class Message(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     role: Mapped[str] = mapped_column(Text, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    active: Mapped[int] = mapped_column(default=1)
     created: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False, init=False
     )
