@@ -7,7 +7,7 @@ import { addCopyButtons } from '/static/js/app-copy-buttons.js';
 import { logError } from '/static/js/error-log.js';
 import { dd } from '/static/js/diff-dom.js';
 import { modifyStreamedText } from '/static/js/utils.js';
-import { copyIcon, checkIcon, generatingIcon } from '/static/js/app-icons.js';
+import { copyIcon, checkIcon, editIcon } from '/static/js/app-icons.js';
 
 const config = await getConfig();
 
