@@ -347,6 +347,24 @@ async def get_messages(request: Request):
         return JSONResponse({"error": True, "message": "Error getting messages"}, status_code=500)
 
 
+async def update_message(request: Request):
+    """
+    Update a message in the database
+    """
+    try:
+        user_id = await user_session.is_logged_in(request)
+        if not user_id:
+            return JSONResponse({"error": True, "message": "You must be logged in to update a message"}, status_code=401)
+
+        result = await chat_repository.update_message(user_id, request)
+        return JSONResponse(result)
+    except exceptions_validation.UserValidate as e:
+        return JSONResponse({"error": True, "message": str(e)})
+    except Exception:
+        logger.exception("Error updating message")
+        return JSONResponse({"error": True, "message": "Error updating message"}, status_code=500)
+
+
 async def delete_dialog(request: Request):
     """
     Delete dialog from database
@@ -375,6 +393,7 @@ routes_chat: list = [
     Route("/list", list_models, methods=["GET"]),
     Route("/chat/create-dialog", create_dialog, methods=["POST"]),
     Route("/chat/create-message/{dialog_id}", create_message, methods=["POST"]),
+    Route("/chat/update-message/{message_id}", update_message, methods=["POST"]),
     Route("/chat/delete-dialog/{dialog_id}", delete_dialog, methods=["POST"]),
     Route("/chat/get-dialog/{dialog_id}", get_dialog, methods=["GET"]),
     Route("/chat/get-messages/{dialog_id}", get_messages, methods=["GET"]),

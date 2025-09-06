@@ -71,7 +71,8 @@ async def get_messages(user_id: int, request: Request):
     dialog_id = request.path_params.get("dialog_id")
 
     async with async_session() as session:
-        stmt = select(Message).where(Message.dialog_id == dialog_id, Message.user_id == user_id).order_by(Message.created.asc()).limit(1000)
+        # Only return active messages
+        stmt = select(Message).where(Message.dialog_id == dialog_id, Message.user_id == user_id, Message.active == 1).order_by(Message.created.asc()).limit(1000)
         result = await session.execute(stmt)
         messages = result.scalars().all()
 
@@ -88,6 +89,51 @@ async def get_messages(user_id: int, request: Request):
             )
 
         return return_list
+
+
+async def update_message(user_id: int, request: Request):
+    form_data = await request.json()
+    
+    message_id = int(request.path_params.get("message_id"))
+    content = str(form_data.get("content"))
+
+    async with async_session() as session:
+        # Get the message to update
+        stmt = select(Message).where(Message.message_id == message_id, Message.user_id == user_id)
+        result = await session.execute(stmt)
+        message = result.scalar_one_or_none()
+
+        if not message:
+            raise exceptions_validation.UserValidate("Message not found or not owned by user")
+
+        # Update the message content
+        message.content = content
+        
+        # Deactivate all messages in the same dialog that were created after this message
+        # This includes both user and assistant messages that came after this one
+        deactivate_stmt = (
+            select(Message)
+            .where(
+                Message.dialog_id == message.dialog_id,
+                Message.user_id == user_id,
+                Message.created > message.created,
+                Message.active == 1
+            )
+        )
+        deactivate_result = await session.execute(deactivate_stmt)
+        messages_to_deactivate = deactivate_result.scalars().all()
+        
+        for msg in messages_to_deactivate:
+            msg.active = 0
+        
+        await session.commit()
+
+        return {
+            "message_id": str(message.message_id),
+            "role": message.role,
+            "content": message.content,
+            "deactivated_count": len(messages_to_deactivate)
+        }
 
 
 async def delete_dialog(user_id: int, request: Request):

@@ -419,3 +419,61 @@ a {
     word-break: break-all;
     overflow-wrap: anywhere;
 }
+
+/* Edit form styles */
+.edit-form {
+    margin-top: 10px;
+    padding: 10px;
+    border: 1px solid var(--text-muted);
+    border-radius: 5px;
+    background-color: var(--background-color);
+}
+
+.edit-textarea {
+    width: 100%;
+    min-height: 80px;
+    border: 1px solid var(--text-muted);
+    border-radius: 3px;
+    padding: 8px;
+    font-family: inherit;
+    font-size: inherit;
+    background-color: var(--input-background, var(--background-color));
+    color: var(--text-color);
+    resize: vertical;
+    box-sizing: border-box;
+}
+
+.edit-actions {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+    margin-top: 10px;
+}
+
+.cancel-edit, .save-edit {
+    padding: 6px 12px;
+    border: 1px solid var(--text-muted);
+    border-radius: 3px;
+    background-color: var(--nav-background);
+    color: var(--nav-text);
+    cursor: pointer;
+    font-size: 0.9em;
+}
+
+.cancel-edit:hover, .save-edit:hover {
+    background-color: rgba(var(--nav-background-rgb), 0.75);
+}
+
+.save-edit {
+    background-color: var(--primary-color, #007bff);
+    color: white;
+    border-color: var(--primary-color, #007bff);
+}
+
+.save-edit:hover {
+    background-color: var(--primary-color-hover, #0056b3);
+}
+
+.edit-message {
+    margin-left: 8px;
+}
