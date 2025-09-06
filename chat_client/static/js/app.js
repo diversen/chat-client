@@ -526,11 +526,11 @@ async function initializeDialog(dialogID) {
     }
 }
 
-async function initializeFromPrompt(promtpID) {
-    console.log('Initializing from prompt ID:', promtpID);
+async function initializeFromPrompt(promptID) {
+    console.log('Initializing from prompt ID:', promptID);
 
     try {
-        const response = await fetch(`/prompt/${promtpID}/json`);
+        const response = await fetch(`/prompt/${promptID}/json`);
         if (!response.ok) {
             throw new Error(`Failed to fetch prompt: ${response.status} ${response.statusText}`);
         }
@@ -575,7 +575,7 @@ if (dialogID) {
     loadingSpinner.classList.add('hidden');
 }
 
-const promtpID = url.searchParams.get('id');
-if (promtpID) {
-    await initializeFromPrompt(promtpID);
+const promptID = url.searchParams.get('id');
+if (promptID) {
+    await initializeFromPrompt(promptID);
 }
