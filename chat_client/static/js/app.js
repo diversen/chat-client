@@ -1,13 +1,13 @@
-import { Flash } from '/static/js/flash.js';
-import { mdNoHTML } from '/static/js/markdown.js';
-import { createDialog, getMessages, createMessage, getConfig, isLoggedInOrRedirect } from '/static/js/app-dialog.js';
-import { responsesElem, messageElem, sendButtonElem, newButtonElem, abortButtonElem, selectModelElem, loadingSpinner, scrollToBottom } from '/static/js/app-elements.js';
-import { } from '/static/js/app-events.js';
-import { addCopyButtons } from '/static/js/app-copy-buttons.js';
-import { logError } from '/static/js/error-log.js';
-import { dd } from '/static/js/diff-dom.js';
-import { modifyStreamedText } from '/static/js/utils.js';
-import { copyIcon, checkIcon, editIcon } from '/static/js/app-icons.js';
+import { Flash } from './flash.js';
+import { mdNoHTML } from './markdown.js';
+import { createDialog, getMessages, createMessage, getConfig, isLoggedInOrRedirect } from './app-dialog.js';
+import { responsesElem, messageElem, sendButtonElem, newButtonElem, abortButtonElem, selectModelElem, loadingSpinner, scrollToBottom } from './app-elements.js';
+import { } from './app-events.js';
+import { addCopyButtons } from './app-copy-buttons.js';
+import { logError } from './error-log.js';
+import { dd } from './diff-dom.js';
+import { modifyStreamedText } from './utils.js';
+import { copyIcon, checkIcon, editIcon } from './app-icons.js';
 
 const config = await getConfig();
 
@@ -343,12 +343,19 @@ async function renderAssistantMessage() {
     };
 
     // Function to handle chunk processing
+    let reasoningActive = false; // Track if reasoning is currently open
+
     const processChunk = async rawLine => {
         // strip leading "data:" (if still there) and white-space
         const line = rawLine.replace(/^data:\s*/, '').trim();
 
         // End-of-stream marker – just finish normally
         if (line === '[DONE]') {
+            // Close reasoning if still open
+            if (reasoningActive) {
+                streamedResponseText += ' </thinking>\n\n';
+                reasoningActive = false;
+            }
             await updateContentDiff(contentElement, hiddenContentElem, streamedResponseText, true);
             return;
         }
@@ -366,8 +373,19 @@ async function renderAssistantMessage() {
         const delta = data.choices?.[0]?.delta ?? {};
         const finishReason = data.choices?.[0]?.finish_reason;
 
+        // Handle reasoning tag logic
+        if (delta.reasoning) {
+            if (!reasoningActive) {
+                streamedResponseText += '<thinking>\n';
+                reasoningActive = true;
+            }
+            streamedResponseText += delta.reasoning;
+        } else if (reasoningActive) {
+            streamedResponseText += ' </thinking>\n\n';
+            reasoningActive = false;
+        }
+
         if (delta.content) streamedResponseText += delta.content;
-        if (delta.reasoning) streamedResponseText += delta.reasoning;
 
         await updateContentDiff(
             contentElement,
