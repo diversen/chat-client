@@ -367,6 +367,7 @@ async function renderAssistantMessage() {
         const finishReason = data.choices?.[0]?.finish_reason;
 
         if (delta.content) streamedResponseText += delta.content;
+        if (delta.reasoning) streamedResponseText += delta.reasoning;
 
         await updateContentDiff(
             contentElement,
