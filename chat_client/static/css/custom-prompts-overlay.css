@@ -1,0 +1,81 @@
+/**
+ * Custom prompts overlay - follows the same pattern as main-menu-overlay
+ */
+.custom-prompts-overlay {
+    display: none;
+    position: fixed;
+    top: calc(var(--main-menu-top) + 2px);
+    right: 60px; /* Position to the left of the main menu */
+    background-color: rgba(var(--nav-background-rgb), 0.975);
+    font-size: 0.9rem;
+    min-width: 200px;
+    max-width: 300px;
+    max-height: 70vh;
+    overflow-y: auto;
+    scrollbar-width: none;
+    z-index: 110;
+    padding: 10px;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.custom-prompts-overlay::-webkit-scrollbar {
+    width: 0px;
+}
+
+/** 
+ When device is smaller than 576px the overlay should be positioned differently
+ */
+@media (max-width: 576px) {
+    .custom-prompts-overlay {
+        right: 0px;
+        width: 100%;
+        max-width: none;
+    }
+}
+
+.custom-prompts-overlay .overlay-header {
+    color: var(--text-main);
+    font-size: 0.9em;
+    font-weight: 600;
+    padding: 8px;
+    border-bottom: 1px solid var(--nav-background-hover);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+}
+
+.custom-prompts-overlay .prompts-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.custom-prompts-overlay .prompt-item {
+    display: flex;
+    color: var(--nav-text);
+    font-size: 0.9em;
+    font-weight: 400;
+    text-decoration: none;
+    border-radius: 6px;
+    padding: 8px;
+    margin-bottom: 2px;
+    transition: background-color 0.2s ease-in-out;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.custom-prompts-overlay .prompt-item:hover {
+    background-color: var(--nav-background-hover);
+}
+
+.custom-prompts-overlay .no-prompts-message {
+    color: var(--text-secondary);
+    font-size: 0.8em;
+    font-style: italic;
+    padding: 8px;
+    text-align: center;
+}
+
+.custom-prompts-overlay.active {
+    display: block;
+}
