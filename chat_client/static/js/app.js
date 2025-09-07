@@ -437,15 +437,30 @@ const chatService = {
  * Conversation controller: owns all state and side-effects
  */
 class ConversationController {
+    /**
+     * @param {{
+     *   view: typeof view,
+     *   storage: typeof storageService,
+     *   auth: typeof authService,
+     *   chat: typeof chatService
+     * }} params
+     */
     constructor({ view, storage, auth, chat }) {
+        /** @type {typeof view} */
         this.view = view;
+        /** @type {typeof storageService} */
         this.storage = storage;
+        /** @type {typeof authService} */
         this.auth = auth;
+        /** @type {typeof chatService} */
         this.chat = chat;
-        // States
+        /** @type {boolean} */
         this.isStreaming = false;
+        /** @type {Array<Object>} */
         this.messages = [];
+        /** @type {string|null} */
         this.dialogId = null;
+        /** @type {AbortController} */
         this.abortController = new AbortController();
 
         // Bind UI once
@@ -750,11 +765,7 @@ class ConversationController {
                 throw new Error(`Failed to fetch prompt: ${response.status} ${response.statusText}`);
             }
             const promptData = await response.json();
-            console.log('Prompt data:', promptData);
             const promptText = promptData.prompt.prompt;
-
-            // Render the prompt text as a user message
-            view.renderStaticUserMessage(promptText, null, async () => { });
 
             // Create a new dialog with the prompt text
             this.dialogId = await this.storage.createDialog(promptText);
@@ -762,19 +773,7 @@ class ConversationController {
             // Save the prompt message to the dialog
             const promptMessage = { role: 'user', content: promptText };
             await this.storage.createMessage(this.dialogId, promptMessage);
-
-            this.messages.push({ role: 'user', content: promptText });
-            console.log('Current dialog ID after prompt:', this.messages);
-
-            // enable edit icon on prompt message
-            const lastUserMessageContainer = responsesElem.querySelector('.user-message:last-of-type');
-
-            renderEditMessageButton(lastUserMessageContainer, promptText, async (id, newContent, container) => {
-                await this.handleMessageUpdate(id, newContent, container);
-            });
-
-            // Redirect to the new dialog URL
-            window.history.replaceState({}, '', `/chat/${this.dialogId}`);
+            await controller.initializeDialog(this.dialogId);
 
 
         } catch (error) {

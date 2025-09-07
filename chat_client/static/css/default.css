@@ -317,14 +317,12 @@ pre code {
 
 .edit-textarea {
     width: 100%;
-    min-height: 80px;
+    min-height: 60px;
     padding: 10px;
     border: 1px solid var(--border);
     border-radius: 4px;
     background-color: var(--background-alt);
     color: var(--text-main);
-    font-family: inherit;
-    font-size: 14px;
     resize: vertical;
     box-sizing: border-box;
 }
