@@ -1,0 +1,29 @@
+{
+  "name": "chat-client",
+  "version": "1.0.0",
+  "description": "Use the simple `chat-client` to chat with a local or remote LLM.",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "dependencies": {
+    "markdown-it-table": "^4.1.1"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.55.0",
+    "@types/node": "^24.3.1"
+  },
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/diversen/chat-client.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/diversen/chat-client/issues"
+  },
+  "homepage": "https://github.com/diversen/chat-client#readme"
+}
