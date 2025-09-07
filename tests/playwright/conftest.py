@@ -4,8 +4,8 @@ import asyncio
 import os
 import tempfile
 import shutil
-from pathlib import Path
 import sqlite3
+from pathlib import Path
 from contextlib import asynccontextmanager
 
 # Ensure the chat_client module can be imported
@@ -14,8 +14,9 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from chat_client.main import app
-from chat_client.database.db_session import engine
+from chat_client.database.db_session import engine, async_session
 from chat_client import cli
+from chat_client.models import Base
 import data.config as config
 
 
@@ -36,38 +37,22 @@ def test_data_dir():
     data_dir = Path(temp_dir) / "data"
     data_dir.mkdir(parents=True, exist_ok=True)
     
-    # Copy config template and modify it for tests
-    config_dist = project_root / "chat_client" / "config-dist.py"
+    # Copy the existing config and modify for testing
+    source_config = project_root / "data" / "config.py"
     test_config = data_dir / "config.py"
     
-    with open(config_dist, 'r') as f:
+    # Read existing config
+    with open(source_config, 'r') as f:
         config_content = f.read()
     
-    # Modify config for test environment
+    # Modify for test environment - just change the database path and make it test-friendly
     test_config_content = config_content.replace(
-        'DATABASE_URL = "sqlite+aiosqlite:///data/database.db"',
-        f'DATABASE_URL = "sqlite+aiosqlite:///{data_dir}/test_database.db"'
+        'DATABASE = Path(DATA_DIR) / Path("database.db")',
+        'DATABASE = Path(DATA_DIR) / Path("database.db")'  # Keep the same, CLI will handle it
     ).replace(
-        'LOG_FILE = "data/main.log"',
-        f'LOG_FILE = "{data_dir}/test.log"'
-    ).replace(
-        'SESSION_HTTPS_ONLY = True',
-        'SESSION_HTTPS_ONLY = False'
-    ).replace(
-        'RELOAD = False',
-        'RELOAD = False'
+        'SESSION_HTTPS_ONLY = False  # Set to False for testing',
+        'SESSION_HTTPS_ONLY = False  # Set to False for testing'
     )
-    
-    # Add test model configuration
-    test_config_content += """
-
-# Test configuration additions
-MODELS = {
-    "test-model": "test",
-}
-
-PROVIDERS = {}  # No real providers for tests
-"""
     
     with open(test_config, 'w') as f:
         f.write(test_config_content)
@@ -86,50 +71,43 @@ PROVIDERS = {}  # No real providers for tests
 @pytest.fixture(scope="session")
 async def setup_test_database(test_data_dir):
     """Initialize the test database."""
-    # Change to test directory
+    # Change to test directory where our config is
     old_cwd = os.getcwd()
     os.chdir(test_data_dir)
     
     try:
-        # Initialize database - call the internal function instead of CLI command
+        # The issue is that we need to force reload the config and database modules
+        # Let's run the initialization in the test directory
+        
+        # Initialize database using the CLI function which will use the test config
         cli._before_server_start()
         
-        # Create a test user
-        from chat_client.repositories import user_repository
-        from unittest.mock import AsyncMock, patch
+        # Now create test user using the same database path that the CLI just set up
+        from chat_client.repositories.user_repository import _password_hash
+        from chat_client.models import User
+        import secrets
+        import sqlite3
         
-        # Mock the request object for user creation
-        class MockRequest:
-            def __init__(self):
-                self._form_data = {
-                    'email': 'test@example.com',
-                    'password': 'test123456',
-                    'password2': 'test123456'
-                }
-            
-            async def form(self):
-                return self._form_data
+        # Get the actual database path that was just created
+        test_db_path = f"{test_data_dir}/data/database.db"  # This is what CLI creates
         
-        request = MockRequest()
-        
-        # Create test user directly in database
-        db_path = f"{test_data_dir}/data/test_database.db"
-        conn = sqlite3.connect(db_path)
+        # Create user directly in the database using sqlite3 since the async session 
+        # was created with the old config
+        conn = sqlite3.connect(test_db_path)
         cursor = conn.cursor()
         
-        # Hash the password
-        import bcrypt
-        password_hash = bcrypt.hashpw('test123456'.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        # Hash the password using the same method as the app
+        password_hash = _password_hash('test123456')
         
         cursor.execute("""
-            INSERT INTO users (email, password, verified, created_on) 
-            VALUES (?, ?, 1, datetime('now'))
-        """, ('test@example.com', password_hash))
+            INSERT INTO users (email, password_hash, random, verified, locked, created) 
+            VALUES (?, ?, ?, 1, 0, datetime('now'))
+        """, ('test@example.com', password_hash, secrets.token_urlsafe(32)))
         
         conn.commit()
         conn.close()
         
-        yield db_path
+        yield test_db_path
         
     finally:
         os.chdir(old_cwd)
