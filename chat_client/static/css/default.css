@@ -301,6 +301,7 @@ pre code {
 
 .message-actions {
     display: flex;
+    gap: 0.5em;
 }
 
 .message-actions svg {
