@@ -765,6 +765,18 @@ class ConversationController {
 
             this.messages.push({ role: 'user', content: promptText });
             console.log('Current dialog ID after prompt:', this.messages);
+
+            // enable edit icon on prompt message
+            const lastUserMessageContainer = responsesElem.querySelector('.user-message:last-of-type');
+
+            renderEditMessageButton(lastUserMessageContainer, promptText, async (id, newContent, container) => {
+                await this.handleMessageUpdate(id, newContent, container);
+            });
+
+            // Redirect to the new dialog URL
+            window.history.replaceState({}, '', `/chat/${this.dialogId}`);
+
+
         } catch (error) {
             console.error('Error in initializeFromPrompt:', error);
             Flash.setMessage('An error occurred while initializing from prompt.', 'error');
