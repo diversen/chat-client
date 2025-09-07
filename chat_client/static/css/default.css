@@ -310,6 +310,61 @@ pre code {
     height: 15px;
 }
 
+.edit-form {
+    margin-top: 10px;
+}
+
+.edit-textarea {
+    width: 100%;
+    min-height: 80px;
+    padding: 10px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background-color: var(--background-alt);
+    color: var(--text-main);
+    font-family: inherit;
+    font-size: 14px;
+    resize: vertical;
+    box-sizing: border-box;
+}
+
+.edit-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+    justify-content: flex-end;
+}
+
+.edit-cancel, .edit-send {
+    padding: 8px 16px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background-color: var(--button-base);
+    color: var(--text-main);
+    cursor: pointer;
+    font-size: 14px;
+}
+
+.edit-cancel:hover, .edit-send:hover {
+    background-color: var(--button-hover);
+}
+
+.edit-send {
+    background-color: var(--links);
+    color: white;
+    border-color: var(--links);
+}
+
+.edit-send:hover {
+    background-color: var(--focus);
+}
+
+.edit-send:disabled {
+    background-color: #666;
+    color: #999;
+    cursor: not-allowed;
+}
+
 .action-link {
     background-color: var(--nav-background);
     color: var(--nav-text);

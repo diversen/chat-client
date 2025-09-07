@@ -1,6 +1,6 @@
 import { Flash } from './flash.js';
 import { mdNoHTML } from './markdown.js';
-import { createDialog, getMessages, createMessage, getConfig, isLoggedInOrRedirect } from './app-dialog.js';
+import { createDialog, getMessages, createMessage, getConfig, isLoggedInOrRedirect, updateMessage } from './app-dialog.js';
 import { responsesElem, messageElem, sendButtonElem, newButtonElem, abortButtonElem, selectModelElem, loadingSpinner, scrollToBottom } from './app-elements.js';
 import { } from './app-events.js';
 import { addCopyButtons } from './app-copy-buttons.js';
@@ -78,10 +78,15 @@ function highlightCodeInElement(element) {
  * Create a message element with role and content
  */
 
-function createMessageElement(role) {
+function createMessageElement(role, messageId = null) {
     const containerClass = `${role.toLowerCase()}-message`;
     const messageContainer = document.createElement('div');
     messageContainer.classList.add(containerClass);
+    
+    // Store message ID as data attribute if provided
+    if (messageId) {
+        messageContainer.setAttribute('data-message-id', messageId);
+    }
 
     // Use template literals to create the HTML structure
     messageContainer.innerHTML = `
@@ -121,18 +126,177 @@ function renderCopyMessageButton(container, message) {
     });
 }
 
+function renderEditMessageButton(container, originalMessage) {
+    const messageActions = container.querySelector('.message-actions');
+    
+    // Add edit button next to copy button
+    const editButton = document.createElement('a');
+    editButton.href = '#';
+    editButton.className = 'edit-message';
+    editButton.title = 'Edit message';
+    editButton.innerHTML = editIcon;
+    messageActions.appendChild(editButton);
+    
+    const contentElement = container.querySelector('.content');
+    
+    editButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        showEditForm(container, originalMessage);
+    });
+}
+
+function showEditForm(container, originalMessage) {
+    const contentElement = container.querySelector('.content');
+    const messageActions = container.querySelector('.message-actions');
+    
+    // Hide original content and actions
+    contentElement.style.display = 'none';
+    messageActions.style.display = 'none';
+    
+    // Create edit form
+    const editForm = document.createElement('div');
+    editForm.className = 'edit-form';
+    editForm.innerHTML = `
+        <textarea class="edit-textarea">${originalMessage}</textarea>
+        <div class="edit-buttons">
+            <button class="edit-cancel">Cancel</button>
+            <button class="edit-send">Send</button>
+        </div>
+    `;
+    
+    // Insert edit form after content
+    contentElement.insertAdjacentElement('afterend', editForm);
+    
+    const textarea = editForm.querySelector('.edit-textarea');
+    const cancelButton = editForm.querySelector('.edit-cancel');
+    const sendButton = editForm.querySelector('.edit-send');
+    
+    // Focus and resize textarea
+    textarea.focus();
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
+    
+    // Cancel button handler
+    cancelButton.addEventListener('click', () => {
+        hideEditForm(container);
+    });
+    
+    // Send button handler
+    sendButton.addEventListener('click', async () => {
+        const newContent = textarea.value.trim();
+        if (!newContent) {
+            alert('Message content cannot be empty');
+            return;
+        }
+        
+        const messageId = container.getAttribute('data-message-id');
+        if (!messageId) {
+            alert('Cannot edit message: message ID not found');
+            return;
+        }
+        
+        try {
+            sendButton.disabled = true;
+            sendButton.textContent = 'Sending...';
+            
+            await handleMessageUpdate(messageId, newContent, container);
+        } catch (error) {
+            console.error('Error updating message:', error);
+            alert('Error updating message. Please try again.');
+            sendButton.disabled = false;
+            sendButton.textContent = 'Send';
+        }
+    });
+}
+
+function hideEditForm(container) {
+    const contentElement = container.querySelector('.content');
+    const messageActions = container.querySelector('.message-actions');
+    const editForm = container.querySelector('.edit-form');
+    
+    // Remove edit form
+    if (editForm) {
+        editForm.remove();
+    }
+    
+    // Show original content and actions
+    contentElement.style.display = '';
+    messageActions.style.display = '';
+}
+
+async function handleMessageUpdate(messageId, newContent, container) {
+    try {
+        // Update message on server
+        await updateMessage(messageId, newContent);
+        
+        // Update the content element with new content
+        const contentElement = container.querySelector('.content');
+        contentElement.style.whiteSpace = 'pre-wrap';
+        contentElement.innerText = newContent;
+        
+        // Hide edit form and show updated content
+        hideEditForm(container);
+        
+        // Remove all messages after this one from DOM and currentDialogMessages
+        removeMessagesAfter(container);
+        
+        // Update currentDialogMessages array
+        updateCurrentDialogMessages(messageId, newContent);
+        
+        // Start new assistant response
+        await renderAssistantMessage();
+        
+    } catch (error) {
+        throw error;
+    }
+}
+
+function removeMessagesAfter(editedContainer) {
+    let nextSibling = editedContainer.nextElementSibling;
+    while (nextSibling) {
+        const toRemove = nextSibling;
+        nextSibling = nextSibling.nextElementSibling;
+        toRemove.remove();
+    }
+}
+
+function updateCurrentDialogMessages(editedMessageId, newContent) {
+    // Find the index of the edited message in currentDialogMessages
+    // Since we don't have message IDs in currentDialogMessages, we'll need to reconstruct it
+    // For now, we'll find by looking at the position in the DOM
+    const allMessages = document.querySelectorAll('.user-message, .assistant-message');
+    const editedIndex = Array.from(allMessages).findIndex(msg => 
+        msg.getAttribute('data-message-id') === editedMessageId
+    );
+    
+    if (editedIndex !== -1) {
+        // Update the content of the edited message
+        if (currentDialogMessages[editedIndex]) {
+            currentDialogMessages[editedIndex].content = newContent;
+        }
+        
+        // Remove all messages after the edited one
+        currentDialogMessages.splice(editedIndex + 1);
+    }
+}
+
 
 /**
  * Render user message to the DOM
  */
-function renderStaticUserMessage(message) {
-    const { container, contentElement } = createMessageElement('User');
+function renderStaticUserMessage(message, messageId = null) {
+    const { container, contentElement } = createMessageElement('User', messageId);
 
     contentElement.style.whiteSpace = 'pre-wrap';
     contentElement.innerText = message;
 
     // Render copy message
     renderCopyMessageButton(container, message);
+    
+    // Render edit message button for user messages (only if we have a message ID)
+    if (messageId) {
+        renderEditMessageButton(container, message);
+    }
 
     responsesElem.appendChild(container);
 }
@@ -173,13 +337,13 @@ async function sendUserMessage() {
         // Push user message to current dialog messages
         currentDialogMessages.push(message);
 
-        // Save user message and push to all messages
-        await createMessage(currentDialogID, message);
+        // Save user message and get the message ID
+        const userMessageId = await createMessage(currentDialogID, message);
 
         // Clear the input field
         messageElem.value = '';
 
-        renderStaticUserMessage(userMessage);
+        renderStaticUserMessage(userMessage, userMessageId);
 
         // Scroll so that last user message is visible
         scrollToLastMessage();
@@ -196,8 +360,8 @@ async function sendUserMessage() {
 /**
  * Render static assistant message (without streaming)
  */
-async function renderStaticAssistantMessage(message) {
-    const { container, contentElement } = createMessageElement('Assistant');
+async function renderStaticAssistantMessage(message, messageId = null) {
+    const { container, contentElement } = createMessageElement('Assistant', messageId);
     responsesElem.appendChild(container);
 
     // Render copy message
@@ -450,7 +614,10 @@ async function renderAssistantMessage() {
 
         // Save message to the dialog
         let assistantMessage = { role: 'assistant', content: streamedResponseText };
-        await createMessage(currentDialogID, assistantMessage);
+        const assistantMessageId = await createMessage(currentDialogID, assistantMessage);
+        
+        // Store the message ID in the container
+        container.setAttribute('data-message-id', assistantMessageId);
 
         // Render copy message
         renderCopyMessageButton(container, streamedResponseText);
@@ -523,10 +690,12 @@ async function loadDialog(savedMessages) {
     for (const msg of currentDialogMessages) {
         if (msg.role === 'user') {
             const message = msg.content;
-            renderStaticUserMessage(message);
+            const messageId = msg.message_id;
+            renderStaticUserMessage(message, messageId);
         } else {
             const message = msg.content;
-            await renderStaticAssistantMessage(message, 'Assistant');
+            const messageId = msg.message_id;
+            await renderStaticAssistantMessage(message, messageId);
         }
     }
 }
