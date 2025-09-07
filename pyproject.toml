@@ -61,17 +61,18 @@ dependencies = [
     "uvicorn==0.34.0",
 ]
 
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3.10",
+]
+
 [project.optional-dependencies]
 test = [
     "playwright==1.55.0",
     "pytest==8.4.2", 
     "pytest-playwright==0.7.0",
     "pytest-asyncio==1.1.0",
-]
-classifiers = [
-    "Development Status :: 1 - Planning",
-    "Operating System :: POSIX :: Linux",
-    "Programming Language :: Python :: 3.10",
 ]
 [[project.authors]]
 name = "Dennis Iversen"
