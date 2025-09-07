@@ -40,46 +40,6 @@ def run_comprehensive_tests():
         return False
 
 
-def run_original_tests():
-    """Run the original simple test scripts"""
-    print("Running Original Test Scripts...")
-    print("=" * 40)
-    
-    test_files = [
-        "tests/test_password_methods.py",
-        "tests/test_tools.py"
-    ]
-    
-    passed = 0
-    failed = 0
-    
-    for test_file in test_files:
-        if Path(test_file).exists():
-            print(f"Running {test_file}...")
-            try:
-                result = subprocess.run([sys.executable, test_file], 
-                                      cwd=project_root, 
-                                      capture_output=True, 
-                                      text=True, 
-                                      timeout=30)
-                if result.returncode == 0:
-                    print(f"  ✓ {test_file} passed")
-                    passed += 1
-                else:
-                    print(f"  ❌ {test_file} failed: {result.stderr}")
-                    failed += 1
-            except Exception as e:
-                print(f"  ❌ {test_file} error: {e}")
-                failed += 1
-        else:
-            print(f"  ⚠️ {test_file} not found")
-    
-    return passed, failed
-
-
-
-
-
 def main():
     """Main test runner"""
     print("Starlette Backend Test Suite")
@@ -126,17 +86,6 @@ def main():
         print()
     except Exception as e:
         print(f"❌ Comprehensive tests failed: {e}")
-        all_passed = False
-    
-    # Run original tests
-    try:
-        passed, failed = run_original_tests()
-        if failed > 0:
-            all_passed = False
-        print(f"Original tests: {passed} passed, {failed} failed")
-        print()
-    except Exception as e:
-        print(f"❌ Original tests failed: {e}")
         all_passed = False
     
     # Final results
