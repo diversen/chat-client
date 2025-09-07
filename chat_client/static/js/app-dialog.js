@@ -46,6 +46,7 @@ async function getMessages(dialogID) {
 
 /**
  * POST message object ({ role: role, message: message } ) to /chat/create-message/{dialog_id}
+ * Returns the message_id of the created message
  */
 async function createMessage(dialogID, message) {
 
@@ -60,6 +61,7 @@ async function createMessage(dialogID, message) {
         throw new Error(data.message);
     }
 
+    return data.message_id;
 }
 
 async function isLoggedInOrRedirect() {
@@ -70,4 +72,23 @@ async function isLoggedInOrRedirect() {
     }
 }
 
-export { createDialog, getMessages, createMessage, getConfig, isLoggedInOrRedirect };
+/**
+ * Update message content
+ * POST updated content to /chat/update-message/{message_id}
+ */
+async function updateMessage(messageId, content) {
+    console.log('Updating message:', messageId, content);
+    const data = await fetch(`/chat/update-message/${messageId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: content }),
+    }).then(response => response.json())
+
+    if (data.error) {
+        throw new Error(data.message);
+    }
+
+    return data;
+}
+
+export { createDialog, getMessages, createMessage, getConfig, isLoggedInOrRedirect, updateMessage };

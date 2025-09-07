@@ -45,6 +45,9 @@ async def create_message(user_id: int, request: Request):
         )
         session.add(new_message)
         await session.commit()
+        await session.refresh(new_message)
+        
+        return new_message.message_id
 
 
 async def get_dialog(user_id: int, request: Request):
