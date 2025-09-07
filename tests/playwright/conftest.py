@@ -91,8 +91,8 @@ async def setup_test_database(test_data_dir):
     os.chdir(test_data_dir)
     
     try:
-        # Initialize database
-        await cli.init_system()
+        # Initialize database - call the internal function instead of CLI command
+        cli._before_server_start()
         
         # Create a test user
         from chat_client.repositories import user_repository
