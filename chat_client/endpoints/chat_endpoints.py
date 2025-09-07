@@ -173,7 +173,7 @@ async def _chat_response_stream(request: Request, messages, model, logged_in):
 
     except OpenAIError:
         logger.exception("OpenAI error")
-        yield json.dumps({"error": "An error occured. Please try again later"})
+        yield json.dumps({"error": "An error occurred. Please try again later"})
 
     except Exception:
         logger.exception("Streaming error")
@@ -265,7 +265,7 @@ async def _get_model_names():
 
 async def list_models(request: Request):
     """
-    GET avalialbe models
+    GET available models
     """
 
     model_names = await _get_model_names()
