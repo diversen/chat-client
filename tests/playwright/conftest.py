@@ -114,17 +114,18 @@ async def setup_test_database(test_data_dir):
 
 
 @pytest.fixture
-async def test_server(setup_test_database, test_data_dir):
+def test_server(setup_test_database, test_data_dir):
     """Start the test server."""
     import uvicorn
     import threading
     import time
+    import asyncio
     
     # Change to test directory
     old_cwd = os.getcwd()
     os.chdir(test_data_dir)
     
-    # Start server in a separate thread
+    # Start server in a separate thread with a new event loop
     server_config = uvicorn.Config(
         app,
         host="127.0.0.1",
@@ -134,13 +135,19 @@ async def test_server(setup_test_database, test_data_dir):
     server = uvicorn.Server(server_config)
     
     def run_server():
-        asyncio.run(server.serve())
+        # Create new event loop for the server thread
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            loop.run_until_complete(server.serve())
+        finally:
+            loop.close()
     
     server_thread = threading.Thread(target=run_server, daemon=True)
     server_thread.start()
     
     # Wait for server to start
-    time.sleep(2)
+    time.sleep(3)  # Give it a bit more time
     
     yield "http://127.0.0.1:8001"
     
