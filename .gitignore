@@ -8,3 +8,9 @@ config.py
 data
 chat_client.egg-info
 prompt.md
+
+# Playwright
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
