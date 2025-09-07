@@ -67,14 +67,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
 ]
 
-[project.optional-dependencies]
-test = [
-    "playwright==1.55.0",
-    "pytest==8.4.2", 
-    "pytest-playwright==0.7.0",
-    "pytest-asyncio==1.1.0",
-    "pytest-base-url==2.1.0",
-]
+
 [[project.authors]]
 name = "Dennis Iversen"
 email = "dennis.iversen@gmail.com"
