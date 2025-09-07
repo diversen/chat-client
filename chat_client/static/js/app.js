@@ -748,6 +748,8 @@ class ConversationController {
      */
     async initializeDialog(dialogID) {
         try {
+
+
             let allMessages = await this.storage.getMessages(dialogID);
             console.log('All messages:', allMessages);
             await this.loadDialog(allMessages);
@@ -759,11 +761,18 @@ class ConversationController {
 
     async initializeFromPrompt(promptID) {
         console.log('Initializing from prompt ID:', promptID);
+
+        // Remove id from URL
+        window.history.replaceState({}, document.title, `/chat/${this.dialogId}`);
+
         try {
+
             const response = await fetch(`/prompt/${promptID}/json`);
             if (!response.ok) {
                 throw new Error(`Failed to fetch prompt: ${response.status} ${response.statusText}`);
             }
+
+
             const promptData = await response.json();
             const promptText = promptData.prompt.prompt;
 
@@ -795,6 +804,7 @@ const controller = new ConversationController({ view, storage: storageService, a
 const url = new URL(window.location.href);
 const dialogID = url.pathname.split('/').pop();
 if (dialogID) {
+
     controller.dialogId = dialogID;
     loadingSpinner.classList.remove('hidden');
 
@@ -806,5 +816,6 @@ if (dialogID) {
 
 const promptID = url.searchParams.get('id');
 if (promptID) {
+    console.log('Prompt ID from URL:', promptID);
     await controller.initializeFromPrompt(promptID);
 }

@@ -20,6 +20,7 @@ async function createDialog(title) {
     }
 
     const currentDialogID = data.dialog_id;
+    console.log('Created dialog with ID:', currentDialogID);
     const url = new URL(window.location.href);
     url.pathname = `/chat/${currentDialogID}`
     window.history.replaceState({}, "", url);
