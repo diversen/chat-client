@@ -1,12 +1,19 @@
 # Quick Start Guide - Playwright Tests
 
-This guide helps you get the Playwright tests running quickly.
+This guide helps you get the Playwright tests running quickly using `uv` (the modern Python package manager).
+
+## Prerequisites
+
+- Python 3.10+ installed
+- `uv` package manager installed: `pip install uv`
 
 ## TL;DR - Just Run the Tests
 
 ```bash
-# Install dependencies and run tests
-pip install -e ".[test]"
+# Create virtual environment and install dependencies
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+uv pip install -e ".[test]"
 python tests/playwright/run_tests.py --install-browsers
 ```
 
@@ -14,11 +21,15 @@ python tests/playwright/run_tests.py --install-browsers
 
 ### 1. Install Dependencies
 ```bash
+# Create virtual environment (required for uv)
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
 # Option A: Install with test dependencies
-pip install -e ".[test]"
+uv pip install -e ".[test]"
 
 # Option B: Install manually
-pip install playwright pytest pytest-playwright pytest-asyncio
+uv pip install playwright pytest pytest-playwright pytest-asyncio
 ```
 
 ### 2. Install Browsers
@@ -32,7 +43,11 @@ python tests/playwright/run_tests.py --install-browsers
 
 ### 3. Validate Setup
 ```bash
+# Comprehensive validation of the test environment
 python tests/playwright/validate_setup.py
+
+# Quick validation of uv-based installation
+python tests/playwright/test_uv_setup.py
 ```
 
 ### 4. Run Tests
@@ -58,9 +73,28 @@ python tests/playwright/run_tests.py --headed
 
 ### Browser Installation Fails
 ```bash
-# Install system dependencies first
+# Try installing system dependencies first
 python -m playwright install-deps
 python -m playwright install chromium
+
+# If download fails due to network issues, try:
+# 1. Check your internet connection
+# 2. Try again later (servers may be temporarily unavailable)
+# 3. Use different network (corporate firewalls may block downloads)
+
+# Alternative: Install only what you need
+python -m playwright install chromium --force
+```
+
+### Virtual Environment Issues
+```bash
+# Make sure uv is installed and virtual environment is activated
+pip install uv
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
+# Verify activation
+which python  # Should show .venv path
 ```
 
 ### Tests Timeout or Fail
@@ -77,13 +111,21 @@ python -m playwright install chromium
 Add to your GitHub Actions or CI pipeline:
 
 ```yaml
+- name: Setup Python and uv
+  run: |
+    pip install uv
+    uv venv
+    source .venv/bin/activate
+
 - name: Install Playwright
   run: |
-    pip install -e ".[test]"
+    uv pip install -e ".[test]"
     python -m playwright install chromium
 
 - name: Run Playwright Tests  
-  run: pytest tests/playwright/ --browser=chromium
+  run: |
+    source .venv/bin/activate
+    pytest tests/playwright/ --browser=chromium
 ```
 
 ## Getting Help

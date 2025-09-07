@@ -126,6 +126,8 @@ def main():
         print("\nNext steps:")
         print("1. Install browser binaries: python -m playwright install chromium")
         print("2. Run tests: pytest tests/playwright/")
+        print("\nNote: If using uv, ensure you have activated your virtual environment:")
+        print("   source .venv/bin/activate")
         return 0
     else:
         print("✗ Some checks failed. Please fix the issues above.")
