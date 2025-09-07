@@ -43,7 +43,11 @@ python tests/playwright/run_tests.py --install-browsers
 
 ### 3. Validate Setup
 ```bash
+# Comprehensive validation of the test environment
 python tests/playwright/validate_setup.py
+
+# Quick validation of uv-based installation
+python tests/playwright/test_uv_setup.py
 ```
 
 ### 4. Run Tests
