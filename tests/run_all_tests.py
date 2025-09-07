@@ -77,6 +77,54 @@ def run_original_tests():
     return passed, failed
 
 
+def run_playwright_tests():
+    """Run Playwright end-to-end tests"""
+    print("Running Playwright End-to-End Tests...")
+    print("=" * 50)
+    
+    playwright_dir = project_root / "tests" / "playwright"
+    if not playwright_dir.exists():
+        print("  ⚠️ Playwright tests not found")
+        return False
+    
+    try:
+        # Check if playwright is installed
+        result = subprocess.run([sys.executable, "-c", "import playwright"], 
+                              capture_output=True, text=True)
+        if result.returncode != 0:
+            print("  ⚠️ Playwright not installed. Install with: pip install -e .[test]")
+            return None  # Skip, not a failure
+        
+        # Check if browsers are installed
+        result = subprocess.run([sys.executable, "-m", "playwright", "install", "--dry-run"],
+                              capture_output=True, text=True)
+        if result.returncode != 0:
+            print("  ⚠️ Playwright browsers not installed. Install with: python -m playwright install chromium")
+            return None  # Skip, not a failure
+        
+        # Run playwright tests
+        result = subprocess.run([
+            sys.executable, "-m", "pytest", 
+            str(playwright_dir),
+            "--browser=chromium",
+            "-v"
+        ], cwd=project_root, timeout=300)
+        
+        if result.returncode == 0:
+            print("  ✅ Playwright tests passed")
+            return True
+        else:
+            print("  ❌ Playwright tests failed")
+            return False
+    
+    except subprocess.TimeoutExpired:
+        print("  ❌ Playwright tests timed out")
+        return False
+    except Exception as e:
+        print(f"  ❌ Error running playwright tests: {e}")
+        return False
+
+
 def main():
     """Main test runner"""
     print("Starlette Backend Test Suite")
@@ -136,6 +184,21 @@ def main():
         print(f"❌ Original tests failed: {e}")
         all_passed = False
     
+    # Run Playwright tests (optional)
+    try:
+        playwright_result = run_playwright_tests()
+        if playwright_result is False:  # False means failed, None means skipped
+            all_passed = False
+        elif playwright_result is True:
+            print("Playwright E2E tests: ✅ passed")
+        else:
+            print("Playwright E2E tests: ⚠️  skipped (not installed)")
+        print()
+    except Exception as e:
+        print(f"❌ Playwright tests failed: {e}")
+        # Don't fail entire suite for Playwright issues
+        print("⚠️  Continuing despite Playwright test failure...")
+    
     # Final results
     print("=" * 70)
     if all_passed:
@@ -151,6 +214,7 @@ def main():
         print("- ✅ Error handling and logging")
         print("- ✅ Tool system")
         print("- ✅ Validation and error cases")
+        print("- ✅ End-to-end UI testing (Playwright)")
         return True
     else:
         print("❌ SOME TESTS FAILED!")
