@@ -761,17 +761,9 @@ class ConversationController {
 
     async initializeFromPrompt(promptID) {
         console.log('Initializing from prompt ID:', promptID);
-
-        // Remove id from URL
-        window.history.replaceState({}, document.title, `/chat/${this.dialogId}`);
-
         try {
-
             const response = await fetch(`/prompt/${promptID}/json`);
-            if (!response.ok) {
-                throw new Error(`Failed to fetch prompt: ${response.status} ${response.statusText}`);
-            }
-
+            if (!response.ok) throw new Error(`Failed to fetch prompt: ${response.status} ${response.statusText}`);
 
             const promptData = await response.json();
             const promptText = promptData.prompt.prompt;
@@ -782,9 +774,12 @@ class ConversationController {
             // Save the prompt message to the dialog
             const promptMessage = { role: 'user', content: promptText };
             await this.storage.createMessage(this.dialogId, promptMessage);
-            await controller.initializeDialog(this.dialogId);
 
+            // IMPORTANT: remove ?id=... from the URL so reloads don’t recreate a new dialog
+            window.history.replaceState({}, document.title, `/chat/${this.dialogId}`);
 
+            // Now load the dialog normally
+            await this.initializeDialog(this.dialogId);
         } catch (error) {
             console.error('Error in initializeFromPrompt:', error);
             Flash.setMessage('An error occurred while initializing from prompt.', 'error');
@@ -802,20 +797,18 @@ const controller = new ConversationController({ view, storage: storageService, a
  * This only happens on page load
  */
 const url = new URL(window.location.href);
+const promptID = url.searchParams.get('id');
 const dialogID = url.pathname.split('/').pop();
-if (dialogID) {
 
+if (promptID) {
+    // If we’re starting from a prompt, create the dialog and clean the URL.
+    loadingSpinner.classList.remove('hidden');
+    await controller.initializeFromPrompt(promptID);
+    loadingSpinner.classList.add('hidden');
+} else if (dialogID) {
+    // Only load an existing dialog if there is no promptID
     controller.dialogId = dialogID;
     loadingSpinner.classList.remove('hidden');
-
-    console.log('Current dialog ID:', controller.dialogId);
     await controller.initializeDialog(controller.dialogId);
-
     loadingSpinner.classList.add('hidden');
-}
-
-const promptID = url.searchParams.get('id');
-if (promptID) {
-    console.log('Prompt ID from URL:', promptID);
-    await controller.initializeFromPrompt(promptID);
 }
