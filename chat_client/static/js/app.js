@@ -174,7 +174,7 @@ const view = {
     /**
      * Render user message to the DOM
      */
-    renderStaticUserMessage(message, messageId = null, onEdit, insertAtTop = false) {
+    renderStaticUserMessage(message, messageId = null, onEdit) {
         const { container, contentElement } = createMessageElement('User', messageId);
         contentElement.style.whiteSpace = 'pre-wrap';
         contentElement.innerText = message;
@@ -184,13 +184,7 @@ const view = {
         if (messageId) {
             renderEditMessageButton(container, message, onEdit);
         }
-        
-        // Insert at top when it's a new message, append normally for loading existing conversations
-        if (insertAtTop) {
-            responsesElem.insertBefore(container, responsesElem.firstChild);
-        } else {
-            responsesElem.appendChild(container);
-        }
+        responsesElem.appendChild(container);
     },
 
     /**
@@ -207,16 +201,9 @@ const view = {
     /**
      * Create a new assistant container for streaming
      */
-    createAssistantContainer(insertAfterFirst = false) {
+    createAssistantContainer() {
         const { container, contentElement, loader } = createMessageElement('Assistant');
-        
-        // Insert after the first child (user message) when it's a new conversation
-        if (insertAfterFirst && responsesElem.children.length > 0) {
-            responsesElem.insertBefore(container, responsesElem.children[1] || null);
-        } else {
-            responsesElem.appendChild(container);
-        }
-        
+        responsesElem.appendChild(container);
         loader.classList.remove('hidden');
 
         const hiddenContentElem = document.createElement('div');
@@ -601,15 +588,15 @@ class ConversationController {
             // Clear the input field
             this.view.clearInput();
 
-            // Render user message at the top for new messages
+            // Render user message
             view.renderStaticUserMessage(userMessage, userMessageId, async (id, newContent, container) => {
                 await this.handleMessageUpdate(id, newContent, container);
-            }, true);
+            });
 
             // Scroll so that last user message is visible
             this.view.scrollToLastMessage();
 
-            await this.renderAssistantMessage(true);
+            await this.renderAssistantMessage();
         } catch (error) {
             await logError(error, 'Error in sendUserMessage');
             console.error('Error in sendUserMessage:', error);
@@ -666,9 +653,9 @@ class ConversationController {
     /**
      * Render assistant message with streaming
      */
-    async renderAssistantMessage(insertAfterFirst = false) {
+    async renderAssistantMessage() {
         // Create container for assistant message and content element
-        const ui = view.createAssistantContainer(insertAfterFirst);
+        const ui = view.createAssistantContainer();
         this.view.disableSend();
         this.view.disableNew();
         this.view.enableAbort();
