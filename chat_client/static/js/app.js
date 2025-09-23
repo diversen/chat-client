@@ -187,6 +187,11 @@ const view = {
         
         // Insert new user messages at the top to appear below the top-bar
         responsesElem.prepend(container);
+        
+        // Add styling to ensure new conversations push older ones out of view
+        // Each conversation pair should take up most of the viewport height
+        container.style.minHeight = '70vh';
+        container.style.marginBottom = '20px';
     },
 
     /**
