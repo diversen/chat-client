@@ -184,14 +184,7 @@ const view = {
         if (messageId) {
             renderEditMessageButton(container, message, onEdit);
         }
-        
-        // Insert new user messages at the top to appear below the top-bar
-        responsesElem.prepend(container);
-        
-        // Add styling to ensure new conversations push older ones out of view
-        // Each conversation pair should take up most of the viewport height
-        container.style.minHeight = '70vh';
-        container.style.marginBottom = '20px';
+        responsesElem.appendChild(container);
     },
 
     /**
@@ -199,15 +192,7 @@ const view = {
      */
     async renderStaticAssistantMessage(message, messageId = null) {
         const { container, contentElement } = createMessageElement('Assistant', messageId);
-        
-        // Insert assistant message right after the most recent user message (at the top)
-        const firstChild = responsesElem.firstElementChild;
-        if (firstChild) {
-            firstChild.insertAdjacentElement('afterend', container);
-        } else {
-            responsesElem.prepend(container);
-        }
-        
+        responsesElem.appendChild(container);
         renderCopyMessageButton(container, message);
         await renderStreamedResponseText(contentElement, message);
         await addCopyButtons(contentElement, config);
@@ -218,15 +203,7 @@ const view = {
      */
     createAssistantContainer() {
         const { container, contentElement, loader } = createMessageElement('Assistant');
-        
-        // Insert assistant message right after the most recent user message (at the top)
-        const firstChild = responsesElem.firstElementChild;
-        if (firstChild) {
-            firstChild.insertAdjacentElement('afterend', container);
-        } else {
-            responsesElem.prepend(container);
-        }
-        
+        responsesElem.appendChild(container);
         loader.classList.remove('hidden');
 
         const hiddenContentElem = document.createElement('div');
@@ -287,8 +264,7 @@ const view = {
     getSelectedModel() { return selectModelElem.value; },
     attachCopy(container, text) { renderCopyMessageButton(container, text); },
     scrollToLastMessage() {
-        // Scroll to top to show the newest user message below the top-bar
-        responsesElem.scrollTo({ top: 0, behavior: 'smooth' });
+        responsesElem.scrollTo({ top: responsesElem.scrollHeight, behavior: 'smooth' });
     },
 };
 
@@ -752,7 +728,6 @@ class ConversationController {
         this.messages = savedMessages.slice();
         responsesElem.innerHTML = '';
 
-        // Load messages in chronological order, but append them so the most recent appears at the top
         for (const msg of this.messages) {
             if (msg.role === 'user') {
                 const message = msg.content;
