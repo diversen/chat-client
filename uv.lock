@@ -155,7 +155,7 @@ wheels = [
 
 [[package]]
 name = "chat-client"
-version = "1.0.1"
+version = "2.3.22"
 source = { editable = "." }
 dependencies = [
     { name = "aiosqlite" },
