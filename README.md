@@ -15,12 +15,12 @@ Example are e.g. `ollama` or `openai` etc.
 * user authentication and registration
 * highlight code
 * highlight KaTeX math
-* user profile
 * dark and light mode
 * user dialog history
 * user dialog management (delete dialogs)
 * copy dialog message to clipboard
 * load and continue saved dialogs
+* Upload images (use vision models)
 * tool support (if enabled)
 * python execution (if enabled)
 * supports ollama and openai models (and others that models that support the openai api)
