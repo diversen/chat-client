@@ -65,7 +65,7 @@ session_middleware = Middleware(
 
 
 no_cache_middlewares = Middleware(NoCacheMiddleware)
-limit_request_size_middlewares = Middleware(LimitRequestSizeMiddleware, max_size=100 * 1024)  # 50 KB
+limit_request_size_middlewares = Middleware(LimitRequestSizeMiddleware, max_size=1000 * 1024)  # 1000 KB
 
 middleware = []
 middleware.append(no_cache_middlewares)
