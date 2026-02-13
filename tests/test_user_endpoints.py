@@ -83,6 +83,15 @@ class TestUserEndpoints(BaseTestCase):
         assert data["error"] is True
         assert "Invalid credentials" in data["message"]
 
+    def test_login_post_missing_fields(self):
+        """Test login with missing required fields"""
+        response = self.client.post("/user/login", json={"email": "", "password": ""})
+
+        assert response.status_code == 400
+        data = response.json()
+        assert data["error"] is True
+        assert "Email and password are required" in data["message"]
+
     def test_verify_get(self):
         """Test GET /user/verify with token"""
         response = self.client.get("/user/verify?token=test-token")

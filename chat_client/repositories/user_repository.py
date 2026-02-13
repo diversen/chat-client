@@ -119,10 +119,14 @@ async def verify_user(request: Request):
 
 async def login_user(request: Request):
     json_data = await request.json()
-    email = json_data.get("email")
-    password = json_data.get("password")
+    email_raw = json_data.get("email")
+    password_raw = json_data.get("password")
 
-    logging.info(f"Login attempt for email: {email}")
+    email = email_raw.strip() if isinstance(email_raw, str) else ""
+    password = password_raw if isinstance(password_raw, str) else ""
+
+    if not email or not password:
+        raise exceptions_validation.UserValidate("Email and password are required")
 
     async with async_session() as session:
         stmt = select(User).where(User.email == email)
@@ -137,6 +141,7 @@ async def login_user(request: Request):
                 "you should reset your password. When this is done, you are verified."
             )
         if not _check_password(password, user.password_hash):
+            logging.info(f"Invalid password attempt for email: {email}")
             raise exceptions_validation.UserValidate("Invalid password")
 
         session_token = secrets.token_urlsafe(32)
@@ -154,7 +159,6 @@ async def reset_password(request: Request):
     form = await request.form()
     email = str(form.get("email"))
 
-    _is_valid_email(email)
     await _validate_captcha(request)
 
     async with async_session() as session:

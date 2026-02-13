@@ -20,11 +20,31 @@ class Requests {
         try {
             const response = await fetch(url, options);
             clearTimeout(timeoutId);
-            
-            if (!response.ok) {
-                throw new Error(`${options.method} request failed: ${response.status} ${response.statusText}`);
+            const responseText = await response.text();
+            let responseJson = null;
+            if (responseText) {
+                try {
+                    responseJson = JSON.parse(responseText);
+                } catch {
+                    responseJson = null;
+                }
             }
-            return response.json();
+
+            if (!response.ok) {
+                const message =
+                    responseJson?.message ||
+                    `${options.method} request failed: ${response.status} ${response.statusText}`;
+                throw new Error(message);
+            }
+
+            if (!responseText) {
+                return {};
+            }
+            if (responseJson !== null) {
+                return responseJson;
+            }
+
+            throw new Error('Server returned an invalid JSON response.');
         } catch (error) {
             if (error.name === 'AbortError') {
                 throw new Error(`${options.method} request aborted due to timeout`);

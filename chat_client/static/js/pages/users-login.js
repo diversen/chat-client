@@ -28,7 +28,7 @@ function initUsersLoginPage() {
             }
         } catch (error) {
             console.error(error);
-            Flash.setMessage('An error occurred while trying to log in. Try again later.', 'error');
+            Flash.setMessage(error?.message || 'An error occurred while trying to log in. Try again later.', 'error');
         } finally {
             spinner?.classList.add('hidden');
         }

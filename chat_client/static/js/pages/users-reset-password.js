@@ -34,7 +34,7 @@ function initUsersResetPasswordPage() {
             }
         } catch (error) {
             console.error(error);
-            Flash.setMessage('An error occurred while resetting your password. Try again later.', 'error');
+            Flash.setMessage(error?.message || 'An error occurred while resetting your password. Try again later.', 'error');
         } finally {
             spinner?.classList.add('hidden');
         }

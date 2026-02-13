@@ -24,7 +24,7 @@ function initUsersNewPasswordPage() {
             }
         } catch (error) {
             console.error(error);
-            Flash.setMessage('An error occurred while setting your new password. Try again later.', 'error');
+            Flash.setMessage(error?.message || 'An error occurred while setting your new password. Try again later.', 'error');
         } finally {
             spinner?.classList.add('hidden');
         }

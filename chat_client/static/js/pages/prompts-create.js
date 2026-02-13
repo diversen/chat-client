@@ -10,9 +10,21 @@ function initPromptsCreatePage() {
     createButton.addEventListener('click', async (event) => {
         event.preventDefault();
 
+        const title = document.getElementById('title')?.value?.trim() || '';
+        const prompt = document.getElementById('prompt')?.value?.trim() || '';
+
+        if (!title) {
+            Flash.setMessage('Please enter a title.', 'error');
+            return;
+        }
+        if (!prompt) {
+            Flash.setMessage('Please enter a prompt.', 'error');
+            return;
+        }
+
         const data = {
-            title: document.getElementById('title')?.value,
-            prompt: document.getElementById('prompt')?.value,
+            title,
+            prompt,
         };
 
         try {
@@ -24,7 +36,7 @@ function initPromptsCreatePage() {
             }
         } catch (error) {
             console.error(error);
-            Flash.setMessage('An error occurred. Try again later.', 'error');
+            Flash.setMessage(error?.message || 'An error occurred. Try again later.', 'error');
         }
     });
 }
