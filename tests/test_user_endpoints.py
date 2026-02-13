@@ -206,7 +206,7 @@ class TestUserEndpoints(BaseTestCase):
         mock_logged_in.return_value = False
 
         response = self.client.get("/user/is-logged-in")
-        assert response.status_code == 200
+        assert response.status_code == 400
         data = response.json()
         assert data["error"] is True
         assert data["redirect"] == "/user/login"

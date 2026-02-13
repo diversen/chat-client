@@ -78,9 +78,10 @@ def test_user_routes():
         # Test is-logged-in when not authenticated
         with patch("chat_client.core.user_session.is_logged_in", return_value=False):
             response = client.get("/user/is-logged-in")
-            assert response.status_code == 200, f"Is-logged-in failed: {response.status_code}"
+            assert response.status_code == 400, f"Is-logged-in failed: {response.status_code}"
             data = response.json()
             assert data["error"] is True  # Should be error because not logged in
+            assert data["redirect"] == "/user/login"
             print("✓ Is-logged-in endpoint works when not authenticated")
 
 

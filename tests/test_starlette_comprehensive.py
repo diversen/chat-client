@@ -321,7 +321,7 @@ class TestStarletteBackend:
                         "captcha": "TEST",
                     },
                 )
-                assert response.status_code == 200
+                assert response.status_code == 400
                 data = response.json()
                 assert data["error"] is True
                 assert "Email already exists" in data["message"]
@@ -334,7 +334,7 @@ class TestStarletteBackend:
                 mock_login.side_effect = UserValidate("Invalid credentials")
 
                 response = client.post("/user/login", json={"email": "test@example.com", "password": "wrongpassword"})
-                assert response.status_code == 200
+                assert response.status_code == 400
                 data = response.json()
                 assert data["error"] is True
                 assert "Invalid credentials" in data["message"]
