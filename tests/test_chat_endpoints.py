@@ -96,6 +96,19 @@ class TestChatEndpoints(BaseTestCase):
         assert data["error"] is True
         assert "must be logged in" in data["message"]
 
+    @patch('chat_client.core.user_session.is_logged_in')
+    def test_chat_response_stream_validation_error(self, mock_logged_in):
+        """Test POST /chat returns 400 on invalid payload"""
+        mock_logged_in.return_value = 1
+
+        response = self.client.post("/chat", json={
+            "messages": [{"role": "user", "content": "Hello"}],
+        })
+
+        assert response.status_code == 400
+        data = response.json()
+        assert data["error"] is True
+
     @patch('openai.OpenAI')
     @patch('chat_client.repositories.user_repository.get_profile')
     @patch('chat_client.core.user_session.is_logged_in')

@@ -12,9 +12,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 DIALOGS_PER_PAGE = 10
 
 
-async def create_dialog(user_id: int, request: Request):
-    form_data = await request.json()
-    title = str(form_data.get("title"))
+async def create_dialog(user_id: int, title: str):
 
     async with async_session() as session:
         dialog_id = str(uuid.uuid4())
@@ -29,12 +27,7 @@ async def create_dialog(user_id: int, request: Request):
         return dialog_id
 
 
-async def create_message(user_id: int, request: Request):
-    form_data = await request.json()
-
-    dialog_id = str(request.path_params.get("dialog_id"))
-    content = str(form_data.get("content"))
-    role = str(form_data.get("role"))
+async def create_message(user_id: int, dialog_id: str, role: str, content: str):
 
     async with async_session() as session:
         new_message = Message(
@@ -164,13 +157,11 @@ async def get_dialogs_info(user_id: int, request: Request):
         }
 
 
-async def update_message(user_id: int, request: Request):
+async def update_message(user_id: int, message_id: int, new_content: str):
     """
     Update a message and deactivate newer messages in the same dialog
     """
-    message_id = int(request.path_params.get("message_id"))
-    form_data = await request.json()
-    new_content = str(form_data.get("content", "")).strip()
+    new_content = str(new_content).strip()
 
     if not new_content:
         raise exceptions_validation.UserValidate("Message content cannot be empty")

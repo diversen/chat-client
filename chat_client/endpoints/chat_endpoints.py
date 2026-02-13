@@ -5,6 +5,7 @@ from starlette.responses import StreamingResponse, JSONResponse, RedirectRespons
 from openai import OpenAI
 from openai import OpenAIError
 import json
+from pydantic import BaseModel, ValidationError
 from chat_client.core import base_context
 from chat_client.core import flash
 import data.config as config
@@ -13,6 +14,12 @@ from chat_client.core import user_session
 from chat_client.core.templates import get_templates
 from chat_client.repositories import chat_repository, user_repository, prompt_repository
 from chat_client.core import exceptions_validation
+from chat_client.schemas.chat import (
+    ChatStreamRequest,
+    CreateDialogRequest,
+    CreateMessageRequest,
+    UpdateMessageRequest,
+)
 
 # Logger
 logger: logging.Logger = logging.getLogger(__name__)
@@ -28,6 +35,19 @@ PROVIDERS = getattr(config, "PROVIDERS", {})
 TOOL_REGISTRY = getattr(config, "TOOL_REGISTRY", {})
 TOOLS = getattr(config, "TOOLS", [])
 TOOL_MODELS = getattr(config, "TOOL_MODELS", [])
+
+
+async def _parse_request_payload(request: Request, model_class: type[BaseModel]) -> BaseModel:
+    try:
+        payload = await request.json()
+    except json.JSONDecodeError:
+        raise exceptions_validation.JSONError("Invalid JSON body", status_code=400)
+
+    try:
+        return model_class.model_validate(payload)
+    except ValidationError as e:
+        error_msg = e.errors()[0].get("msg", "Invalid request body")
+        raise exceptions_validation.JSONError(error_msg, status_code=400)
 
 
 async def chat_page(request: Request):
@@ -233,13 +253,15 @@ async def chat_response_stream(request: Request):
     if not logged_in:
         return JSONResponse({"error": True, "message": "You must be logged in to use the chat"}, status_code=401)
 
-    data = await request.json()
-    messages = _normalize_chat_messages(data["messages"])
-    model = data["model"]
-    return StreamingResponse(
-        _chat_response_stream(request, messages, model, logged_in),
-        media_type="text/event-stream",
-    )
+    try:
+        payload = await _parse_request_payload(request, ChatStreamRequest)
+        messages = _normalize_chat_messages([message.model_dump() for message in payload.messages])
+        return StreamingResponse(
+            _chat_response_stream(request, messages, payload.model, logged_in),
+            media_type="text/event-stream",
+        )
+    except exceptions_validation.JSONError as e:
+        return JSONResponse({"error": True, "message": str(e)}, status_code=e.status_code)
 
 
 async def config_(request: Request):
@@ -326,8 +348,11 @@ async def create_dialog(request: Request):
         if not user_id:
             return JSONResponse({"error": True, "message": "You must be logged in to save a dialog"}, status_code=401)
 
-        dialog_id = await chat_repository.create_dialog(user_id, request)
+        payload = await _parse_request_payload(request, CreateDialogRequest)
+        dialog_id = await chat_repository.create_dialog(user_id, payload.title)
         return JSONResponse({"error": False, "dialog_id": dialog_id, "message": "Dialog saved"})
+    except exceptions_validation.JSONError as e:
+        return JSONResponse({"error": True, "message": str(e)}, status_code=e.status_code)
     except exceptions_validation.UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})
     except Exception:
@@ -345,8 +370,15 @@ async def create_message(request: Request):
         if not user_id:
             return JSONResponse({"error": True, "message": "You must be logged in create a message"}, status_code=401)
 
-        message_id = await chat_repository.create_message(user_id, request)
+        dialog_id = str(request.path_params.get("dialog_id", "")).strip()
+        if not dialog_id:
+            raise exceptions_validation.UserValidate("Dialog id is required")
+
+        payload = await _parse_request_payload(request, CreateMessageRequest)
+        message_id = await chat_repository.create_message(user_id, dialog_id, payload.role, payload.content)
         return JSONResponse({"message_id": message_id})
+    except exceptions_validation.JSONError as e:
+        return JSONResponse({"error": True, "message": str(e)}, status_code=e.status_code)
     except exceptions_validation.UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})
     except Exception:
@@ -420,8 +452,14 @@ async def update_message(request: Request):
         if not user_id:
             return JSONResponse({"error": True, "message": "You must be logged in to update a message"}, status_code=401)
 
-        result = await chat_repository.update_message(user_id, request)
+        message_id = int(request.path_params.get("message_id"))
+        payload = await _parse_request_payload(request, UpdateMessageRequest)
+        result = await chat_repository.update_message(user_id, message_id, payload.content)
         return JSONResponse({"error": False, **result})
+    except exceptions_validation.JSONError as e:
+        return JSONResponse({"error": True, "message": str(e)}, status_code=e.status_code)
+    except (TypeError, ValueError):
+        return JSONResponse({"error": True, "message": "Invalid message id"}, status_code=400)
     except exceptions_validation.UserValidate as e:
         return JSONResponse({"error": True, "message": str(e)})
     except Exception:
