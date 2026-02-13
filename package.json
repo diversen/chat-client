@@ -14,7 +14,14 @@
     "@playwright/test": "^1.55.0",
     "@types/node": "^24.3.1"
   },
-  "scripts": {},
+  "scripts": {
+    "e2e": "E2E_BASE_URL=http://localhost:8000 playwright test",
+    "e2e:headed": "E2E_BASE_URL=http://localhost:8000 playwright test --headed",
+    "e2e:ui": "E2E_BASE_URL=http://localhost:8000 playwright test --ui",
+    "e2e:debug": "E2E_BASE_URL=http://localhost:8000 playwright test --debug",
+    "e2e:managed": "E2E_MANAGED_SERVER=1 E2E_BASE_URL=http://127.0.0.1:8010 playwright test",
+    "e2e:managed:headed": "E2E_MANAGED_SERVER=1 E2E_BASE_URL=http://127.0.0.1:8010 playwright test --headed"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/diversen/chat-client.git"

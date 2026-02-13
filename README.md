@@ -79,5 +79,14 @@ uv pip install -r requirements.txt
 uv pip install -e .
 ```
 
+## E2E tests
+
+```bash
+# Use an already running server at http://localhost:8000
+E2E_EMAIL=test E2E_PASSWORD=test npm run e2e
+
+# Or let Playwright start its own server
+npm run e2e:managed
+```
 
 MIT © [Dennis Iversen](https://github.com/diversen)
