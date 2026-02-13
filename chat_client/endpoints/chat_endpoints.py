@@ -69,6 +69,51 @@ def _execute_tool(tool_call):
         return f"Unknown tool: {func_name}"
 
 
+def _normalize_chat_messages(messages: list) -> list:
+    """
+    Convert user messages with uploaded images into OpenAI content parts.
+    """
+    normalized: list = []
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+
+        role = str(message.get("role", ""))
+        if role != "user":
+            normalized.append(message)
+            continue
+
+        content = str(message.get("content", ""))
+        images = message.get("images", [])
+        if not isinstance(images, list) or not images:
+            normalized.append(message)
+            continue
+
+        content_parts: list[dict] = []
+        if content:
+            content_parts.append({"type": "text", "text": content})
+
+        for image in images:
+            if not isinstance(image, dict):
+                continue
+            data_url = str(image.get("data_url", "")).strip()
+            if not data_url.startswith("data:image/"):
+                continue
+            content_parts.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": data_url},
+                }
+            )
+
+        if content_parts:
+            normalized.append({"role": "user", "content": content_parts})
+        else:
+            normalized.append({"role": "user", "content": content})
+
+    return normalized
+
+
 async def _chat_response_stream(request: Request, messages, model, logged_in):
     profile = await user_repository.get_profile(logged_in)
     if "system_message" in profile and profile["system_message"]:
@@ -189,7 +234,7 @@ async def chat_response_stream(request: Request):
         return JSONResponse({"error": True, "message": "You must be logged in to use the chat"}, status_code=401)
 
     data = await request.json()
-    messages = data["messages"]
+    messages = _normalize_chat_messages(data["messages"])
     model = data["model"]
     return StreamingResponse(
         _chat_response_stream(request, messages, model, logged_in),

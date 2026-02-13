@@ -3,14 +3,22 @@ import { responsesElem, messageElem, sendButtonElem, newButtonElem, abortButtonE
 // sendButtonElem is disabled by default
 sendButtonElem.setAttribute('disabled', true);
 
-// Add event to sendButtonElem to remove disabled when content exists in messageElem
-messageElem.addEventListener('input', () => {
-    if (messageElem.value.trim().length > 0) {
+function updateSendButtonState() {
+    const hasText = messageElem.value.trim().length > 0;
+    const hasImages = messageElem.dataset.hasImages === '1';
+    if (hasText || hasImages) {
         sendButtonElem.removeAttribute('disabled');
     } else {
         sendButtonElem.setAttribute('disabled', true);
     }
+}
+
+// Add event to sendButtonElem to remove disabled when content exists in messageElem
+messageElem.addEventListener('input', () => {
+    updateSendButtonState();
 });
+
+document.addEventListener('chat:images-updated', updateSendButtonState);
 
 /**
  * On select model change save the selected model in local storage

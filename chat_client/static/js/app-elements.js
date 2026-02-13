@@ -8,5 +8,21 @@ const selectModelElem = document.getElementById('select-model');
 const loadingSpinner = document.querySelector('.loading-spinner');
 const chatContainer = document.querySelector('.chat-container');
 const scrollToBottom = document.getElementById('scroll-to-bottom');
+const imageInputElem = document.getElementById('image-input');
+const imagePreviewElem = document.getElementById('image-preview');
+const attachImageButtonElem = document.getElementById('attach-image');
 
-export { responsesElem, messageElem, sendButtonElem, newButtonElem, abortButtonElem, selectModelElem, loadingSpinner, chatContainer, scrollToBottom };
+export {
+    responsesElem,
+    messageElem,
+    sendButtonElem,
+    newButtonElem,
+    abortButtonElem,
+    selectModelElem,
+    loadingSpinner,
+    chatContainer,
+    scrollToBottom,
+    imageInputElem,
+    imagePreviewElem,
+    attachImageButtonElem,
+};

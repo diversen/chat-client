@@ -1,7 +1,19 @@
 import { Flash } from './flash.js';
 import { mdNoHTML } from './markdown.js';
 import { createDialog, getMessages, createMessage, getConfig, isLoggedInOrRedirect, updateMessage } from './app-dialog.js';
-import { responsesElem, messageElem, sendButtonElem, newButtonElem, abortButtonElem, selectModelElem, loadingSpinner, scrollToBottom } from './app-elements.js';
+import {
+    responsesElem,
+    messageElem,
+    sendButtonElem,
+    newButtonElem,
+    abortButtonElem,
+    selectModelElem,
+    loadingSpinner,
+    scrollToBottom,
+    imageInputElem,
+    imagePreviewElem,
+    attachImageButtonElem,
+} from './app-elements.js';
 import { } from './app-events.js';
 import { addCopyButtons } from './app-copy-buttons.js';
 import { logError } from './error-log.js';
@@ -10,9 +22,19 @@ import { modifyStreamedText } from './utils.js';
 import { copyIcon, checkIcon, editIcon } from './app-icons.js';
 
 const config = await getConfig();
+const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
 
 // Math rendering
 const useKatex = config.use_katex;
+
+function fileToDataURL(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
+        reader.readAsDataURL(file);
+    });
+}
 
 /**
  * Helper function: Highlight code in a given element
@@ -462,9 +484,98 @@ class ConversationController {
         this.dialogId = null;
         /** @type {AbortController} */
         this.abortController = new AbortController();
+        /** @type {Array<{id: string, name: string, type: string, size: number, dataUrl: string}>} */
+        this.pendingImages = [];
 
         // Bind UI once
         this.wireUI();
+        this.refreshSendButton();
+    }
+
+    refreshSendButton() {
+        messageElem.dataset.hasImages = this.pendingImages.length > 0 ? '1' : '0';
+        document.dispatchEvent(new Event('chat:images-updated'));
+    }
+
+    renderPendingImages() {
+        if (!this.pendingImages.length) {
+            imagePreviewElem.innerHTML = '';
+            imagePreviewElem.classList.add('hidden');
+            return;
+        }
+
+        imagePreviewElem.classList.remove('hidden');
+        imagePreviewElem.innerHTML = '';
+
+        this.pendingImages.forEach((img) => {
+            const item = document.createElement('div');
+            item.className = 'image-preview-item';
+
+            const thumbnail = document.createElement('img');
+            thumbnail.className = 'image-preview-thumb';
+            thumbnail.alt = img.name;
+            thumbnail.src = img.dataUrl;
+
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'image-preview-remove';
+            remove.title = `Remove ${img.name}`;
+            remove.textContent = 'x';
+            remove.addEventListener('click', () => {
+                this.pendingImages = this.pendingImages.filter((pending) => pending.id !== img.id);
+                this.renderPendingImages();
+                this.refreshSendButton();
+            });
+
+            item.appendChild(thumbnail);
+            item.appendChild(remove);
+            imagePreviewElem.appendChild(item);
+        });
+    }
+
+    clearPendingImages() {
+        this.pendingImages = [];
+        imageInputElem.value = '';
+        this.renderPendingImages();
+        this.refreshSendButton();
+    }
+
+    async handleImageSelection(files) {
+        const selectedFiles = Array.from(files || []);
+        if (!selectedFiles.length) return;
+
+        const newImages = [];
+
+        for (const file of selectedFiles) {
+            if (!file.type.startsWith('image/')) {
+                Flash.setMessage(`Skipped ${file.name}: file is not an image`, 'notice');
+                continue;
+            }
+
+            if (file.size > MAX_IMAGE_SIZE_BYTES) {
+                Flash.setMessage(`Skipped ${file.name}: file is larger than 10MB`, 'notice');
+                continue;
+            }
+
+            try {
+                const dataUrl = await fileToDataURL(file);
+                newImages.push({
+                    id: `${Date.now()}-${Math.random()}`,
+                    name: file.name,
+                    type: file.type,
+                    size: file.size,
+                    dataUrl,
+                });
+            } catch (error) {
+                console.error('Error reading image:', error);
+                Flash.setMessage(`Skipped ${file.name}: could not read file`, 'notice');
+            }
+        }
+
+        this.pendingImages = this.pendingImages.concat(newImages);
+        imageInputElem.value = '';
+        this.renderPendingImages();
+        this.refreshSendButton();
     }
 
     /**
@@ -474,6 +585,14 @@ class ConversationController {
         // Add event listener to the send button
         sendButtonElem.addEventListener('click', async () => {
             await this.sendUserMessage();
+        });
+
+        attachImageButtonElem.addEventListener('click', () => {
+            imageInputElem.click();
+        });
+
+        imageInputElem.addEventListener('change', async (event) => {
+            await this.handleImageSelection(event.target.files);
         });
 
         /**
@@ -555,7 +674,8 @@ class ConversationController {
      * Validate user message
      */
     validateUserMessage(userMessage) {
-        if (!userMessage || this.isStreaming) {
+        const hasImages = this.pendingImages.length > 0;
+        if ((!userMessage && !hasImages) || this.isStreaming) {
             console.log('Empty message or assistant is streaming');
             return false;
         }
@@ -569,27 +689,34 @@ class ConversationController {
         try {
             await this.auth.ensure();
             const userMessage = messageElem.value.trim();
+            const images = this.pendingImages.map((img) => ({ data_url: img.dataUrl }));
             if (!this.validateUserMessage(userMessage)) return;
 
             // Save as dialog if it's the first message
-            const message = { role: 'user', content: userMessage };
+            const message = { role: 'user', content: userMessage, images: images };
+            const messageTextForStorage = userMessage || `[${images.length} image${images.length > 1 ? 's' : ''} attached]`;
 
             // Create new dialog if there are no messages
             if (this.messages.length === 0) {
-                this.dialogId = await this.storage.createDialog(userMessage);
+                const title = userMessage || `Image message (${images.length})`;
+                this.dialogId = await this.storage.createDialog(title);
             }
 
             // Push user message to current dialog messages
             this.messages.push(message);
 
             // Save user message and get the message ID
-            const userMessageId = await this.storage.createMessage(this.dialogId, message);
+            const userMessageId = await this.storage.createMessage(this.dialogId, {
+                role: 'user',
+                content: messageTextForStorage,
+            });
 
             // Clear the input field
             this.view.clearInput();
+            this.clearPendingImages();
 
             // Render user message
-            view.renderStaticUserMessage(userMessage, userMessageId, async (id, newContent, container) => {
+            view.renderStaticUserMessage(messageTextForStorage, userMessageId, async (id, newContent, container) => {
                 await this.handleMessageUpdate(id, newContent, container);
             });
 
@@ -717,7 +844,7 @@ class ConversationController {
 
             // reset abort controller for next run
             this.abortController = new AbortController();
-            this.view.enableSend();
+            this.refreshSendButton();
         }
     }
 

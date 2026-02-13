@@ -10,6 +10,25 @@ from tests.test_base import BaseTestCase, mock_openai_client, mock_llm_response
 class TestChatEndpoints(BaseTestCase):
     """Test chat-related endpoints"""
 
+    def test_normalize_chat_messages_with_images(self):
+        """User messages with images should be converted to OpenAI content parts"""
+        from chat_client.endpoints.chat_endpoints import _normalize_chat_messages
+
+        messages = [
+            {
+                "role": "user",
+                "content": "Describe this image",
+                "images": [{"data_url": "data:image/png;base64,AAAA"}],
+            }
+        ]
+        normalized = _normalize_chat_messages(messages)
+
+        assert len(normalized) == 1
+        assert normalized[0]["role"] == "user"
+        assert isinstance(normalized[0]["content"], list)
+        assert normalized[0]["content"][0]["type"] == "text"
+        assert normalized[0]["content"][1]["type"] == "image_url"
+
     @patch('chat_client.core.user_session.is_logged_in')
     def test_chat_page_not_authenticated(self, mock_logged_in):
         """Test GET / when not authenticated"""
@@ -96,6 +115,38 @@ class TestChatEndpoints(BaseTestCase):
         
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
+
+    @patch('chat_client.endpoints.chat_endpoints.OpenAI')
+    @patch('chat_client.repositories.user_repository.get_profile')
+    @patch('chat_client.core.user_session.is_logged_in')
+    def test_chat_response_stream_with_images(self, mock_logged_in, mock_profile, mock_openai_class):
+        """Test POST /chat converts uploaded images into model content parts"""
+        mock_logged_in.return_value = 1
+        mock_profile.return_value = {"system_message": ""}
+
+        mock_client = mock_openai_client()
+        mock_openai_class.return_value = mock_client
+
+        response = self.client.post("/chat", json={
+            "messages": [
+                {
+                    "role": "user",
+                    "content": "Describe this",
+                    "images": [
+                        {"data_url": "data:image/png;base64,AAAA"},
+                    ],
+                }
+            ],
+            "model": "test-model"
+        })
+
+        assert response.status_code == 200
+        _ = response.content
+        called_messages = mock_client.chat.completions.create.call_args.kwargs["messages"]
+        assert called_messages[0]["role"] == "user"
+        assert isinstance(called_messages[0]["content"], list)
+        assert called_messages[0]["content"][0]["type"] == "text"
+        assert called_messages[0]["content"][1]["type"] == "image_url"
 
     @patch('chat_client.core.user_session.is_logged_in')
     def test_create_dialog_not_authenticated(self, mock_logged_in):
