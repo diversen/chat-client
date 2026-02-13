@@ -23,15 +23,14 @@ function initPromptsEditPage() {
         };
 
         try {
-            const res = await Requests.asyncPostJson(`/prompt/${promptId}/edit`, data);
-            if (res.error) {
-                Flash.setMessage(res.message, 'error');
-            } else {
-                window.location.href = '/prompt';
-            }
+            await Requests.asyncPostJson(`/prompt/${promptId}/edit`, data);
+            window.location.href = '/prompt';
         } catch (error) {
             console.error(error);
-            Flash.setMessage('An error occurred while updating the prompt.', 'error');
+            Flash.setMessage(
+                Requests.getErrorMessage(error, 'An error occurred while updating the prompt.'),
+                'error',
+            );
         }
     });
 }

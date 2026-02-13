@@ -2,7 +2,7 @@
 
 from starlette.routing import Route
 from starlette.requests import Request
-from starlette.responses import RedirectResponse, JSONResponse
+from starlette.responses import RedirectResponse
 from chat_client.core.templates import get_templates
 from chat_client.core.base_context import get_context
 
@@ -50,7 +50,7 @@ async def prompt_list_json(request: Request):
             }
             for p in prompts
         ]
-        return JSONResponse({"error": False, "prompts": data})
+        return json_success(prompts=data)
     except exceptions_validation.JSONError as e:
         return json_error(str(e), status_code=e.status_code)
 
@@ -107,7 +107,7 @@ async def prompt_detail_json(request: Request):
         user_id = await require_user_id_json(request, message="Not authenticated")
         prompt = await prompt_repository.get_prompt(user_id, prompt_id)
     except exceptions_validation.UserValidate:
-        return JSONResponse({"error": True, "message": "Prompt not found"}, status_code=404)
+        return json_error("Prompt not found", status_code=404)
     except exceptions_validation.JSONError as e:
         return json_error(str(e), status_code=e.status_code)
     data = {
@@ -115,7 +115,7 @@ async def prompt_detail_json(request: Request):
         "title": prompt.title,
         "prompt": prompt.prompt,
     }
-    return JSONResponse({"error": False, "prompt": data})
+    return json_success(prompt=data)
 
 
 async def prompt_edit_get(request: Request):

@@ -22,11 +22,6 @@ function initUsersDialogsPage() {
 
         try {
             const response = await Requests.asyncGetJson(`/user/dialogs/json?page=${page}`);
-            if (response.error) {
-                Flash.setMessage(response.message, 'error');
-                return;
-            }
-
             const info = response.dialogs_info;
             if (info.dialogs.length === 0 && currentPage === 1) {
                 noDialogs.classList.remove('hidden');
@@ -39,7 +34,7 @@ function initUsersDialogsPage() {
             currentPage += 1;
         } catch (error) {
             console.error(error);
-            Flash.setMessage('An error occurred while loading dialogs.', 'error');
+            Flash.setMessage(Requests.getErrorMessage(error, 'An error occurred while loading dialogs.'), 'error');
         } finally {
             isLoading = false;
             loading.classList.add('hidden');
@@ -88,17 +83,13 @@ function initUsersDialogsPage() {
         loading.classList.remove('hidden');
 
         try {
-            const response = await Requests.asyncPostJson(`/chat/delete-dialog/${dialogId}`, {});
-            if (response.error) {
-                Flash.setMessage(response.message, 'error');
-            } else {
-                const dialog = elem.closest('.dialog');
-                dialog?.remove();
-                Flash.setMessage('Dialog deleted successfully', 'success');
-            }
+            await Requests.asyncPostJson(`/chat/delete-dialog/${dialogId}`, {});
+            const dialog = elem.closest('.dialog');
+            dialog?.remove();
+            Flash.setMessage('Dialog deleted successfully', 'success');
         } catch (error) {
             console.error(error);
-            Flash.setMessage('An error occurred while deleting the dialog.', 'error');
+            Flash.setMessage(Requests.getErrorMessage(error, 'An error occurred while deleting the dialog.'), 'error');
         } finally {
             loading.classList.add('hidden');
             handleScroll();

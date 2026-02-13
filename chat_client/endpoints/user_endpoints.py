@@ -1,6 +1,6 @@
 from starlette.requests import Request
 from starlette.routing import Route
-from starlette.responses import JSONResponse, RedirectResponse
+from starlette.responses import RedirectResponse
 import logging
 from starlette.responses import Response
 import random
@@ -267,9 +267,9 @@ async def is_logged_in(request: Request):
     user_id = await user_session.is_logged_in(request)
     if not user_id:
         flash.set_notice(request, "You are logged out. Please login again.")
-        return JSONResponse({"error": True, "redirect": "/user/login"})
+        return json_error("You are logged out. Please login again.", redirect="/user/login")
 
-    return JSONResponse({"error": False, "message": "You are logged in"})
+    return json_success(message="You are logged in")
 
 
 routes_user: list = [

@@ -19,15 +19,14 @@ function initUsersProfilePage() {
                 dark_theme: document.getElementById('dark_theme')?.checked,
             };
 
-            const res = await Requests.asyncPostJson('/user/profile', jsonData);
-            if (res.error) {
-                Flash.setMessage(res.message, 'error');
-            } else {
-                window.location.reload();
-            }
+            await Requests.asyncPostJson('/user/profile', jsonData);
+            window.location.reload();
         } catch (error) {
             console.error(error);
-            Flash.setMessage('An error occurred while saving your profile.', 'error');
+            Flash.setMessage(
+                Requests.getErrorMessage(error, 'An error occurred while saving your profile.'),
+                'error',
+            );
         } finally {
             spinner?.classList.add('hidden');
         }

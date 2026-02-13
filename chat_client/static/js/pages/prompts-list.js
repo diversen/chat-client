@@ -21,15 +21,14 @@ function initPromptsListPage() {
             }
 
             try {
-                const res = await Requests.asyncPostJson(`/prompt/${promptId}/delete`, {});
-                if (res.error) {
-                    Flash.setMessage(res.message, 'error');
-                } else {
-                    window.location.href = '/prompt';
-                }
+                await Requests.asyncPostJson(`/prompt/${promptId}/delete`, {});
+                window.location.href = '/prompt';
             } catch (error) {
                 console.error(error);
-                Flash.setMessage('An error occurred while deleting the prompt.', 'error');
+                Flash.setMessage(
+                    Requests.getErrorMessage(error, 'An error occurred while deleting the prompt.'),
+                    'error',
+                );
             }
         });
     });

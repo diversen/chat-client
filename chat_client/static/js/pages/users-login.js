@@ -20,15 +20,14 @@ function initUsersLoginPage() {
         };
 
         try {
-            const res = await Requests.asyncPostJson('/user/login', jsonData);
-            if (res.error) {
-                Flash.setMessage(res.message, 'error');
-            } else {
-                window.location.href = '/';
-            }
+            await Requests.asyncPostJson('/user/login', jsonData);
+            window.location.href = '/';
         } catch (error) {
             console.error(error);
-            Flash.setMessage(error?.message || 'An error occurred while trying to log in. Try again later.', 'error');
+            Flash.setMessage(
+                Requests.getErrorMessage(error, 'An error occurred while trying to log in. Try again later.'),
+                'error',
+            );
         } finally {
             spinner?.classList.add('hidden');
         }

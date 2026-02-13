@@ -26,15 +26,14 @@ function initUsersSignupPage() {
         try {
             const form = document.getElementById('signup-form');
             const formData = new FormData(form);
-            const res = await Requests.asyncPost('/user/signup', formData);
-            if (res.error) {
-                Flash.setMessage(res.message, 'error');
-            } else {
-                window.location.replace('/user/login');
-            }
+            await Requests.asyncPost('/user/signup', formData);
+            window.location.replace('/user/login');
         } catch (error) {
             console.error(error);
-            Flash.setMessage(error?.message || 'An error occurred while creating your account. Try again later.', 'error');
+            Flash.setMessage(
+                Requests.getErrorMessage(error, 'An error occurred while creating your account. Try again later.'),
+                'error',
+            );
         } finally {
             spinner?.classList.add('hidden');
         }

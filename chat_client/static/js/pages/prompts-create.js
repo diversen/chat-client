@@ -28,15 +28,11 @@ function initPromptsCreatePage() {
         };
 
         try {
-            const res = await Requests.asyncPostJson('/prompt/create', data);
-            if (res.error) {
-                Flash.setMessage(res.message, 'error');
-            } else {
-                window.location.href = '/prompt';
-            }
+            await Requests.asyncPostJson('/prompt/create', data);
+            window.location.href = '/prompt';
         } catch (error) {
             console.error(error);
-            Flash.setMessage(error?.message || 'An error occurred. Try again later.', 'error');
+            Flash.setMessage(Requests.getErrorMessage(error), 'error');
         }
     });
 }

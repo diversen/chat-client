@@ -10,6 +10,17 @@ class Requests {
     static REQUEST_TIMEOUT = 10;
 
     /**
+     * Normalize an unknown error into a user-displayable message.
+     */
+    static getErrorMessage(error, fallbackMessage = 'An error occurred. Try again later.') {
+        const message = error?.message;
+        if (typeof message === 'string' && message.trim()) {
+            return message;
+        }
+        return fallbackMessage;
+    }
+
+    /**
      * Helper function to fetch with timeout
      */
     static async _fetchWithTimeout(url, options) {

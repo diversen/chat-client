@@ -16,15 +16,14 @@ function initUsersNewPasswordPage() {
         try {
             const form = document.getElementById('new-password-form');
             const formData = new FormData(form);
-            const res = await Requests.asyncPost('/user/new-password', formData);
-            if (res.error) {
-                Flash.setMessage(res.message, 'error');
-            } else {
-                window.location.replace('/user/login');
-            }
+            await Requests.asyncPost('/user/new-password', formData);
+            window.location.replace('/user/login');
         } catch (error) {
             console.error(error);
-            Flash.setMessage(error?.message || 'An error occurred while setting your new password. Try again later.', 'error');
+            Flash.setMessage(
+                Requests.getErrorMessage(error, 'An error occurred while setting your new password. Try again later.'),
+                'error',
+            );
         } finally {
             spinner?.classList.add('hidden');
         }

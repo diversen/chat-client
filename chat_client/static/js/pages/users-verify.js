@@ -16,15 +16,14 @@ function initUsersVerifyPage() {
         try {
             const form = document.getElementById('signup-form');
             const formData = new FormData(form);
-            const res = await Requests.asyncPost('/user/verify', formData);
-            if (res.error) {
-                Flash.setMessage(res.message, 'error');
-            } else {
-                window.location.href = '/user/login';
-            }
+            await Requests.asyncPost('/user/verify', formData);
+            window.location.href = '/user/login';
         } catch (error) {
             console.error(error);
-            Flash.setMessage('An error occurred while verifying your account. Try again later.', 'error');
+            Flash.setMessage(
+                Requests.getErrorMessage(error, 'An error occurred while verifying your account. Try again later.'),
+                'error',
+            );
         } finally {
             spinner?.classList.add('hidden');
         }

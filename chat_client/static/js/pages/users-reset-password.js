@@ -26,15 +26,14 @@ function initUsersResetPasswordPage() {
         try {
             const form = document.getElementById('reset-form');
             const formData = new FormData(form);
-            const res = await Requests.asyncPost('/user/reset', formData);
-            if (res.error) {
-                Flash.setMessage(res.message, 'error');
-            } else {
-                window.location.replace('/user/login');
-            }
+            await Requests.asyncPost('/user/reset', formData);
+            window.location.replace('/user/login');
         } catch (error) {
             console.error(error);
-            Flash.setMessage(error?.message || 'An error occurred while resetting your password. Try again later.', 'error');
+            Flash.setMessage(
+                Requests.getErrorMessage(error, 'An error occurred while resetting your password. Try again later.'),
+                'error',
+            );
         } finally {
             spinner?.classList.add('hidden');
         }
