@@ -2,6 +2,7 @@
 Test runner for all Starlette backend tests.
 This module provides different levels of testing for the backend.
 """
+
 import sys
 import os
 import subprocess
@@ -16,9 +17,10 @@ def run_simple_tests():
     """Run simple backend tests (basic functionality)"""
     print("Running Simple Backend Tests...")
     print("=" * 50)
-    
+
     try:
         from tests.test_starlette_simple import main
+
         success = main()
         return success
     except Exception as e:
@@ -30,9 +32,10 @@ def run_comprehensive_tests():
     """Run comprehensive backend tests (full functionality)"""
     print("Running Comprehensive Backend Tests...")
     print("=" * 60)
-    
+
     try:
         from tests.test_starlette_comprehensive import main
+
         success = main()
         return success
     except Exception as e:
@@ -46,17 +49,15 @@ def main():
     print("=" * 70)
     print("This test suite validates all Starlette backend endpoints and functionality.")
     print()
-    
+
     # Check if database is initialized
     db_path = project_root / "data" / "database.db"
     if not db_path.exists():
         print("⚠️  Database not found. Initializing...")
         try:
-            result = subprocess.run([sys.executable, "-m", "chat_client.cli", "init-system"], 
-                                  cwd=project_root,
-                                  capture_output=True,
-                                  text=True,
-                                  timeout=60)
+            result = subprocess.run(
+                [sys.executable, "-m", "chat_client.cli", "init-system"], cwd=project_root, capture_output=True, text=True, timeout=60
+            )
             if result.returncode == 0:
                 print("✓ Database initialized successfully")
             else:
@@ -65,9 +66,9 @@ def main():
         except Exception as e:
             print(f"❌ Error initializing database: {e}")
             return False
-    
+
     all_passed = True
-    
+
     # Run simple tests first
     try:
         simple_success = run_simple_tests()
@@ -77,7 +78,7 @@ def main():
     except Exception as e:
         print(f"❌ Simple tests failed: {e}")
         all_passed = False
-    
+
     # Run comprehensive tests
     try:
         comprehensive_success = run_comprehensive_tests()
@@ -87,7 +88,7 @@ def main():
     except Exception as e:
         print(f"❌ Comprehensive tests failed: {e}")
         all_passed = False
-    
+
     # Final results
     print("=" * 70)
     if all_passed:

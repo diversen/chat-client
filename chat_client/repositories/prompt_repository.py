@@ -1,12 +1,10 @@
 """Data-access helpers for Prompt CRUD operations."""
 
 from sqlalchemy import select, update, delete
-from starlette.requests import Request
 
 from chat_client.database.db_session import async_session
 from chat_client.core import exceptions_validation
 from chat_client.models import Prompt
-from chat_client.core import user_session
 
 MAX_TITLE_LEN = 256
 MAX_PROMPT_LEN = 8096
@@ -23,11 +21,7 @@ async def _validate(title: str, prompt_text: str):
         raise exceptions_validation.UserValidate(f"Prompt must be ≤ {MAX_PROMPT_LEN} characters")
 
 
-async def create_prompt(user_id: int, request: Request):
-
-    form = await request.json()
-    title = str(form.get("title", ""))
-    prompt_text = str(form.get("prompt", ""))
+async def create_prompt(user_id: int, title: str, prompt_text: str):
 
     await _validate(title, prompt_text)
 
@@ -53,14 +47,7 @@ async def get_prompt(user_id: int, prompt_id: int):
         return prompt
 
 
-async def update_prompt(request: Request, prompt_id: int):
-    user_id = await user_session.is_logged_in(request)
-    if not user_id:
-        raise exceptions_validation.UserValidate("You must be logged in to update prompts")
-
-    form = await request.json()
-    title = str(form.get("title", ""))
-    prompt_text = str(form.get("prompt", ""))
+async def update_prompt(user_id: int, prompt_id: int, title: str, prompt_text: str):
 
     await _validate(title, prompt_text)
 
@@ -77,10 +64,7 @@ async def update_prompt(request: Request, prompt_id: int):
         await session.commit()
 
 
-async def delete_prompt(request: Request, prompt_id: int):
-    user_id = await user_session.is_logged_in(request)
-    if not user_id:
-        raise exceptions_validation.UserValidate("You must be logged in to delete prompts")
+async def delete_prompt(user_id: int, prompt_id: int):
 
     async with async_session() as session:
         stmt = delete(Prompt).where(Prompt.user_id == user_id, Prompt.prompt_id == prompt_id)

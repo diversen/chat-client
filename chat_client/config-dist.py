@@ -36,6 +36,9 @@ SESSION_SECRET_KEY = "SECRET_KEY_SADFDFREQ2134324AADFDGFFGMIESDF"
 # Session HTTPS only
 SESSION_HTTPS_ONLY = True  # Set to True if using HTTPS
 
+# Maximum accepted HTTP request body size in bytes (default 10 MB)
+REQUEST_MAX_SIZE = 10 * 1024 * 1024
+
 # Use mathjax for rendering math
 USE_KATEX = True
 

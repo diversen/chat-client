@@ -2,6 +2,7 @@
 Base test utilities for Starlette backend tests.
 Provides TestClient setup, database fixtures, and common test utilities.
 """
+
 import asyncio
 import tempfile
 import os
@@ -24,7 +25,7 @@ from chat_client.models import Base
 
 class TestDatabase:
     """Test database setup and teardown"""
-    
+
     def __init__(self):
         self.temp_dir = tempfile.mkdtemp()
         self.db_path = Path(self.temp_dir) / "test.db"
@@ -38,7 +39,7 @@ class TestDatabase:
             f"sqlite+aiosqlite:///{self.db_path}",
             echo=False,
         )
-        
+
         # Enable foreign key support for SQLite
         @event.listens_for(self.engine.sync_engine, "connect")
         def enable_foreign_keys(dbapi_connection, connection_record):
@@ -51,22 +52,19 @@ class TestDatabase:
             await conn.run_sync(Base.metadata.create_all)
 
         # Create session factory
-        self.session_factory = async_sessionmaker(
-            self.engine,
-            class_=AsyncSession,
-            expire_on_commit=False
-        )
+        self.session_factory = async_sessionmaker(self.engine, class_=AsyncSession, expire_on_commit=False)
 
     async def teardown(self):
         """Teardown test database"""
         if self.engine:
             await self.engine.dispose()
-        
+
         # Clean up temporary files
         if self.db_path.exists():
             self.db_path.unlink()
         if Path(self.temp_dir).exists():
             import shutil
+
             shutil.rmtree(self.temp_dir)
 
     async def get_session(self):
@@ -77,7 +75,7 @@ class TestDatabase:
 
 class BaseTestCase:
     """Base test case with common setup"""
-    
+
     def __init__(self):
         self.client = None
         self.db = None
@@ -85,9 +83,9 @@ class BaseTestCase:
     def setup_method(self):
         """Setup before each test method"""
         # Create test client with mocked dependencies
-        with patch('chat_client.endpoints.chat_endpoints.config') as mock_config:
-            with patch('chat_client.endpoints.user_endpoints.config') as mock_user_config:
-                with patch('chat_client.endpoints.prompt_endpoints.config') as mock_prompt_config:
+        with patch("chat_client.endpoints.chat_endpoints.config") as mock_config:
+            with patch("chat_client.endpoints.user_endpoints.config") as mock_user_config:
+                with patch("chat_client.endpoints.prompt_endpoints.config") as mock_prompt_config:
                     # Mock configuration
                     mock_config.DEFAULT_MODEL = "test-model"
                     mock_config.PROVIDERS = {"test-provider": {"base_url": "http://test", "api_key": "test"}}
@@ -97,9 +95,10 @@ class BaseTestCase:
                     mock_config.TOOLS = []
                     mock_config.TOOLS_CALLBACK = {}
                     mock_config.USE_KATEX = False
-                    
+
                     # Import app after mocking config
                     from chat_client.main import app
+
                     self.client = TestClient(app)
 
     def teardown_method(self):
@@ -113,7 +112,7 @@ class BaseTestCase:
             "email": "test@example.com",
             "password": "testpassword123",
             "password_repeat": "testpassword123",
-            "captcha": "TEST"  # Mock captcha
+            "captcha": "TEST",  # Mock captcha
         }
 
 
@@ -131,9 +130,7 @@ def mock_llm_response():
     mock_response.choices[0].delta.content = "Test response"
     mock_response.choices[0].delta.tool_calls = None
     mock_response.choices[0].finish_reason = "stop"
-    mock_response.model_dump.return_value = {
-        "choices": [{"delta": {"content": "Test response"}}]
-    }
+    mock_response.model_dump.return_value = {"choices": [{"delta": {"content": "Test response"}}]}
     return [mock_response]
 
 

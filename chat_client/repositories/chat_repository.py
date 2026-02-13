@@ -1,4 +1,3 @@
-from starlette.requests import Request
 from chat_client.core import exceptions_validation
 
 from chat_client.models import Dialog, Message
@@ -39,12 +38,11 @@ async def create_message(user_id: int, dialog_id: str, role: str, content: str):
         session.add(new_message)
         await session.commit()
         await session.refresh(new_message)
-        
+
         return new_message.message_id
 
 
-async def get_dialog(user_id: int, request: Request):
-    dialog_id = request.path_params.get("dialog_id")
+async def get_dialog(user_id: int, dialog_id: str):
 
     async with async_session() as session:
         stmt = select(Dialog).where(Dialog.dialog_id == dialog_id, Dialog.user_id == user_id)
@@ -63,8 +61,7 @@ async def get_dialog(user_id: int, request: Request):
         }
 
 
-async def get_messages(user_id: int, request: Request):
-    dialog_id = request.path_params.get("dialog_id")
+async def get_messages(user_id: int, dialog_id: str):
 
     async with async_session() as session:
         stmt = (
@@ -91,8 +88,7 @@ async def get_messages(user_id: int, request: Request):
         return return_list
 
 
-async def delete_dialog(user_id: int, request: Request):
-    dialog_id = request.path_params.get("dialog_id")
+async def delete_dialog(user_id: int, dialog_id: str):
 
     async with async_session() as session:
         stmt = select(Dialog).where(Dialog.dialog_id == dialog_id, Dialog.user_id == user_id)
@@ -106,8 +102,7 @@ async def delete_dialog(user_id: int, request: Request):
         await session.commit()
 
 
-async def get_dialogs_info(user_id: int, request: Request):
-    current_page = int(request.query_params.get("page", 1))
+async def get_dialogs_info(user_id: int, current_page: int = 1):
 
     async with async_session() as session:
 
@@ -181,19 +176,11 @@ async def update_message(user_id: int, message_id: int, new_content: str):
         # Deactivate all messages in the same dialog that were created after this message
         deactivate_stmt = (
             update(Message)
-            .where(
-                Message.dialog_id == message.dialog_id,
-                Message.created > message.created,
-                Message.user_id == user_id
-            )
+            .where(Message.dialog_id == message.dialog_id, Message.created > message.created, Message.user_id == user_id)
             .values(active=0)
         )
         await session.execute(deactivate_stmt)
 
         await session.commit()
 
-        return {
-            "message_id": message_id,
-            "content": new_content,
-            "updated": True
-        }
+        return {"message_id": message_id, "content": new_content, "updated": True}

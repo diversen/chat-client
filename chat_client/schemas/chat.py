@@ -33,4 +33,3 @@ class CreateMessageRequest(BaseModel):
 class UpdateMessageRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
     content: str
-

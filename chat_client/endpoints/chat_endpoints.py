@@ -5,15 +5,19 @@ from starlette.responses import StreamingResponse, JSONResponse, RedirectRespons
 from openai import OpenAI
 from openai import OpenAIError
 import json
-from pydantic import BaseModel, ValidationError
 from chat_client.core import base_context
-from chat_client.core import flash
 import data.config as config
 import logging
-from chat_client.core import user_session
 from chat_client.core.templates import get_templates
 from chat_client.repositories import chat_repository, user_repository, prompt_repository
 from chat_client.core import exceptions_validation
+from chat_client.core.http import (
+    parse_json_payload,
+    get_user_id_or_json_error,
+    get_user_id_or_redirect,
+    json_error,
+    json_success,
+)
 from chat_client.schemas.chat import (
     ChatStreamRequest,
     CreateDialogRequest,
@@ -37,27 +41,33 @@ TOOLS = getattr(config, "TOOLS", [])
 TOOL_MODELS = getattr(config, "TOOL_MODELS", [])
 
 
-async def _parse_request_payload(request: Request, model_class: type[BaseModel]) -> BaseModel:
-    try:
-        payload = await request.json()
-    except json.JSONDecodeError:
-        raise exceptions_validation.JSONError("Invalid JSON body", status_code=400)
+def _resolve_provider_info(model: str) -> dict:
+    model_config = MODELS.get(model, "")
 
-    try:
-        return model_class.model_validate(payload)
-    except ValidationError as e:
-        error_msg = e.errors()[0].get("msg", "Invalid request body")
-        raise exceptions_validation.JSONError(error_msg, status_code=400)
+    if isinstance(model_config, str):
+        return PROVIDERS.get(model_config, {})
+
+    if isinstance(model_config, dict):
+        provider_name = model_config.get("provider")
+        base_info = PROVIDERS.get(provider_name, {}) if isinstance(provider_name, str) else {}
+        merged = {**base_info, **model_config}
+        merged.pop("provider", None)
+        return merged
+
+    return {}
 
 
 async def chat_page(request: Request):
     """
     The GET chat page
     """
-    user_id = await user_session.is_logged_in(request)
-    if not user_id:
-        flash.set_notice(request, "You must be logged in to access the chat")
-        return RedirectResponse("/user/login")
+    user_id_or_response = await get_user_id_or_redirect(
+        request,
+        notice="You must be logged in to access the chat",
+    )
+    if isinstance(user_id_or_response, RedirectResponse):
+        return user_id_or_response
+    user_id = user_id_or_response
 
     model_names = await _get_model_names()
     prompts = await prompt_repository.list_prompts(user_id)
@@ -151,8 +161,7 @@ async def _chat_response_stream(request: Request, messages, model, logged_in):
 
     try:
 
-        provider = MODELS.get(model, {})
-        provider_info = PROVIDERS.get(provider, {})
+        provider_info = _resolve_provider_info(model)
 
         client = OpenAI(
             api_key=provider_info.get("api_key"),
@@ -249,19 +258,20 @@ async def _chat_response_stream(request: Request, messages, model, logged_in):
 
 
 async def chat_response_stream(request: Request):
-    logged_in = await user_session.is_logged_in(request)
-    if not logged_in:
-        return JSONResponse({"error": True, "message": "You must be logged in to use the chat"}, status_code=401)
+    logged_in_or_response = await get_user_id_or_json_error(request, message="You must be logged in to use the chat")
+    if isinstance(logged_in_or_response, JSONResponse):
+        return logged_in_or_response
+    logged_in = logged_in_or_response
 
     try:
-        payload = await _parse_request_payload(request, ChatStreamRequest)
+        payload = await parse_json_payload(request, ChatStreamRequest)
         messages = _normalize_chat_messages([message.model_dump() for message in payload.messages])
         return StreamingResponse(
             _chat_response_stream(request, messages, payload.model, logged_in),
             media_type="text/event-stream",
         )
     except exceptions_validation.JSONError as e:
-        return JSONResponse({"error": True, "message": str(e)}, status_code=e.status_code)
+        return json_error(str(e), status_code=e.status_code)
 
 
 async def config_(request: Request):
@@ -292,9 +302,9 @@ async def json_tools(request: Request):
 
     """
 
-    logged_in = await user_session.is_logged_in(request)
-    if not logged_in:
-        return JSONResponse({"error": True, "message": "You must be logged in to use tools"}, status_code=401)
+    logged_in_or_response = await get_user_id_or_json_error(request, message="You must be logged in to use tools")
+    if isinstance(logged_in_or_response, JSONResponse):
+        return logged_in_or_response
 
     # Get JSON data
     data = await request.json()
@@ -307,6 +317,7 @@ async def json_tools(request: Request):
     if not tool_def:
         return JSONResponse({"tool": tool, "text": "Tool not found"}, status_code=404)
 
+    ret_data = ""
     try:
         # import module and call function
         module = __import__(tool_def["module"], fromlist=[tool_def["def"]])
@@ -316,18 +327,13 @@ async def json_tools(request: Request):
 
     except Exception:
         logger.exception(f"Error calling tool {tool}")
+        return json_error("Tool execution failed", status_code=500, tool=tool)
 
-    # Better error handling
     return JSONResponse({"tool": tool, "text": ret_data})
 
 
 async def _get_model_names():
-
-    models = []
-    for model_name in MODELS.keys():
-        models.append(model_name)
-
-    return models
+    return list(MODELS.keys())
 
 
 async def list_models(request: Request):
@@ -344,20 +350,21 @@ async def create_dialog(request: Request):
     Save dialog to database
     """
     try:
-        user_id = await user_session.is_logged_in(request)
-        if not user_id:
-            return JSONResponse({"error": True, "message": "You must be logged in to save a dialog"}, status_code=401)
+        user_id_or_response = await get_user_id_or_json_error(request, message="You must be logged in to save a dialog")
+        if isinstance(user_id_or_response, JSONResponse):
+            return user_id_or_response
+        user_id = user_id_or_response
 
-        payload = await _parse_request_payload(request, CreateDialogRequest)
+        payload = await parse_json_payload(request, CreateDialogRequest)
         dialog_id = await chat_repository.create_dialog(user_id, payload.title)
-        return JSONResponse({"error": False, "dialog_id": dialog_id, "message": "Dialog saved"})
+        return json_success(dialog_id=dialog_id, message="Dialog saved")
     except exceptions_validation.JSONError as e:
-        return JSONResponse({"error": True, "message": str(e)}, status_code=e.status_code)
+        return json_error(str(e), status_code=e.status_code)
     except exceptions_validation.UserValidate as e:
-        return JSONResponse({"error": True, "message": str(e)})
+        return json_error(str(e))
     except Exception:
         logger.exception("Error saving dialog")
-        return JSONResponse({"error": True, "message": "Error saving dialog"}, status_code=500)
+        return json_error("Error saving dialog", status_code=500)
 
 
 async def create_message(request: Request):
@@ -366,24 +373,25 @@ async def create_message(request: Request):
     """
     try:
 
-        user_id = await user_session.is_logged_in(request)
-        if not user_id:
-            return JSONResponse({"error": True, "message": "You must be logged in create a message"}, status_code=401)
+        user_id_or_response = await get_user_id_or_json_error(request, message="You must be logged in create a message")
+        if isinstance(user_id_or_response, JSONResponse):
+            return user_id_or_response
+        user_id = user_id_or_response
 
         dialog_id = str(request.path_params.get("dialog_id", "")).strip()
         if not dialog_id:
             raise exceptions_validation.UserValidate("Dialog id is required")
 
-        payload = await _parse_request_payload(request, CreateMessageRequest)
+        payload = await parse_json_payload(request, CreateMessageRequest)
         message_id = await chat_repository.create_message(user_id, dialog_id, payload.role, payload.content)
         return JSONResponse({"message_id": message_id})
     except exceptions_validation.JSONError as e:
-        return JSONResponse({"error": True, "message": str(e)}, status_code=e.status_code)
+        return json_error(str(e), status_code=e.status_code)
     except exceptions_validation.UserValidate as e:
-        return JSONResponse({"error": True, "message": str(e)})
+        return json_error(str(e))
     except Exception:
         logger.exception("Error saving message")
-        return JSONResponse({"error": True, "message": "Error saving message"}, status_code=500)
+        return json_error("Error saving message", status_code=500)
 
 
 async def get_dialog(request: Request):
@@ -392,17 +400,21 @@ async def get_dialog(request: Request):
     """
     try:
 
-        user_id = await user_session.is_logged_in(request)
-        if not user_id:
-            return JSONResponse({"error": True, "message": "You must be logged in to get a dialog"}, status_code=401)
+        user_id_or_response = await get_user_id_or_json_error(request, message="You must be logged in to get a dialog")
+        if isinstance(user_id_or_response, JSONResponse):
+            return user_id_or_response
+        user_id = user_id_or_response
 
-        dialog = await chat_repository.get_dialog(user_id, request)
+        dialog_id = str(request.path_params.get("dialog_id", "")).strip()
+        if not dialog_id:
+            raise exceptions_validation.UserValidate("Dialog id is required")
+        dialog = await chat_repository.get_dialog(user_id, dialog_id)
         return JSONResponse(dialog)
     except exceptions_validation.UserValidate as e:
-        return JSONResponse({"error": True, "message": str(e)})
+        return json_error(str(e))
     except Exception:
         logger.exception("Error getting dialog")
-        return JSONResponse({"error": True, "message": "Error getting dialog"}, status_code=500)
+        return json_error("Error getting dialog", status_code=500)
 
 
 async def get_messages(request: Request):
@@ -411,17 +423,21 @@ async def get_messages(request: Request):
     """
     try:
 
-        user_id = await user_session.is_logged_in(request)
-        if not user_id:
-            return JSONResponse({"error": True, "message": "You must be logged in to get a dialog"}, status_code=401)
+        user_id_or_response = await get_user_id_or_json_error(request, message="You must be logged in to get a dialog")
+        if isinstance(user_id_or_response, JSONResponse):
+            return user_id_or_response
+        user_id = user_id_or_response
 
-        messages = await chat_repository.get_messages(user_id, request)
+        dialog_id = str(request.path_params.get("dialog_id", "")).strip()
+        if not dialog_id:
+            raise exceptions_validation.UserValidate("Dialog id is required")
+        messages = await chat_repository.get_messages(user_id, dialog_id)
         return JSONResponse(messages)
     except exceptions_validation.UserValidate as e:
-        return JSONResponse({"error": True, "message": str(e)})
+        return json_error(str(e))
     except Exception:
         logger.exception("Error getting messages")
-        return JSONResponse({"error": True, "message": "Error getting messages"}, status_code=500)
+        return json_error("Error getting messages", status_code=500)
 
 
 async def delete_dialog(request: Request):
@@ -430,17 +446,21 @@ async def delete_dialog(request: Request):
     """
     try:
 
-        user_id = await user_session.is_logged_in(request)
-        if not user_id:
-            return JSONResponse({"error": True, "message": "You must be logged in to delete a dialog"}, status_code=401)
+        user_id_or_response = await get_user_id_or_json_error(request, message="You must be logged in to delete a dialog")
+        if isinstance(user_id_or_response, JSONResponse):
+            return user_id_or_response
+        user_id = user_id_or_response
 
-        await chat_repository.delete_dialog(user_id, request)
-        return JSONResponse({"error": False})
+        dialog_id = str(request.path_params.get("dialog_id", "")).strip()
+        if not dialog_id:
+            raise exceptions_validation.UserValidate("Dialog id is required")
+        await chat_repository.delete_dialog(user_id, dialog_id)
+        return json_success()
     except exceptions_validation.UserValidate as e:
-        return JSONResponse({"error": True, "message": str(e)})
+        return json_error(str(e))
     except Exception:
         logger.exception("Error deleting dialog")
-        return JSONResponse({"error": True, "message": "Error deleting dialog"}, status_code=500)
+        return json_error("Error deleting dialog", status_code=500)
 
 
 async def update_message(request: Request):
@@ -448,23 +468,27 @@ async def update_message(request: Request):
     Update message content and deactivate newer messages in the same dialog
     """
     try:
-        user_id = await user_session.is_logged_in(request)
-        if not user_id:
-            return JSONResponse({"error": True, "message": "You must be logged in to update a message"}, status_code=401)
+        user_id_or_response = await get_user_id_or_json_error(
+            request,
+            message="You must be logged in to update a message",
+        )
+        if isinstance(user_id_or_response, JSONResponse):
+            return user_id_or_response
+        user_id = user_id_or_response
 
         message_id = int(request.path_params.get("message_id"))
-        payload = await _parse_request_payload(request, UpdateMessageRequest)
+        payload = await parse_json_payload(request, UpdateMessageRequest)
         result = await chat_repository.update_message(user_id, message_id, payload.content)
-        return JSONResponse({"error": False, **result})
+        return json_success(**result)
     except exceptions_validation.JSONError as e:
-        return JSONResponse({"error": True, "message": str(e)}, status_code=e.status_code)
+        return json_error(str(e), status_code=e.status_code)
     except (TypeError, ValueError):
-        return JSONResponse({"error": True, "message": "Invalid message id"}, status_code=400)
+        return json_error("Invalid message id", status_code=400)
     except exceptions_validation.UserValidate as e:
-        return JSONResponse({"error": True, "message": str(e)})
+        return json_error(str(e))
     except Exception:
         logger.exception("Error updating message")
-        return JSONResponse({"error": True, "message": "Error updating message"}, status_code=500)
+        return json_error("Error updating message", status_code=500)
 
 
 routes_chat: list = [

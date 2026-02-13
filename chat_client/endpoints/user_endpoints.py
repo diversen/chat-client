@@ -15,6 +15,7 @@ from chat_client.core import exceptions_validation
 from chat_client.core import user_session
 from chat_client.core.templates import get_templates
 from chat_client.core.base_context import get_context
+from chat_client.core.http import get_user_id_or_redirect, get_user_id_or_json_error, json_error, json_success
 
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -49,12 +50,12 @@ async def signup_post(request: Request):
             "Your account was created successfully. " "Check your email in order to verify your account. After verification you may login.",
         )
 
-        return JSONResponse({"error": False, "message": "Your account has been created"})
+        return json_success(message="Your account has been created")
     except exceptions_validation.UserValidate as e:
-        return JSONResponse({"error": True, "message": str(e)})
+        return json_error(str(e))
     except Exception as e:
         logger.exception(e)
-        return JSONResponse({"error": True, "message": "An unexpected error occurred"})
+        return json_error("An unexpected error occurred")
 
 
 async def verify_get(request: Request):
@@ -73,12 +74,12 @@ async def verify_post(request: Request):
     try:
         await user_repository.verify_user(request)
         flash.set_success(request, "Your account has been verified successfully")
-        return JSONResponse({"error": False})
+        return json_success()
     except exceptions_validation.UserValidate as e:
-        return JSONResponse({"error": True, "message": str(e)})
+        return json_error(str(e))
     except Exception as e:
         logger.exception(e)
-        return JSONResponse({"error": True, "message": "An unexpected error occurred"})
+        return json_error("An unexpected error occurred")
 
 
 async def login_get(request: Request):
@@ -96,12 +97,12 @@ async def login_post(request: Request):
         login_user = await user_repository.login_user(request)
         user_session.set_session_variable(request, "user_id", login_user["user_id"])
         flash.set_success(request, "You are now logged in")
-        return JSONResponse({"error": False})
+        return json_success()
     except exceptions_validation.UserValidate as e:
-        return JSONResponse({"error": True, "message": str(e)})
+        return json_error(str(e))
     except Exception as e:
         logger.exception(e)
-        return JSONResponse({"error": True, "message": "An unexpected error occurred"})
+        return json_error("An unexpected error occurred")
 
 
 async def captcha_(request):
@@ -161,12 +162,12 @@ async def reset_password_post(request: Request):
             "Check your email and click the link in the email to reset your password. "
             "Then you can login with your new password.",
         )
-        return JSONResponse({"error": False, "message": "A password reset email has been sent."})
+        return json_success(message="A password reset email has been sent.")
     except exceptions_validation.UserValidate as e:
-        return JSONResponse({"error": True, "message": str(e)})
+        return json_error(str(e))
     except Exception as e:
         logger.exception(e)
-        return JSONResponse({"error": True, "message": "An unexpected error occurred"})
+        return json_error("An unexpected error occurred")
 
 
 async def new_password_get(request: Request):
@@ -185,12 +186,12 @@ async def new_password_post(request: Request):
     try:
         await user_repository.new_password(request)
         flash.set_success(request, "Password has been updated. You can now login.")
-        return JSONResponse({"error": False, "message": "Password reset email sent"})
+        return json_success(message="Password reset email sent")
     except exceptions_validation.UserValidate as e:
-        return JSONResponse({"error": True, "message": str(e)})
+        return json_error(str(e))
     except Exception as e:
         logger.exception(e)
-        return JSONResponse({"error": True, "message": "An unexpected error occurred"})
+        return json_error("An unexpected error occurred")
 
 
 async def list_dialogs_json(request: Request):
@@ -198,13 +199,18 @@ async def list_dialogs_json(request: Request):
     Get user dialogs from database
     Endpoint /user/dialogs
     """
-    user_id = await user_session.is_logged_in(request)
+    user_id_or_response = await get_user_id_or_json_error(
+        request,
+        message="It seems you have been logged out. Log in again",
+        status_code=200,
+    )
+    if isinstance(user_id_or_response, JSONResponse):
+        return user_id_or_response
+    user_id = user_id_or_response
 
-    if not user_id:
-        raise exceptions_validation.JSONError("It seems you have been logged out. Log in again", status_code=200)
-
-    dialogs_info = await chat_repository.get_dialogs_info(user_id, request)
-    return JSONResponse({"error": False, "dialogs_info": dialogs_info})
+    current_page = int(request.query_params.get("page", 1))
+    dialogs_info = await chat_repository.get_dialogs_info(user_id, current_page=current_page)
+    return json_success(dialogs_info=dialogs_info)
 
 
 async def list_dialogs(request: Request):
@@ -213,10 +219,9 @@ async def list_dialogs(request: Request):
     Endpoint /user/dialogs
     """
 
-    user_id = await user_session.is_logged_in(request)
-    if not user_id:
-        flash.set_notice(request, "You must be logged in to view your profile")
-        return RedirectResponse(url="/user/login")
+    user_id_or_response = await get_user_id_or_redirect(request, notice="You must be logged in to view your profile")
+    if isinstance(user_id_or_response, RedirectResponse):
+        return user_id_or_response
 
     context = {
         "request": request,
@@ -231,10 +236,10 @@ async def profile(request: Request):
     """
     List profile edit page
     """
-    user_id = await user_session.is_logged_in(request)
-    if not user_id:
-        flash.set_notice(request, "You must be logged in to view your profile")
-        return RedirectResponse(url="/user/login")
+    user_id_or_response = await get_user_id_or_redirect(request, notice="You must be logged in to view your profile")
+    if isinstance(user_id_or_response, RedirectResponse):
+        return user_id_or_response
+    user_id = user_id_or_response
 
     profile = await user_repository.get_profile(user_id)
     context = {
@@ -251,12 +256,12 @@ async def profile_post(request: Request):
     try:
         await user_repository.update_profile(request)
         flash.set_success(request, "Profile updated successfully")
-        return JSONResponse({"error": False})
+        return json_success()
     except exceptions_validation.UserValidate as e:
-        return JSONResponse({"error": True, "message": str(e)})
+        return json_error(str(e))
     except Exception as e:
         logger.exception(e)
-        return JSONResponse({"error": True, "message": "An unexpected error occurred"})
+        return json_error("An unexpected error occurred")
 
 
 async def is_logged_in(request: Request):
