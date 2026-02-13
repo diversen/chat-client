@@ -34,6 +34,21 @@ async def get_user_id_or_json_error(
     return user_id
 
 
+async def require_user_id_json(
+    request: Request,
+    message: str = "Not authenticated",
+    status_code: int = 401,
+) -> int:
+    user_id_or_response = await get_user_id_or_json_error(
+        request=request,
+        message=message,
+        status_code=status_code,
+    )
+    if isinstance(user_id_or_response, JSONResponse):
+        raise exceptions_validation.JSONError(message, status_code=status_code)
+    return user_id_or_response
+
+
 async def get_user_id_or_redirect(
     request: Request,
     notice: str | None = None,
