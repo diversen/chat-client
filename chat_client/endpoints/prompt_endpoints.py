@@ -11,7 +11,7 @@ from chat_client.core import exceptions_validation
 from chat_client.repositories import prompt_repository
 from chat_client.core import flash
 from chat_client.core.http import (
-    get_user_id_or_json_error,
+    require_user_id_json,
     get_user_id_or_redirect,
     parse_json_payload,
     json_error,
@@ -39,20 +39,20 @@ async def prompt_list_get(request: Request):
 
 
 async def prompt_list_json(request: Request):
-    user_id_or_response = await get_user_id_or_json_error(request, message="Not authenticated")
-    if isinstance(user_id_or_response, JSONResponse):
-        return user_id_or_response
-    user_id = user_id_or_response
-    prompts = await prompt_repository.list_prompts(user_id)
-    data = [
-        {
-            "prompt_id": p.prompt_id,
-            "title": p.title,
-            "prompt": p.prompt,
-        }
-        for p in prompts
-    ]
-    return JSONResponse({"error": False, "prompts": data})
+    try:
+        user_id = await require_user_id_json(request, message="Not authenticated")
+        prompts = await prompt_repository.list_prompts(user_id)
+        data = [
+            {
+                "prompt_id": p.prompt_id,
+                "title": p.title,
+                "prompt": p.prompt,
+            }
+            for p in prompts
+        ]
+        return JSONResponse({"error": False, "prompts": data})
+    except exceptions_validation.JSONError as e:
+        return json_error(str(e), status_code=e.status_code)
 
 
 async def prompt_create_get(request: Request):
@@ -70,11 +70,7 @@ async def prompt_create_get(request: Request):
 
 async def prompt_create_post(request: Request):
     try:
-        user_id_or_response = await get_user_id_or_json_error(request, message="Not authenticated")
-        if isinstance(user_id_or_response, JSONResponse):
-            return user_id_or_response
-        user_id = user_id_or_response
-
+        user_id = await require_user_id_json(request, message="Not authenticated")
         payload = await parse_json_payload(request, PromptUpsertRequest)
         result = await prompt_repository.create_prompt(user_id, payload.title, payload.prompt)
         flash.set_success(request, "Prompt created successfully")
@@ -82,7 +78,7 @@ async def prompt_create_post(request: Request):
     except exceptions_validation.JSONError as e:
         return json_error(str(e), status_code=e.status_code)
     except exceptions_validation.UserValidate as e:
-        return json_error(str(e))
+        return json_error(str(e), status_code=400)
 
 
 async def prompt_detail(request: Request):
@@ -106,15 +102,14 @@ async def prompt_detail(request: Request):
 
 
 async def prompt_detail_json(request: Request):
-    prompt_id = int(request.path_params["prompt_id"])
-    user_id_or_response = await get_user_id_or_json_error(request, message="Not authenticated")
-    if isinstance(user_id_or_response, JSONResponse):
-        return user_id_or_response
-    user_id = user_id_or_response
     try:
+        prompt_id = int(request.path_params["prompt_id"])
+        user_id = await require_user_id_json(request, message="Not authenticated")
         prompt = await prompt_repository.get_prompt(user_id, prompt_id)
     except exceptions_validation.UserValidate:
         return JSONResponse({"error": True, "message": "Prompt not found"}, status_code=404)
+    except exceptions_validation.JSONError as e:
+        return json_error(str(e), status_code=e.status_code)
     data = {
         "prompt_id": prompt.prompt_id,
         "title": prompt.title,
@@ -163,7 +158,7 @@ async def prompt_edit_post(request: Request):
     except exceptions_validation.JSONError as e:
         return json_error(str(e), status_code=e.status_code)
     except exceptions_validation.UserValidate as e:
-        return json_error(str(e))
+        return json_error(str(e), status_code=400)
 
 
 async def prompt_delete_post(request: Request):
@@ -181,7 +176,7 @@ async def prompt_delete_post(request: Request):
         flash.set_success(request, "Prompt deleted successfully")
         return json_success()
     except exceptions_validation.UserValidate as e:
-        return json_error(str(e))
+        return json_error(str(e), status_code=400)
 
 
 routes_prompt = [

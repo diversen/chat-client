@@ -117,7 +117,7 @@ class TestPromptEndpoints(BaseTestCase):
 
         response = self.client.post("/prompt/create", json={"title": "", "prompt": "Test content"})
 
-        assert response.status_code == 200
+        assert response.status_code == 400
         data = response.json()
         assert data["error"] is True
         assert "Title is required" in data["message"]
@@ -290,7 +290,7 @@ class TestPromptEndpoints(BaseTestCase):
 
         response = self.client.post("/prompt/1/edit", json={"title": "", "prompt": "Updated content"})
 
-        assert response.status_code == 200
+        assert response.status_code == 400
         data = response.json()
         assert data["error"] is True
         assert "Title is required" in data["message"]
@@ -348,7 +348,7 @@ class TestPromptEndpoints(BaseTestCase):
 
         response = self.client.post("/prompt/1/delete")
 
-        assert response.status_code == 200
+        assert response.status_code == 400
         data = response.json()
         assert data["error"] is True
         assert "Cannot delete prompt" in data["message"]

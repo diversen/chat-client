@@ -212,7 +212,7 @@ class TestChatEndpoints(BaseTestCase):
 
         response = self.client.post("/chat/create-dialog", json={"title": ""})
 
-        assert response.status_code == 200
+        assert response.status_code == 400
         data = response.json()
         assert data["error"] is True
         assert "Invalid title" in data["message"]

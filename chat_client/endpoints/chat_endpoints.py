@@ -189,7 +189,7 @@ async def create_dialog(request: Request):
     except exceptions_validation.JSONError as e:
         return json_error(str(e), status_code=e.status_code)
     except exceptions_validation.UserValidate as e:
-        return json_error(str(e))
+        return json_error(str(e), status_code=400)
     except Exception:
         logger.exception("Error saving dialog")
         return json_error("Error saving dialog", status_code=500)
@@ -211,7 +211,7 @@ async def create_message(request: Request):
     except exceptions_validation.JSONError as e:
         return json_error(str(e), status_code=e.status_code)
     except exceptions_validation.UserValidate as e:
-        return json_error(str(e))
+        return json_error(str(e), status_code=400)
     except Exception:
         logger.exception("Error saving message")
         return json_error("Error saving message", status_code=500)
@@ -229,7 +229,7 @@ async def get_dialog(request: Request):
         dialog = await chat_repository.get_dialog(user_id, dialog_id)
         return JSONResponse(dialog)
     except exceptions_validation.UserValidate as e:
-        return json_error(str(e))
+        return json_error(str(e), status_code=400)
     except Exception:
         logger.exception("Error getting dialog")
         return json_error("Error getting dialog", status_code=500)
@@ -247,7 +247,7 @@ async def get_messages(request: Request):
         messages = await chat_repository.get_messages(user_id, dialog_id)
         return JSONResponse(messages)
     except exceptions_validation.UserValidate as e:
-        return json_error(str(e))
+        return json_error(str(e), status_code=400)
     except Exception:
         logger.exception("Error getting messages")
         return json_error("Error getting messages", status_code=500)
@@ -265,7 +265,7 @@ async def delete_dialog(request: Request):
         await chat_repository.delete_dialog(user_id, dialog_id)
         return json_success()
     except exceptions_validation.UserValidate as e:
-        return json_error(str(e))
+        return json_error(str(e), status_code=400)
     except Exception:
         logger.exception("Error deleting dialog")
         return json_error("Error deleting dialog", status_code=500)
@@ -290,7 +290,7 @@ async def update_message(request: Request):
     except (TypeError, ValueError):
         return json_error("Invalid message id", status_code=400)
     except exceptions_validation.UserValidate as e:
-        return json_error(str(e))
+        return json_error(str(e), status_code=400)
     except Exception:
         logger.exception("Error updating message")
         return json_error("Error updating message", status_code=500)

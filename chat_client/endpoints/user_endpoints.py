@@ -15,7 +15,7 @@ from chat_client.core import exceptions_validation
 from chat_client.core import user_session
 from chat_client.core.templates import get_templates
 from chat_client.core.base_context import get_context
-from chat_client.core.http import get_user_id_or_redirect, get_user_id_or_json_error, json_error, json_success
+from chat_client.core.http import get_user_id_or_redirect, require_user_id_json, json_error, json_success
 
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ async def signup_post(request: Request):
 
         return json_success(message="Your account has been created")
     except exceptions_validation.UserValidate as e:
-        return json_error(str(e))
+        return json_error(str(e), status_code=400)
     except Exception as e:
         logger.exception(e)
         return json_error("An unexpected error occurred")
@@ -76,7 +76,7 @@ async def verify_post(request: Request):
         flash.set_success(request, "Your account has been verified successfully")
         return json_success()
     except exceptions_validation.UserValidate as e:
-        return json_error(str(e))
+        return json_error(str(e), status_code=400)
     except Exception as e:
         logger.exception(e)
         return json_error("An unexpected error occurred")
@@ -99,7 +99,7 @@ async def login_post(request: Request):
         flash.set_success(request, "You are now logged in")
         return json_success()
     except exceptions_validation.UserValidate as e:
-        return json_error(str(e))
+        return json_error(str(e), status_code=400)
     except Exception as e:
         logger.exception(e)
         return json_error("An unexpected error occurred")
@@ -164,7 +164,7 @@ async def reset_password_post(request: Request):
         )
         return json_success(message="A password reset email has been sent.")
     except exceptions_validation.UserValidate as e:
-        return json_error(str(e))
+        return json_error(str(e), status_code=400)
     except Exception as e:
         logger.exception(e)
         return json_error("An unexpected error occurred")
@@ -188,7 +188,7 @@ async def new_password_post(request: Request):
         flash.set_success(request, "Password has been updated. You can now login.")
         return json_success(message="Password reset email sent")
     except exceptions_validation.UserValidate as e:
-        return json_error(str(e))
+        return json_error(str(e), status_code=400)
     except Exception as e:
         logger.exception(e)
         return json_error("An unexpected error occurred")
@@ -199,18 +199,17 @@ async def list_dialogs_json(request: Request):
     Get user dialogs from database
     Endpoint /user/dialogs
     """
-    user_id_or_response = await get_user_id_or_json_error(
-        request,
-        message="It seems you have been logged out. Log in again",
-        status_code=200,
-    )
-    if isinstance(user_id_or_response, JSONResponse):
-        return user_id_or_response
-    user_id = user_id_or_response
-
-    current_page = int(request.query_params.get("page", 1))
-    dialogs_info = await chat_repository.get_dialogs_info(user_id, current_page=current_page)
-    return json_success(dialogs_info=dialogs_info)
+    try:
+        user_id = await require_user_id_json(
+            request,
+            message="It seems you have been logged out. Log in again",
+            status_code=401,
+        )
+        current_page = int(request.query_params.get("page", 1))
+        dialogs_info = await chat_repository.get_dialogs_info(user_id, current_page=current_page)
+        return json_success(dialogs_info=dialogs_info)
+    except exceptions_validation.JSONError as e:
+        return json_error(str(e), status_code=e.status_code)
 
 
 async def list_dialogs(request: Request):
@@ -258,7 +257,7 @@ async def profile_post(request: Request):
         flash.set_success(request, "Profile updated successfully")
         return json_success()
     except exceptions_validation.UserValidate as e:
-        return json_error(str(e))
+        return json_error(str(e), status_code=400)
     except Exception as e:
         logger.exception(e)
         return json_error("An unexpected error occurred")

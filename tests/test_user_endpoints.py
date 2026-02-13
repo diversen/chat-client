@@ -47,7 +47,7 @@ class TestUserEndpoints(BaseTestCase):
             json={"email": "test@example.com", "password": "testpassword123", "password_repeat": "testpassword123", "captcha": "TEST"},
         )
 
-        assert response.status_code == 200
+        assert response.status_code == 400
         data = response.json()
         assert data["error"] is True
         assert "Email already exists" in data["message"]
@@ -78,7 +78,7 @@ class TestUserEndpoints(BaseTestCase):
 
         response = self.client.post("/user/login", json={"email": "test@example.com", "password": "wrongpassword"})
 
-        assert response.status_code == 200
+        assert response.status_code == 400
         data = response.json()
         assert data["error"] is True
         assert "Invalid credentials" in data["message"]
@@ -109,7 +109,7 @@ class TestUserEndpoints(BaseTestCase):
 
         response = self.client.post("/user/verify", json={"token": "invalid-token"})
 
-        assert response.status_code == 200
+        assert response.status_code == 400
         data = response.json()
         assert data["error"] is True
         assert "Invalid token" in data["message"]
@@ -167,7 +167,7 @@ class TestUserEndpoints(BaseTestCase):
 
         response = self.client.post("/user/reset", json={"email": "nonexistent@example.com"})
 
-        assert response.status_code == 200
+        assert response.status_code == 400
         data = response.json()
         assert data["error"] is True
         assert "User not found" in data["message"]
@@ -270,7 +270,7 @@ class TestUserEndpoints(BaseTestCase):
         mock_logged_in.return_value = False
 
         response = self.client.get("/user/dialogs/json")
-        assert response.status_code == 200
+        assert response.status_code == 401
         data = response.json()
         assert data["error"] is True
         assert "logged out" in data["message"]

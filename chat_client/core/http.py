@@ -62,7 +62,7 @@ async def get_user_id_or_redirect(
     return user_id
 
 
-def json_error(message: str, status_code: int = 200, **extra):
+def json_error(message: str, status_code: int = 400, **extra):
     return JSONResponse({"error": True, "message": message, **extra}, status_code=status_code)
 
 
