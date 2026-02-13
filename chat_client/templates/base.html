@@ -6,14 +6,8 @@
     {% include "includes/scripts_head.html" %}
 
     <script type="module">
-        import '/static/js/main-menu-overlay.js'
-        import '/static/js/custom-prompts-overlay.js'
-        import { Flash } from '/static/js/flash.js'
-        import { } from '/static/js/short-cuts.js'
-
-        Flash.removeAfterSecs = 10;
-        // Flash.singleMessage = false;
-        Flash.clearMessages();
+        import { initBasePage } from '/static/js/pages/base.js'
+        initBasePage();
     </script>
 
     {% block head %}

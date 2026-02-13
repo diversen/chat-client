@@ -14,13 +14,14 @@ import {
     imagePreviewElem,
     attachImageButtonElem,
 } from './app-elements.js';
-import { } from './app-events.js';
+import { initAppEvents } from './app-events.js';
 import { addCopyButtons } from './app-copy-buttons.js';
 import { logError } from './error-log.js';
 import { dd } from './diff-dom.js';
 import { modifyStreamedText } from './utils.js';
 import { copyIcon, checkIcon, editIcon } from './app-icons.js';
 
+initAppEvents();
 const config = await getConfig();
 const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
 

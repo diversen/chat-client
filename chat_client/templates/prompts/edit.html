@@ -4,7 +4,7 @@
 <main class="default-container">
     <h3>Edit Prompt</h3>
 
-    <form id="edit-form">
+    <form id="edit-form" data-prompt-id="{{ prompt.prompt_id }}">
         <label for="title">Title</label>
         <input id="title" type="text" name="title" maxlength="256" value="{{ prompt.title }}" required>
 
@@ -17,21 +17,7 @@
 </main>
 
 <script type="module">
-    import { Flash } from '/static/js/flash.js';
-    import { Requests } from '/static/js/requests.js';
-
-    document.getElementById('save-btn').addEventListener('click', async (event) => {
-        event.preventDefault();
-        const data = {
-            title: document.getElementById('title').value,
-            prompt: document.getElementById('prompt').value,
-        };
-        const res = await Requests.asyncPostJson('/prompt/{{ prompt.prompt_id }}/edit', data);
-        if (res.error) {
-            Flash.setMessage(res.message, 'error');
-        } else {
-            window.location.href = '/prompt';
-        }
-    });
+    import { initPromptsEditPage } from '/static/js/pages/prompts-edit.js';
+    initPromptsEditPage();
 </script>
 {% endblock content %}

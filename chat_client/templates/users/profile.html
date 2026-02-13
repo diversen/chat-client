@@ -24,39 +24,8 @@
 </main>
 
 <script type="module">
-
-    import { Flash } from '/static/js/flash.js';
-    import { Requests } from '/static/js/requests.js';
-
-    document.getElementById('save').addEventListener('click', async (event) => {
-
-        const spinner = document.querySelector('.loading-spinner');
-        spinner.classList.toggle('hidden');
-        try {
-
-            event.preventDefault();
-
-            let jsonData = {
-                username: document.getElementById('username').value,
-                dark_theme: document.getElementById('dark_theme').checked,
-            };
-
-            const res = await Requests.asyncPostJson('/user/profile', jsonData);
-            if (res.error) {
-                Flash.setMessage(res.message, 'error');
-            } else {
-                // Reload the page using JS to reflect changes
-                window.location.reload();
-
-            }
-        } catch (error) {
-            console.error(error);
-            Flash.setMessage('An error occurred while saving your profile.', 'error');
-        } finally {
-            spinner.classList.toggle('hidden');
-        }
-    });
-
+    import { initUsersProfilePage } from '/static/js/pages/users-profile.js';
+    initUsersProfilePage();
 </script>
 
 {% endblock content %}

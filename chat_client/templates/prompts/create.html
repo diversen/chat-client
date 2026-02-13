@@ -20,25 +20,7 @@
 </main>
 
 <script type="module">
-    import { Flash } from '/static/js/flash.js';
-    import { Requests } from '/static/js/requests.js';
-
-    document.getElementById('create-btn').addEventListener('click', async (event) => {
-        event.preventDefault();
-        const data = {
-            title: document.getElementById('title').value,
-            prompt: document.getElementById('prompt').value,
-        };
-        try {
-            const res = await Requests.asyncPostJson('/prompt/create', data);
-            if (res.error) {
-                Flash.setMessage(res.message, 'error');
-            } else {
-                window.location.href = `/prompt`;
-            }
-        } catch (e) {
-            Flash.setMessage('An error occurred. Try again later.', 'error');
-        }
-    });
+    import { initPromptsCreatePage } from '/static/js/pages/prompts-create.js';
+    initPromptsCreatePage();
 </script>
 {% endblock content %}

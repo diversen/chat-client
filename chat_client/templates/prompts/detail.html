@@ -10,23 +10,13 @@
 
     <div class="action-links">
         <a class="action-link" href="/prompt/{{ prompt.prompt_id }}/edit">Edit</a>
-        <a class="action-link" id="delete-btn">Delete</a>
+        <a class="action-link" id="delete-btn" data-prompt-id="{{ prompt.prompt_id }}">Delete</a>
         <a class="action-link" href="/prompt">Back to list</a>
     </div>
 </main>
 
 <script type="module">
-    import { Flash } from '/static/js/flash.js';
-    import { Requests } from '/static/js/requests.js';
-
-    document.getElementById('delete-btn').addEventListener('click', async () => {
-        if (!confirm('Are you sure you want to delete this prompt?')) return;
-        const res = await Requests.asyncPostJson('/prompt/{{ prompt.prompt_id }}/delete', {});
-        if (res.error) {
-            Flash.setMessage(res.message, 'error');
-        } else {
-            window.location.href = '/prompt';
-        }
-    });
+    import { initPromptsDetailPage } from '/static/js/pages/prompts-detail.js';
+    initPromptsDetailPage();
 </script>
 {% endblock content %}
