@@ -436,6 +436,9 @@ const chatService = {
                 }
                 let data;
                 try { data = JSON.parse(line); } catch (_) { continue; }
+                if (typeof data.error === 'string' && data.error.trim()) {
+                    throw new Error(data.error.trim());
+                }
                 const delta = data.choices?.[0]?.delta ?? {};
                 const finishReason = data.choices?.[0]?.finish_reason;
 
@@ -813,7 +816,10 @@ class ConversationController {
                 console.log('Request was aborted');
             } else {
                 console.error('Error in processStream:', error);
-                Flash.setMessage('An error occurred while processing the stream.', 'error');
+                const message = (typeof error?.message === 'string' && error.message.trim())
+                    ? error.message.trim()
+                    : 'An error occurred while processing the stream.';
+                Flash.setMessage(message, 'error');
             }
         } finally {
             // Clear streaming

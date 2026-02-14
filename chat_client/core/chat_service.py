@@ -7,6 +7,56 @@ from openai import OpenAIError
 from starlette.requests import Request
 
 
+GENERIC_OPENAI_ERROR_MESSAGE = "An error occurred. Please try again later."
+IMAGE_MODALITY_ERROR_MESSAGE = "The selected model does not support image inputs. Remove attached images or choose a vision model."
+
+
+def _extract_error_messages(value: Any) -> list[str]:
+    messages: list[str] = []
+    if isinstance(value, dict):
+        message = value.get("message")
+        if isinstance(message, str) and message.strip():
+            messages.append(message.strip())
+        nested = value.get("error")
+        if nested is not None:
+            messages.extend(_extract_error_messages(nested))
+    elif isinstance(value, list):
+        for item in value:
+            messages.extend(_extract_error_messages(item))
+    elif isinstance(value, str) and value.strip():
+        messages.append(value.strip())
+    return messages
+
+
+def map_openai_error_message(error: OpenAIError) -> str:
+    texts: list[str] = []
+
+    direct_message = str(error).strip()
+    if direct_message:
+        texts.append(direct_message)
+
+    error_body = getattr(error, "body", None)
+    if error_body is not None:
+        texts.extend(_extract_error_messages(error_body))
+
+    response = getattr(error, "response", None)
+    if response is not None:
+        try:
+            texts.extend(_extract_error_messages(response.json()))
+        except Exception:
+            pass
+
+    joined = " ".join(texts).lower()
+    if (
+        "image input modality is not enabled" in joined
+        or "image modality" in joined
+        or "does not support image" in joined
+    ):
+        return IMAGE_MODALITY_ERROR_MESSAGE
+
+    return GENERIC_OPENAI_ERROR_MESSAGE
+
+
 def resolve_provider_info(model: str, models: dict[str, Any], providers: dict[str, Any]) -> dict[str, Any]:
     model_config = models.get(model, "")
 
@@ -175,11 +225,11 @@ async def chat_response_stream(
                 json_chunk = json.dumps(model_dict)
                 yield f"data: {json_chunk}\n\n"
 
-    except OpenAIError:
+    except OpenAIError as error:
         logger.exception("OpenAI error")
-        yield json.dumps({"error": "An error occurred. Please try again later"})
+        yield f"data: {json.dumps({'error': map_openai_error_message(error)})}\n\n"
     except Exception:
         logger.exception("Streaming error")
-        yield json.dumps({"error": "Streaming failed"})
+        yield f"data: {json.dumps({'error': 'Streaming failed'})}\n\n"
     finally:
         logger.info("Closing stream")
