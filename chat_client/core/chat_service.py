@@ -11,6 +11,19 @@ GENERIC_OPENAI_ERROR_MESSAGE = "An error occurred. Please try again later."
 IMAGE_MODALITY_ERROR_MESSAGE = "The selected model does not support image inputs. Remove attached images or choose a vision model."
 
 
+def _close_stream(stream: Any, logger: logging.Logger) -> None:
+    """
+    Best-effort close of an OpenAI stream-like object.
+    """
+    close = getattr(stream, "close", None)
+    if not callable(close):
+        return
+    try:
+        close()
+    except Exception:
+        logger.exception("Failed to close provider stream")
+
+
 def _extract_error_messages(value: Any) -> list[str]:
     messages: list[str] = []
     if isinstance(value, dict):
@@ -170,34 +183,41 @@ async def chat_response_stream(
             chat_args["tools"] = tools
 
         stream_response = client.chat.completions.create(**chat_args)
-
         tool_call: dict[str, Any] = {}
-        for chunk in stream_response:
-            if await request.is_disconnected():
-                break
+        disconnected = False
+        try:
+            for chunk in stream_response:
+                if await request.is_disconnected():
+                    disconnected = True
+                    break
 
-            delta = chunk.choices[0].delta
+                delta = chunk.choices[0].delta
 
-            if delta.tool_calls:
-                call = delta.tool_calls[0]
-                if not tool_call:
-                    tool_call = {
-                        "id": call.id,
-                        "type": call.type,
-                        "function": {"name": "", "arguments": ""},
-                    }
+                if delta.tool_calls:
+                    call = delta.tool_calls[0]
+                    if not tool_call:
+                        tool_call = {
+                            "id": call.id,
+                            "type": call.type,
+                            "function": {"name": "", "arguments": ""},
+                        }
 
-                if call.function and call.function.name:
-                    tool_call["function"]["name"] += call.function.name
-                if call.function and call.function.arguments:
-                    tool_call["function"]["arguments"] += call.function.arguments
+                    if call.function and call.function.name:
+                        tool_call["function"]["name"] += call.function.name
+                    if call.function and call.function.arguments:
+                        tool_call["function"]["arguments"] += call.function.arguments
 
-            if chunk.choices[0].finish_reason == "tool_calls":
-                break
+                if chunk.choices[0].finish_reason == "tool_calls":
+                    break
 
-            model_dict = chunk.model_dump()
-            json_chunk = json.dumps(model_dict)
-            yield f"data: {json_chunk}\n\n"
+                model_dict = chunk.model_dump()
+                json_chunk = json.dumps(model_dict)
+                yield f"data: {json_chunk}\n\n"
+        finally:
+            _close_stream(stream_response, logger)
+
+        if disconnected:
+            return
 
         if tool_call:
             result = tool_executor(tool_call)
@@ -217,13 +237,16 @@ async def chat_response_stream(
                 stream=True,
             )
 
-            for chunk in tool_response:
-                if await request.is_disconnected():
-                    break
+            try:
+                for chunk in tool_response:
+                    if await request.is_disconnected():
+                        break
 
-                model_dict = chunk.model_dump()
-                json_chunk = json.dumps(model_dict)
-                yield f"data: {json_chunk}\n\n"
+                    model_dict = chunk.model_dump()
+                    json_chunk = json.dumps(model_dict)
+                    yield f"data: {json_chunk}\n\n"
+            finally:
+                _close_stream(tool_response, logger)
 
     except OpenAIError as error:
         logger.exception("OpenAI error")
