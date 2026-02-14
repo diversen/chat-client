@@ -103,6 +103,16 @@ except Exception as e:
 
 TOOL_MODELS = ["gpt-40-mini"]
 
+# MCP server integration (remote JSON-RPC over HTTP)
+# Enable this to let model tool calls use an MCP server instead of local TOOL_REGISTRY.
+MCP_ENABLED = True
+MCP_SERVER_URL = "http://127.0.0.1:5000/mcp"
+MCP_AUTH_TOKEN = "your-very-secret-token"  # Set bearer token / OAuth access token when required.
+# Example for Context7 API-key auth:
+# MCP_SERVER_URL = "https://mcp.context7.com/mcp"  # Use /mcp, not /mcp/oauth
+# MCP_AUTH_TOKEN = "ctx7sk-..."  # Sent as Bearer and CONTEXT7_API_KEY for Context7 hosts.
+MCP_TIMEOUT_SECONDS = 20.0
+
 
 # # Model tools configuration
 

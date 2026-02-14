@@ -5,6 +5,7 @@ from starlette.responses import StreamingResponse, JSONResponse, RedirectRespons
 from openai import OpenAI
 from chat_client.core import base_context
 from chat_client.core import chat_service
+from chat_client.core import mcp_client
 import data.config as config
 import logging
 from chat_client.core.templates import get_templates
@@ -34,6 +35,10 @@ PROVIDERS = getattr(config, "PROVIDERS", {})
 TOOL_REGISTRY = getattr(config, "TOOL_REGISTRY", {})
 TOOLS = getattr(config, "TOOLS", [])
 TOOL_MODELS = getattr(config, "TOOL_MODELS", [])
+MCP_ENABLED = bool(getattr(config, "MCP_ENABLED", False))
+MCP_SERVER_URL = str(getattr(config, "MCP_SERVER_URL", "")).strip()
+MCP_AUTH_TOKEN = getattr(config, "MCP_AUTH_TOKEN", None)
+MCP_TIMEOUT_SECONDS = float(getattr(config, "MCP_TIMEOUT_SECONDS", 15.0))
 
 
 def _resolve_provider_info(model: str) -> dict:
@@ -75,6 +80,21 @@ def _execute_tool(tool_call):
     return chat_service.execute_tool(tool_call, TOOL_REGISTRY, logger)
 
 
+def _mcp_active_for_model(model: str) -> bool:
+    return MCP_ENABLED and bool(MCP_SERVER_URL) and model in TOOL_MODELS
+
+
+def _resolve_tools_for_model(model: str) -> list[dict]:
+    if not _mcp_active_for_model(model):
+        return TOOLS
+    return mcp_client.get_openai_tools_from_mcp(
+        server_url=MCP_SERVER_URL,
+        timeout_seconds=MCP_TIMEOUT_SECONDS,
+        auth_token=MCP_AUTH_TOKEN,
+        logger=logger,
+    )
+
+
 def _normalize_chat_messages(messages: list) -> list:
     """
     Convert user messages with uploaded images into OpenAI content parts.
@@ -83,6 +103,22 @@ def _normalize_chat_messages(messages: list) -> list:
 
 
 async def _chat_response_stream(request: Request, messages, model, logged_in):
+    tools = _resolve_tools_for_model(model)
+    tool_models = TOOL_MODELS if tools else []
+
+    if _mcp_active_for_model(model):
+        def _tool_executor(tool_call):
+            return mcp_client.execute_tool_call_via_mcp(
+                tool_call=tool_call,
+                server_url=MCP_SERVER_URL,
+                timeout_seconds=MCP_TIMEOUT_SECONDS,
+                auth_token=MCP_AUTH_TOKEN,
+                logger=logger,
+            )
+    else:
+        def _tool_executor(tool_call):
+            return _execute_tool(tool_call)
+
     async for chunk in chat_service.chat_response_stream(
         request,
         messages,
@@ -91,9 +127,9 @@ async def _chat_response_stream(request: Request, messages, model, logged_in):
         get_profile=user_repository.get_profile,
         openai_client_cls=OpenAI,
         provider_info_resolver=_resolve_provider_info,
-        tool_models=TOOL_MODELS,
-        tools=TOOLS,
-        tool_executor=_execute_tool,
+        tool_models=tool_models,
+        tools=tools,
+        tool_executor=_tool_executor,
         logger=logger,
     ):
         yield chunk
