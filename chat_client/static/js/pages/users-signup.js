@@ -21,7 +21,7 @@ function initUsersSignupPage() {
         event.preventDefault();
 
         const spinner = document.querySelector('.loading-spinner');
-        spinner?.classList.remove('hidden');
+        spinner.classList.remove('hidden');
 
         try {
             const form = document.getElementById('signup-form');
@@ -35,7 +35,7 @@ function initUsersSignupPage() {
                 'error',
             );
         } finally {
-            spinner?.classList.add('hidden');
+            spinner.classList.add('hidden');
         }
     });
 }

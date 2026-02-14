@@ -21,7 +21,7 @@ function initUsersResetPasswordPage() {
         event.preventDefault();
 
         const spinner = document.querySelector('.loading-spinner');
-        spinner?.classList.remove('hidden');
+        spinner.classList.remove('hidden');
 
         try {
             const form = document.getElementById('reset-form');
@@ -35,7 +35,7 @@ function initUsersResetPasswordPage() {
                 'error',
             );
         } finally {
-            spinner?.classList.add('hidden');
+            spinner.classList.add('hidden');
         }
     });
 }

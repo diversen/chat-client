@@ -11,7 +11,7 @@ function initUsersLoginPage() {
         event.preventDefault();
 
         const spinner = document.querySelector('.loading-spinner');
-        spinner?.classList.remove('hidden');
+        spinner.classList.remove('hidden');
 
         const jsonData = {
             email: document.getElementById('email')?.value,
@@ -29,7 +29,7 @@ function initUsersLoginPage() {
                 'error',
             );
         } finally {
-            spinner?.classList.add('hidden');
+            spinner.classList.add('hidden');
         }
     });
 }

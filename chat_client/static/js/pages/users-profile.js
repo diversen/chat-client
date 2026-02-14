@@ -11,7 +11,7 @@ function initUsersProfilePage() {
         event.preventDefault();
 
         const spinner = document.querySelector('.loading-spinner');
-        spinner?.classList.remove('hidden');
+        spinner.classList.remove('hidden');
 
         try {
             const jsonData = {
@@ -28,7 +28,7 @@ function initUsersProfilePage() {
                 'error',
             );
         } finally {
-            spinner?.classList.add('hidden');
+            spinner.classList.add('hidden');
         }
     });
 }
