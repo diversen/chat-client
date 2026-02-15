@@ -60,11 +60,7 @@ def map_openai_error_message(error: OpenAIError) -> str:
             pass
 
     joined = " ".join(texts).lower()
-    if (
-        "image input modality is not enabled" in joined
-        or "image modality" in joined
-        or "does not support image" in joined
-    ):
+    if "image input modality is not enabled" in joined or "image modality" in joined or "does not support image" in joined:
         return IMAGE_MODALITY_ERROR_MESSAGE
 
     return GENERIC_OPENAI_ERROR_MESSAGE

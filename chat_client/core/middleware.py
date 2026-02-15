@@ -54,7 +54,7 @@ class LimitRequestSizeMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-max_age = getattr(config, "SESSION_MAX_AGE", 14 * 24 * 60 * 60  )  # 14 days default
+max_age = getattr(config, "SESSION_MAX_AGE", 14 * 24 * 60 * 60)  # 14 days default
 session_middleware = Middleware(
     SessionMiddleware,
     secret_key=getattr(config, "SESSION_SECRET_KEY", "SECRET_KEY"),

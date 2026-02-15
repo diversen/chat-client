@@ -1,5 +1,7 @@
+import { Requests } from '/static/js/requests.js';
+
 async function getConfig() {
-    return await fetch('/config').then(response => response.json());
+    return await Requests.asyncGetJson('/config');
 }
 
 /**
@@ -9,11 +11,7 @@ async function getConfig() {
  */
 async function createDialog(title) {
 
-    const data = await fetch('/chat/create-dialog', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: title }),
-    }).then(response => response.json())
+    const data = await Requests.asyncPostJson('/chat/create-dialog', { title: title });
 
     if (data.error) {
         throw new Error(data.message);
@@ -34,7 +32,7 @@ async function createDialog(title) {
  */
 async function getMessages(dialogID) {
 
-    const data = await fetch(`/chat/get-messages/${dialogID}`).then(response => response.json())
+    const data = await Requests.asyncGetJson(`/chat/get-messages/${dialogID}`);
     console.log(data)
 
     if (data.error) {
@@ -52,11 +50,7 @@ async function getMessages(dialogID) {
 async function createMessage(dialogID, message) {
 
     console.log('Creating message:', message);
-    const data = await fetch(`/chat/create-message/${dialogID}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(message),
-    }).then(response => response.json())
+    const data = await Requests.asyncPostJson(`/chat/create-message/${dialogID}`, message);
 
     if (data.error) {
         throw new Error(data.message);
@@ -67,7 +61,7 @@ async function createMessage(dialogID, message) {
 
 async function isLoggedInOrRedirect() {
     
-    const data = await fetch('/user/is-logged-in').then(response => response.json());
+    const data = await Requests.asyncGetJson('/user/is-logged-in');
     if (data.error) {
         window.location.href = data.redirect;
     }
@@ -79,11 +73,7 @@ async function isLoggedInOrRedirect() {
  */
 async function updateMessage(messageId, content) {
     console.log('Updating message:', messageId, content);
-    const data = await fetch(`/chat/update-message/${messageId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: content }),
-    }).then(response => response.json())
+    const data = await Requests.asyncPostJson(`/chat/update-message/${messageId}`, { content: content });
 
     if (data.error) {
         throw new Error(data.message);

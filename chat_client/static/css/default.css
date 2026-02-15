@@ -427,6 +427,12 @@ pre code {
     cursor: not-allowed;
 }
 
+a.is-disabled-link {
+    pointer-events: none;
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
 .executed-code-container {
     margin-top: 10px;
 }

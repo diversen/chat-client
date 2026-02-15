@@ -1,34 +1,15 @@
 import {
     responsesElem,
     messageElem,
-    sendButtonElem,
     selectModelElem,
     chatContainer,
     scrollToBottom,
 } from '/static/js/app-elements.js';
 
 function initAppEvents() {
-    if (!messageElem || !sendButtonElem) {
+    if (!messageElem) {
         return;
     }
-
-    sendButtonElem.setAttribute('disabled', true);
-
-    function updateSendButtonState() {
-        const hasText = messageElem.value.trim().length > 0;
-        const hasImages = messageElem.dataset.hasImages === '1';
-        if (hasText || hasImages) {
-            sendButtonElem.removeAttribute('disabled');
-        } else {
-            sendButtonElem.setAttribute('disabled', true);
-        }
-    }
-
-    messageElem.addEventListener('input', () => {
-        updateSendButtonState();
-    });
-
-    document.addEventListener('chat:images-updated', updateSendButtonState);
 
     if (selectModelElem) {
         selectModelElem.addEventListener('change', () => {

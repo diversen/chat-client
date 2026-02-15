@@ -1,4 +1,5 @@
 import { md } from '/static/js/markdown.js';
+import { Requests } from '/static/js/requests.js';
 
 async function addCopyButtons(contentElem, config) {
 
@@ -20,11 +21,7 @@ async function addCopyButtons(contentElem, config) {
             executeButton.onclick = async function () {
 
                 // POST response and expect JSON response
-                const data = await fetch('/tools/python', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: code.textContent }),
-                }).then(response => response.json())
+                const data = await Requests.asyncPostJson('/tools/python', { text: code.textContent });
 
                 // Remove existing output
                 const existingOutput = contentElem.querySelector('.executed-code-container');
