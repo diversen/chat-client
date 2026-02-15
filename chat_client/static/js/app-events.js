@@ -2,6 +2,7 @@ import {
     messageElem,
     selectModelElem,
     scrollToBottom,
+    promptElem,
 } from '/static/js/app-elements.js';
 
 function initAppEvents() {
@@ -15,6 +16,25 @@ function initAppEvents() {
             localStorage.setItem('selectedModel', selectedModel);
             messageElem.focus();
         });
+    }
+
+    function updateScrollToBottomPosition() {
+        if (!scrollToBottom) return;
+        const gapAbovePrompt = 12;
+        const fallbackPromptHeight = 120;
+        const promptHeight = promptElem
+            ? Math.ceil(promptElem.getBoundingClientRect().height)
+            : fallbackPromptHeight;
+        scrollToBottom.style.bottom = `${promptHeight + gapAbovePrompt}px`;
+
+        if (promptElem) {
+            const promptRect = promptElem.getBoundingClientRect();
+            const sidePadding = 20;
+            const buttonWidth = Math.ceil(scrollToBottom.getBoundingClientRect().width) || 40;
+            const left = Math.round(promptRect.right - sidePadding - buttonWidth);
+            scrollToBottom.style.right = 'auto';
+            scrollToBottom.style.left = `${Math.max(0, left)}px`;
+        }
     }
 
     function applyInitialUIState() {
@@ -31,11 +51,18 @@ function initAppEvents() {
 
         messageElem.style.display = 'unset';
         messageElem.focus();
+        updateScrollToBottomPosition();
     }
 
     window.addEventListener('load', applyInitialUIState);
     window.addEventListener('pageshow', applyInitialUIState);
     applyInitialUIState();
+    window.addEventListener('resize', updateScrollToBottomPosition);
+
+    if (promptElem && typeof ResizeObserver !== 'undefined') {
+        const promptResizeObserver = new ResizeObserver(() => updateScrollToBottomPosition());
+        promptResizeObserver.observe(promptElem);
+    }
 
     if (scrollToBottom) {
         scrollToBottom.addEventListener('click', () => {
