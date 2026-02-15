@@ -1,8 +1,6 @@
 import {
-    responsesElem,
     messageElem,
     selectModelElem,
-    chatContainer,
     scrollToBottom,
 } from '/static/js/app-elements.js';
 
@@ -19,19 +17,7 @@ function initAppEvents() {
         });
     }
 
-    function setChatContainerHeight() {
-        if (!chatContainer) {
-            return;
-        }
-        const visibleHeight = window.innerHeight;
-        const headerHeight = 0;
-        const chatContainerHeight = visibleHeight - headerHeight;
-        chatContainer.style.height = `${chatContainerHeight}px`;
-    }
-
     function applyInitialUIState() {
-        setChatContainerHeight();
-
         if (selectModelElem) {
             const selectedModel = localStorage.getItem('selectedModel');
             if (selectedModel) {
@@ -51,14 +37,10 @@ function initAppEvents() {
     window.addEventListener('pageshow', applyInitialUIState);
     applyInitialUIState();
 
-    window.addEventListener('resize', () => {
-        setChatContainerHeight();
-    });
-
-    if (scrollToBottom && responsesElem) {
+    if (scrollToBottom) {
         scrollToBottom.addEventListener('click', () => {
-            responsesElem.scrollTo({
-                top: responsesElem.scrollHeight,
+            window.scrollTo({
+                top: document.documentElement.scrollHeight,
                 behavior: 'smooth',
             });
         });

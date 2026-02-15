@@ -15,14 +15,14 @@ code {
 body {
     display: flex;
     flex-direction: column;
-    overflow-y: scroll; 
+    overflow-y: scroll;
 }
 
 html,
 body {
     margin: 0;
     padding: 0;
-    height: 100vh;
+    min-height: 100%;
     scrollbar-width: thin;
 
 }
@@ -89,13 +89,8 @@ nav svg {
 }
 
 .chat-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
     width: 100%;
-    height: calc(100vh - 61px);/* initial height - will be altered by js */ 
-    overflow: hidden;
+    padding-top: var(--main-menu-top);
     overflow-wrap: anywhere;
 }
 
@@ -103,24 +98,29 @@ nav svg {
 #prompt {
     max-width: var(--width);
     width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+    box-sizing: border-box;
 }
 
 #responses {
-    flex: 1;
-    /* Take up all available space */
-    overflow: auto;
-    padding: 0 20px;
+    overflow: visible;
+    padding: 0 20px 180px;
     scrollbar-width: thin;
     white-space: normal;
-    margin-top: var(--main-menu-top);
-    margin-bottom: 5px;
+    margin-top: 0;
+    margin-bottom: 0;
     scrollbar-color: var(--nav-background) transparent;
 }
 
 #prompt {
     color: var(--text-main);
-    padding: 10px;
-
+    position: sticky;
+    bottom: 0;
+    z-index: 50;
+    padding: 10px 20px;
+    background-color: var(--background-body);
+    border-top: 1px solid var(--border);
 }
 
 .image-preview {
@@ -313,8 +313,10 @@ pre code {
     justify-content: center;
     align-items: center;
     display: none;
-    position: absolute;
+    position: fixed;
+    right: 20px;
     bottom: 150px;
+    z-index: 60;
     cursor: pointer;
 }
 

@@ -12,7 +12,6 @@ import { createChatView } from './chat-view.js';
 
 initAppEvents();
 const config = await getConfig();
-const RESPONSES_ANCHOR_SPACER_ID = 'responses-anchor-spacer';
 
 // Math rendering
 const useKatex = config.use_katex;
@@ -123,7 +122,6 @@ const view = createChatView({
     config,
     renderStreamedResponseText,
     updateContentDiff,
-    responsesAnchorSpacerId: RESPONSES_ANCHOR_SPACER_ID,
 });
 
 const storageService = createStorageService();

@@ -133,30 +133,8 @@ function showEditForm(container, originalMessage, onEdit) {
     });
 }
 
-function createChatView({ config, renderStreamedResponseText, updateContentDiff, responsesAnchorSpacerId }) {
+function createChatView({ config, renderStreamedResponseText, updateContentDiff }) {
     return {
-        getAnchorSpacer() {
-            return document.getElementById(responsesAnchorSpacerId);
-        },
-        ensureAnchorSpacer() {
-            let spacer = this.getAnchorSpacer();
-            if (!spacer) {
-                spacer = document.createElement('div');
-                spacer.id = responsesAnchorSpacerId;
-            }
-            return spacer;
-        },
-        setAnchorSpacerHeight(heightPx) {
-            const spacer = this.ensureAnchorSpacer();
-            spacer.style.height = `${Math.max(0, Math.floor(heightPx))}px`;
-            if (spacer.parentElement !== responsesElem) {
-                responsesElem.appendChild(spacer);
-            }
-        },
-        clearAnchorSpacer() {
-            const spacer = this.getAnchorSpacer();
-            if (spacer) spacer.remove();
-        },
         renderStaticUserMessage(message, messageId = null, onEdit) {
             const { container, contentElement } = createMessageElement('User', messageId);
             contentElement.style.whiteSpace = 'pre-wrap';
@@ -178,12 +156,7 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff,
         },
         createAssistantContainer() {
             const { container, contentElement, loader } = createMessageElement('Assistant');
-            const spacer = this.getAnchorSpacer();
-            if (spacer && spacer.parentElement === responsesElem) {
-                responsesElem.insertBefore(container, spacer);
-            } else {
-                responsesElem.appendChild(container);
-            }
+            responsesElem.appendChild(container);
             loader.classList.remove('hidden');
 
             const hiddenContentElem = document.createElement('div');
@@ -247,12 +220,12 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff,
         hideEditForm(container) { hideEditForm(container); },
         scrollMessageToTop(container) {
             if (!container) return;
-            const gapToFill = responsesElem.clientHeight - container.offsetHeight;
-            this.setAnchorSpacerHeight(gapToFill);
-            responsesElem.scrollTo({ top: responsesElem.scrollHeight, behavior: 'auto' });
+            const navOffset = 80;
+            const targetTop = container.getBoundingClientRect().top + window.scrollY - navOffset;
+            window.scrollTo({ top: Math.max(0, targetTop), behavior: 'auto' });
         },
         scrollToLastMessage() {
-            responsesElem.scrollTo({ top: responsesElem.scrollHeight, behavior: 'smooth' });
+            window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
         },
     };
 }

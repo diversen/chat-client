@@ -6,7 +6,6 @@ const newButtonElem = document.getElementById('new');
 const abortButtonElem = document.getElementById('abort');
 const selectModelElem = document.getElementById('select-model');
 const loadingSpinner = document.querySelector('.loading-spinner');
-const chatContainer = document.querySelector('.chat-container');
 const scrollToBottom = document.getElementById('scroll-to-bottom');
 const imageInputElem = document.getElementById('image-input');
 const imagePreviewElem = document.getElementById('image-preview');
@@ -20,7 +19,6 @@ export {
     abortButtonElem,
     selectModelElem,
     loadingSpinner,
-    chatContainer,
     scrollToBottom,
     imageInputElem,
     imagePreviewElem,

@@ -172,7 +172,9 @@ class ConversationController {
 
         window.addEventListener('wheel', () => {
             userInteracting = true;
-            scrollToBottom.style.display = 'none';
+            if (scrollToBottom) {
+                scrollToBottom.style.display = 'none';
+            }
             clearTimeout(interactionTimeout);
             interactionTimeout = setTimeout(() => {
                 userInteracting = false;
@@ -180,13 +182,15 @@ class ConversationController {
             }, 1000);
         });
 
-        responsesElem.addEventListener('touchstart', () => {
+        window.addEventListener('touchstart', () => {
             userInteracting = true;
-            scrollToBottom.style.display = 'none';
+            if (scrollToBottom) {
+                scrollToBottom.style.display = 'none';
+            }
             clearTimeout(interactionTimeout);
         });
 
-        responsesElem.addEventListener('touchend', () => {
+        window.addEventListener('touchend', () => {
             clearTimeout(interactionTimeout);
             interactionTimeout = setTimeout(() => {
                 userInteracting = false;
@@ -194,14 +198,17 @@ class ConversationController {
             }, 1000);
         });
 
-        responsesElem.addEventListener('scroll', () => this.checkScroll(userInteracting));
+        window.addEventListener('scroll', () => this.checkScroll(userInteracting), { passive: true });
         new MutationObserver(() => this.checkScroll(userInteracting)).observe(responsesElem, { childList: true, subtree: true });
     }
 
     checkScroll(userInteracting) {
+        if (!scrollToBottom) return;
+
         const threshold = 2;
-        const atBottom = Math.abs(responsesElem.scrollHeight - responsesElem.scrollTop - responsesElem.clientHeight) <= threshold;
-        const hasScrollbar = responsesElem.scrollHeight > responsesElem.clientHeight;
+        const doc = document.documentElement;
+        const atBottom = Math.abs((window.innerHeight + window.scrollY) - doc.scrollHeight) <= threshold;
+        const hasScrollbar = doc.scrollHeight > window.innerHeight;
 
         if (hasScrollbar && !atBottom && !userInteracting) {
             scrollToBottom.style.display = 'flex';
@@ -248,7 +255,6 @@ class ConversationController {
             if (isContinuingDialog) {
                 this.view.scrollMessageToTop(userContainer);
             } else {
-                this.view.clearAnchorSpacer();
                 this.view.scrollToLastMessage();
             }
 
@@ -335,7 +341,6 @@ class ConversationController {
 
             this.messages.push({ ...assistantMessage, message_id: assistantMessageId });
             this.abortController = new AbortController();
-            this.view.clearAnchorSpacer();
         }
     }
 
