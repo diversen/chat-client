@@ -39,7 +39,8 @@ function createMessageElement(role, messageId = null) {
 function renderCopyMessageButton(container, message) {
     const messageActions = container.querySelector('.message-actions');
     messageActions.classList.remove('hidden');
-    messageActions.querySelector('.copy-message').addEventListener('click', () => {
+    messageActions.querySelector('.copy-message').addEventListener('click', (e) => {
+        e.preventDefault();
         navigator.clipboard.writeText(message);
         const copyButton = messageActions.querySelector('.copy-message');
         copyButton.innerHTML = checkIcon;
