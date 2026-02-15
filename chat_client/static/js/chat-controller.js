@@ -182,7 +182,10 @@ class ConversationController {
             }, 1000);
         });
 
-        window.addEventListener('touchstart', () => {
+        window.addEventListener('touchstart', (event) => {
+            if (scrollToBottom && event.target instanceof Element && event.target.closest('#scroll-to-bottom')) {
+                return;
+            }
             userInteracting = true;
             if (scrollToBottom) {
                 scrollToBottom.style.display = 'none';
