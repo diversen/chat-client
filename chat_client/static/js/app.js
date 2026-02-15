@@ -24,6 +24,7 @@ import { copyIcon, checkIcon, editIcon } from './app-icons.js';
 initAppEvents();
 const config = await getConfig();
 const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
+const RESPONSES_ANCHOR_SPACER_ID = 'responses-anchor-spacer';
 
 // Math rendering
 const useKatex = config.use_katex;
@@ -194,6 +195,28 @@ function renderCopyMessageButton(container, message) {
  * View: DOM-only utilities (no state)
  */
 const view = {
+    getAnchorSpacer() {
+        return document.getElementById(RESPONSES_ANCHOR_SPACER_ID);
+    },
+    ensureAnchorSpacer() {
+        let spacer = this.getAnchorSpacer();
+        if (!spacer) {
+            spacer = document.createElement('div');
+            spacer.id = RESPONSES_ANCHOR_SPACER_ID;
+        }
+        return spacer;
+    },
+    setAnchorSpacerHeight(heightPx) {
+        const spacer = this.ensureAnchorSpacer();
+        spacer.style.height = `${Math.max(0, Math.floor(heightPx))}px`;
+        if (spacer.parentElement !== responsesElem) {
+            responsesElem.appendChild(spacer);
+        }
+    },
+    clearAnchorSpacer() {
+        const spacer = this.getAnchorSpacer();
+        if (spacer) spacer.remove();
+    },
     /**
      * Render user message to the DOM
      */
@@ -208,6 +231,7 @@ const view = {
             renderEditMessageButton(container, message, onEdit);
         }
         responsesElem.appendChild(container);
+        return container;
     },
 
     /**
@@ -226,7 +250,12 @@ const view = {
      */
     createAssistantContainer() {
         const { container, contentElement, loader } = createMessageElement('Assistant');
-        responsesElem.appendChild(container);
+        const spacer = this.getAnchorSpacer();
+        if (spacer && spacer.parentElement === responsesElem) {
+            responsesElem.insertBefore(container, spacer);
+        } else {
+            responsesElem.appendChild(container);
+        }
         loader.classList.remove('hidden');
 
         const hiddenContentElem = document.createElement('div');
@@ -286,6 +315,12 @@ const view = {
     enableAbort() { abortButtonElem.removeAttribute('disabled'); },
     getSelectedModel() { return selectModelElem.value; },
     attachCopy(container, text) { renderCopyMessageButton(container, text); },
+    scrollMessageToTop(container) {
+        if (!container) return;
+        const gapToFill = responsesElem.clientHeight - container.offsetHeight;
+        this.setAnchorSpacerHeight(gapToFill);
+        responsesElem.scrollTo({ top: responsesElem.scrollHeight, behavior: 'auto' });
+    },
     scrollToLastMessage() {
         responsesElem.scrollTo({ top: responsesElem.scrollHeight, behavior: 'smooth' });
     },
@@ -695,6 +730,7 @@ class ConversationController {
             const userMessage = messageElem.value.trim();
             const images = this.pendingImages.map((img) => ({ data_url: img.dataUrl }));
             if (!this.validateUserMessage(userMessage)) return;
+            const isContinuingDialog = this.messages.length > 0;
 
             // Save as dialog if it's the first message
             const message = { role: 'user', content: userMessage, images: images };
@@ -720,12 +756,17 @@ class ConversationController {
             this.clearPendingImages();
 
             // Render user message
-            view.renderStaticUserMessage(messageTextForStorage, userMessageId, async (id, newContent, container) => {
+            const userContainer = view.renderStaticUserMessage(messageTextForStorage, userMessageId, async (id, newContent, container) => {
                 await this.handleMessageUpdate(id, newContent, container);
             });
 
-            // Scroll so that last user message is visible
-            this.view.scrollToLastMessage();
+            if (isContinuingDialog) {
+                this.view.scrollMessageToTop(userContainer);
+            } else {
+                this.view.clearAnchorSpacer();
+                // Scroll so that last user message is visible
+                this.view.scrollToLastMessage();
+            }
 
             await this.renderAssistantMessage();
         } catch (error) {
@@ -852,6 +893,7 @@ class ConversationController {
             // reset abort controller for next run
             this.abortController = new AbortController();
             this.refreshSendButton();
+            this.view.clearAnchorSpacer();
         }
     }
 
