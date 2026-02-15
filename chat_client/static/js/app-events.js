@@ -29,11 +29,11 @@ function initAppEvents() {
 
         if (promptElem) {
             const promptRect = promptElem.getBoundingClientRect();
-            const sidePadding = 20;
             const buttonWidth = Math.ceil(scrollToBottom.getBoundingClientRect().width) || 40;
-            const left = Math.round(promptRect.right - sidePadding - buttonWidth);
+            const maxLeft = Math.max(0, window.innerWidth - buttonWidth);
+            const left = Math.round(promptRect.left + (promptRect.width - buttonWidth) / 2);
             scrollToBottom.style.right = 'auto';
-            scrollToBottom.style.left = `${Math.max(0, left)}px`;
+            scrollToBottom.style.left = `${Math.min(Math.max(0, left), maxLeft)}px`;
         }
     }
 
