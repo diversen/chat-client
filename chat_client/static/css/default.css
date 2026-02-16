@@ -74,6 +74,14 @@ nav svg {
 }
 
 
+.base-container {
+    width: 100%;
+    max-width: var(--width);
+    margin-left: auto;
+    margin-right: auto;
+    box-sizing: border-box;
+}
+
 .default-container {
     max-width: 100%;
     width: var(--width);
@@ -89,23 +97,18 @@ nav svg {
 }
 
 .chat-container {
-    width: 100%;
     padding-top: var(--main-menu-top);
     overflow-wrap: anywhere;
 }
 
-#responses,
-#prompt {
-    max-width: var(--width);
+#responses {
     width: 100%;
+    max-width: var(--width);
     margin-left: auto;
     margin-right: auto;
     box-sizing: border-box;
-}
-
-#responses {
     overflow: visible;
-    padding: 0 20px calc(20px + var(--prompt-height, 120px));
+    padding: 0 0 calc(20px + var(--prompt-height, 120px));
     scrollbar-width: thin;
     white-space: normal;
     margin-top: 0;
@@ -117,11 +120,33 @@ nav svg {
     color: var(--text-main);
     position: fixed;
     bottom: 0;
-    left: 50%;
-    transform: translateX(-50%);
+    left: 0;
+    right: 0;
     z-index: 50;
-    padding: 10px 20px;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 0;
     background-color: var(--background-body);
+}
+
+#prompt > form,
+#prompt > #image-preview,
+#prompt > .actions {
+    width: 100%;
+    max-width: var(--width);
+    margin-left: auto;
+    margin-right: auto;
+    box-sizing: border-box;
+}
+
+@media (max-width: 840px) {
+    .chat-container,
+    #prompt > form,
+    #prompt > #image-preview,
+    #prompt > .actions {
+        padding-left: 12px;
+        padding-right: 12px;
+    }
 }
 
 .image-preview {
