@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 from chat_client.core.api_utils import get_provider_models
+import os
 
 
 # SMTP
@@ -32,6 +33,9 @@ SITE_NAME = "home.10kilobyte.com"
 
 # Session key
 SESSION_SECRET_KEY = "SECRET_KEY_SADFDFREQ2134324AADFDGFFGMIESDF"
+
+# Session cookie name (helps avoid collisions with other apps on the same host)
+SESSION_COOKIE = "chat_client_session"
 
 # Session HTTPS only
 SESSION_HTTPS_ONLY = True  # Set to True if using HTTPS
@@ -70,11 +74,11 @@ USE_KATEX = True
 PROVIDERS = {
     # "openai": {
     #     "base_url": "https://api.openai.com/v1",
-    #     "api_key": "API_KEY",
+    #     "api_key": os.getenv("OPENAI_API_KEY"),
     # },
     # "gemini": {
     #     "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
-    #     "api_key": "API_KEY",
+    #     "api_key": os.getenv("GEMINI_API_KEY"),
     # },
     "ollama": {
         "base_url": "http://localhost:11434/v1",
@@ -82,23 +86,26 @@ PROVIDERS = {
     },
 }
 
+# Set a Default model
+# DEFAULT_MODEL = "deepseek-r1:14b"
 
 MODELS = {
-    # "gpt-4o-mini": "openai",
+    # "gpt-5-nano": "openai",
     # "gemma-3-27b-it": "gemini",
 }
 
 # Add all ollama models to the list of models
-try:
-    ollama_models = get_provider_models(PROVIDERS["ollama"])
-    for ollama_model in ollama_models:
-        MODELS[ollama_model] = "ollama"
-except Exception as e:
-    print(f"Error getting ollama provided models: {e}")
-    print("You can try to fix this by:")
-    print("a) Install and run the ollama server")
-    print("b) Edit the config.py file and remove the provider ollama")
-    exit()
+if "ollama" in PROVIDERS:
+    try:
+        ollama_models = get_provider_models(PROVIDERS["ollama"])
+        for ollama_model in ollama_models:
+            MODELS[ollama_model] = "ollama"
+    except Exception as e:
+        print(f"Error getting ollama provided models: {e}")
+        print("You can try to fix this by:")
+        print("a) Install and run the ollama server")
+        print("b) Edit the config.py file and remove the provider ollama")
+        exit()
 
 
 TOOL_MODELS = ["gpt-40-mini"]

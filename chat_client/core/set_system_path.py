@@ -21,6 +21,7 @@ except ImportError:
     data_dir = Path("data")
     if not data_dir.exists():
         os.makedirs(data_dir)
+    data_dir_abs = data_dir.resolve()
 
     # copy the config-dist.py file to the current directory.
     config_dist_path = Path(__file__).resolve().parent.parent / "config-dist.py"
@@ -33,15 +34,24 @@ except ImportError:
     config_path = Path("data") / "config.py"
     with open(config_path, "w") as f:
         f.write(config_content)
+    config_path_abs = config_path.resolve()
 
-    user_message = """A default 'config.py' file has been created in the 'data' dir or the current working directory.
-You may edit this file in order to e.g. allow users to register and login. Or add models and providers that supports the openai API.
+    user_message = f"""A default 'config.py' file has been created.
+
+Config file path: {config_path_abs}
+Data directory path: {data_dir_abs}
+
+You may edit this file in order to e.g. allow users to register and login. 
+Or add other models and providers that supports the openai API.
 
 Create the database and run migrations with the command:
 
     chat-client init-system
 
-This will create a database in the 'data' dir of the current working directory.
+This will create the default database in:
+
+    {data_dir_abs / "database.db"}
+
 You may then generate a single user with the command:
 
     chat-client create-user

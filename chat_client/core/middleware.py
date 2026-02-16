@@ -55,9 +55,11 @@ class LimitRequestSizeMiddleware(BaseHTTPMiddleware):
 
 
 max_age = getattr(config, "SESSION_MAX_AGE", 14 * 24 * 60 * 60)  # 14 days default
+session_cookie = getattr(config, "SESSION_COOKIE", "chat_client_session")
 session_middleware = Middleware(
     SessionMiddleware,
     secret_key=getattr(config, "SESSION_SECRET_KEY", "SECRET_KEY"),
+    session_cookie=session_cookie,
     https_only=getattr(config, "SESSION_HTTPS_ONLY", True),
     max_age=max_age,
     same_site="lax",
