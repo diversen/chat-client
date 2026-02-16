@@ -109,7 +109,7 @@ nav svg {
     scrollbar-width: thin;
     white-space: normal;
     margin-top: 0;
-    margin-bottom: 0;
+    margin-bottom: 20px;
     scrollbar-color: var(--nav-background) transparent;
 }
 
@@ -168,6 +168,11 @@ nav svg {
 .content {
     scrollbar-width: thin;
     margin-bottom: 0px;
+}
+
+/* Keep action row spacing consistent across plain-text (user) and markdown (assistant) content. */
+.content > :last-child {
+    margin-bottom: 0;
 }
 
 #responses p {
@@ -346,6 +351,7 @@ pre code {
 .message-actions {
     display: flex;
     gap: 0.5em;
+    margin-top: 0.5em;
 }
 
 .message-actions svg {
