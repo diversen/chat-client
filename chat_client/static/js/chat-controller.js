@@ -11,6 +11,9 @@ import {
     imageInputElem,
     imagePreviewElem,
     attachImageButtonElem,
+    imagePreviewModalElem,
+    imagePreviewModalImageElem,
+    imagePreviewModalCloseElem,
 } from './app-elements.js';
 
 const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
@@ -71,6 +74,9 @@ class ConversationController {
             thumbnail.className = 'image-preview-thumb';
             thumbnail.alt = img.name;
             thumbnail.src = img.dataUrl;
+            thumbnail.addEventListener('click', () => {
+                this.openImagePreviewModal(img.dataUrl, img.name);
+            });
 
             const remove = document.createElement('button');
             remove.type = 'button';
@@ -89,9 +95,23 @@ class ConversationController {
         });
     }
 
+    openImagePreviewModal(dataUrl, name) {
+        if (!imagePreviewModalElem || !imagePreviewModalImageElem) return;
+        imagePreviewModalImageElem.src = dataUrl;
+        imagePreviewModalImageElem.alt = name || 'Selected image preview';
+        imagePreviewModalElem.classList.remove('hidden');
+    }
+
+    closeImagePreviewModal() {
+        if (!imagePreviewModalElem || !imagePreviewModalImageElem) return;
+        imagePreviewModalElem.classList.add('hidden');
+        imagePreviewModalImageElem.src = '';
+    }
+
     clearPendingImages() {
         this.pendingImages = [];
         imageInputElem.value = '';
+        this.closeImagePreviewModal();
         this.renderPendingImages();
         this.updateSendButtonState();
     }
@@ -146,6 +166,26 @@ class ConversationController {
 
         imageInputElem.addEventListener('change', async (event) => {
             await this.handleImageSelection(event.target.files);
+        });
+
+        if (imagePreviewModalCloseElem) {
+            imagePreviewModalCloseElem.addEventListener('click', () => {
+                this.closeImagePreviewModal();
+            });
+        }
+
+        if (imagePreviewModalElem) {
+            imagePreviewModalElem.addEventListener('click', (event) => {
+                if (event.target === imagePreviewModalElem) {
+                    this.closeImagePreviewModal();
+                }
+            });
+        }
+
+        window.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') {
+                this.closeImagePreviewModal();
+            }
         });
 
         abortButtonElem.addEventListener('click', () => {

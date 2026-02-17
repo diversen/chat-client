@@ -159,8 +159,8 @@ nav svg {
 
 .image-preview-item {
     position: relative;
-    width: 72px;
-    height: 72px;
+    width: 54px;
+    height: 54px;
     border: 1px solid var(--border);
     border-radius: 6px;
     overflow: hidden;
@@ -172,6 +172,7 @@ nav svg {
     height: 100%;
     object-fit: cover;
     display: block;
+    cursor: zoom-in;
 }
 
 .image-preview-remove {
@@ -188,6 +189,46 @@ nav svg {
     border-radius: 9px;
     cursor: pointer;
     font-size: 11px;
+}
+
+.image-preview-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(0, 0, 0, 0.82);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.image-preview-modal-image {
+    max-width: min(90vw, 1200px);
+    max-height: 85vh;
+    width: auto;
+    height: auto;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+    background: #111;
+}
+
+.image-preview-modal-close {
+    all: unset;
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    cursor: pointer;
+    color: #fff;
+    background: rgba(0, 0, 0, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    width: 32px;
+    height: 32px;
+    line-height: 32px;
+    text-align: center;
+    border-radius: 16px;
+    font-size: 16px;
 }
 
 .content {

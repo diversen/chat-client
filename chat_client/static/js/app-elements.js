@@ -11,6 +11,9 @@ const promptElem = document.getElementById('prompt');
 const imageInputElem = document.getElementById('image-input');
 const imagePreviewElem = document.getElementById('image-preview');
 const attachImageButtonElem = document.getElementById('attach-image');
+const imagePreviewModalElem = document.getElementById('image-preview-modal');
+const imagePreviewModalImageElem = document.getElementById('image-preview-modal-image');
+const imagePreviewModalCloseElem = document.getElementById('image-preview-modal-close');
 
 export {
     responsesElem,
@@ -25,4 +28,7 @@ export {
     imageInputElem,
     imagePreviewElem,
     attachImageButtonElem,
+    imagePreviewModalElem,
+    imagePreviewModalImageElem,
+    imagePreviewModalCloseElem,
 };
