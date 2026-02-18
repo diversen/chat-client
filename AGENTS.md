@@ -1,5 +1,7 @@
 # AGENTS
 
+Ask for explicit user confirmation before implementing code changes.
+
 ## Project Snapshot
 - `chat-client` is a Python 3.10+ Starlette web app with server-rendered templates and static JS/CSS.
 - Main app entrypoint: `chat_client/main.py` (`app` object).
