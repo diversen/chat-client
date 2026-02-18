@@ -5,6 +5,8 @@ import {
     newButtonElem,
     abortButtonElem,
     selectModelElem,
+    imagePreviewModalElem,
+    imagePreviewModalImageElem,
 } from './app-elements.js';
 import { addCopyButtons } from './app-copy-buttons.js';
 import { copyIcon, checkIcon, editIcon } from './app-icons.js';
@@ -134,10 +136,50 @@ function showEditForm(container, originalMessage, onEdit) {
     });
 }
 
+function openImagePreviewModal(dataUrl, name) {
+    if (!imagePreviewModalElem || !imagePreviewModalImageElem) return;
+    imagePreviewModalImageElem.src = dataUrl;
+    imagePreviewModalImageElem.alt = name || 'Selected image preview';
+    imagePreviewModalElem.classList.remove('hidden');
+}
+
+function createMessageImages(images = []) {
+    if (!Array.isArray(images) || images.length === 0) return null;
+
+    const preview = document.createElement('div');
+    preview.className = 'image-preview';
+
+    images.forEach((image, index) => {
+        const dataUrl = String(image?.data_url || '').trim();
+        if (!dataUrl.startsWith('data:image/')) return;
+
+        const item = document.createElement('div');
+        item.className = 'image-preview-item';
+
+        const thumbnail = document.createElement('img');
+        thumbnail.className = 'image-preview-thumb';
+        thumbnail.alt = `Message image ${index + 1}`;
+        thumbnail.src = dataUrl;
+        thumbnail.addEventListener('click', () => {
+            openImagePreviewModal(dataUrl, thumbnail.alt);
+        });
+
+        item.appendChild(thumbnail);
+        preview.appendChild(item);
+    });
+
+    if (preview.children.length === 0) return null;
+    return preview;
+}
+
 function createChatView({ config, renderStreamedResponseText, updateContentDiff }) {
     return {
-        renderStaticUserMessage(message, messageId = null, onEdit) {
+        renderStaticUserMessage(message, messageId = null, onEdit, images = []) {
             const { container, contentElement } = createMessageElement('User', messageId);
+            const imagePreview = createMessageImages(images);
+            if (imagePreview) {
+                contentElement.insertAdjacentElement('beforebegin', imagePreview);
+            }
             contentElement.style.whiteSpace = 'pre-wrap';
             contentElement.innerText = message;
             renderCopyMessageButton(container, message);

@@ -286,14 +286,20 @@ class ConversationController {
             const userMessageId = await this.storage.createMessage(this.dialogId, {
                 role: 'user',
                 content: messageTextForStorage,
+                images,
             });
 
             this.view.clearInput();
             this.clearPendingImages();
 
-            const userContainer = this.view.renderStaticUserMessage(messageTextForStorage, userMessageId, async (id, newContent, container) => {
-                await this.handleMessageUpdate(id, newContent, container);
-            });
+            const userContainer = this.view.renderStaticUserMessage(
+                messageTextForStorage,
+                userMessageId,
+                async (id, newContent, container) => {
+                    await this.handleMessageUpdate(id, newContent, container);
+                },
+                images,
+            );
 
             if (isContinuingDialog) {
                 this.view.scrollMessageToTop(userContainer);
@@ -393,9 +399,14 @@ class ConversationController {
 
         for (const msg of this.messages) {
             if (msg.role === 'user') {
-                this.view.renderStaticUserMessage(msg.content, msg.message_id, async (id, newContent, container) => {
-                    await this.handleMessageUpdate(id, newContent, container);
-                });
+                this.view.renderStaticUserMessage(
+                    msg.content,
+                    msg.message_id,
+                    async (id, newContent, container) => {
+                        await this.handleMessageUpdate(id, newContent, container);
+                    },
+                    msg.images || [],
+                );
             } else {
                 await this.view.renderStaticAssistantMessage(msg.content, msg.message_id);
             }

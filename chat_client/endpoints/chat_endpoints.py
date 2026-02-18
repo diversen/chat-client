@@ -205,7 +205,13 @@ async def create_message(request: Request):
             raise exceptions_validation.UserValidate("Dialog id is required")
 
         payload = await parse_json_payload(request, CreateMessageRequest)
-        message_id = await chat_repository.create_message(user_id, dialog_id, payload.role, payload.content)
+        message_id = await chat_repository.create_message(
+            user_id,
+            dialog_id,
+            payload.role,
+            payload.content,
+            [image.model_dump() for image in payload.images],
+        )
         return JSONResponse({"message_id": message_id})
     except exceptions_validation.JSONError as e:
         return json_error(str(e), status_code=e.status_code)
@@ -280,7 +286,10 @@ async def update_message(request: Request):
             message="You must be logged in to update a message",
         )
 
-        message_id = int(request.path_params.get("message_id"))
+        raw_message_id = request.path_params.get("message_id")
+        if raw_message_id is None:
+            raise ValueError("Missing message id")
+        message_id = int(raw_message_id)
         payload = await parse_json_payload(request, UpdateMessageRequest)
         result = await chat_repository.update_message(user_id, message_id, payload.content)
         return json_success(**result)
@@ -293,4 +302,3 @@ async def update_message(request: Request):
     except Exception:
         logger.exception("Error updating message")
         return json_error("Error updating message", status_code=500)
-

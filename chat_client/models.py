@@ -122,6 +122,33 @@ class Message(Base):
     )
 
 
+class Image(Base):
+    __tablename__ = "image"
+    __table_args__ = {"sqlite_autoincrement": True}
+
+    image_id: Mapped[int | None] = mapped_column(primary_key=True, autoincrement=True, init=False)
+    data_url: Mapped[str] = mapped_column(Text, nullable=False)
+    created: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False, init=False
+    )
+
+
+class MessageImage(Base):
+    __tablename__ = "message_image"
+    __table_args__ = (
+        Index("message_image_message_id", "message_id"),
+        Index("message_image_image_id", "image_id"),
+        {"sqlite_autoincrement": True},
+    )
+
+    message_image_id: Mapped[int | None] = mapped_column(primary_key=True, autoincrement=True, init=False)
+    message_id: Mapped[int] = mapped_column(ForeignKey("message.message_id", ondelete="CASCADE"), nullable=False)
+    image_id: Mapped[int] = mapped_column(ForeignKey("image.image_id", ondelete="CASCADE"), nullable=False)
+    created: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False, init=False
+    )
+
+
 class Prompt(Base):
     __tablename__ = "prompt"
     __table_args__ = (

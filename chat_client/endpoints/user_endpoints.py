@@ -269,4 +269,3 @@ async def is_logged_in(request: Request):
         return json_error("You are logged out. Please login again.", redirect="/user/login")
 
     return json_success(message="You are logged in")
-

@@ -176,4 +176,3 @@ async def prompt_delete_post(request: Request):
         return json_success()
     except exceptions_validation.UserValidate as e:
         return json_error(str(e), status_code=400)
-

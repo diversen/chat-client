@@ -41,7 +41,7 @@ except ImportError:
 Config file path: {config_path_abs}
 Data directory path: {data_dir_abs}
 
-You may edit this file in order to e.g. allow users to register and login. 
+You may edit this file in order to e.g. allow users to register and login.
 Or add other models and providers that supports the openai API.
 
 Create the database and run migrations with the command:

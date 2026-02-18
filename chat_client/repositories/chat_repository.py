@@ -1,6 +1,6 @@
 from chat_client.core import exceptions_validation
 
-from chat_client.models import Dialog, Message
+from chat_client.models import Dialog, Message, Image, MessageImage
 from chat_client.database.db_session import async_session
 import uuid
 import logging
@@ -26,7 +26,13 @@ async def create_dialog(user_id: int, title: str):
         return dialog_id
 
 
-async def create_message(user_id: int, dialog_id: str, role: str, content: str):
+async def create_message(
+    user_id: int,
+    dialog_id: str,
+    role: str,
+    content: str,
+    images: list[dict[str, str]] | None = None,
+):
 
     async with async_session() as session:
         new_message = Message(
@@ -36,6 +42,29 @@ async def create_message(user_id: int, dialog_id: str, role: str, content: str):
             user_id=user_id,
         )
         session.add(new_message)
+        await session.flush()
+        message_id = new_message.message_id
+        if message_id is None:
+            raise RuntimeError("Failed to create message id")
+
+        for image in images or []:
+            data_url = str(image.get("data_url", "")).strip()
+            if not data_url.startswith("data:image/"):
+                continue
+
+            new_image = Image(data_url=data_url)
+            session.add(new_image)
+            await session.flush()
+            image_id = new_image.image_id
+            if image_id is None:
+                continue
+            session.add(
+                MessageImage(
+                    message_id=message_id,
+                    image_id=image_id,
+                )
+            )
+
         await session.commit()
         await session.refresh(new_message)
 
@@ -73,14 +102,31 @@ async def get_messages(user_id: int, dialog_id: str):
         result = await session.execute(stmt)
         messages = result.scalars().all()
 
+        message_ids = [m.message_id for m in messages if m.message_id is not None]
+        images_by_message: dict[int, list[dict[str, str]]] = {}
+        if message_ids:
+            image_stmt = (
+                select(MessageImage.message_id, Image.data_url)
+                .join(Image, Image.image_id == MessageImage.image_id)
+                .where(MessageImage.message_id.in_(message_ids))
+                .order_by(MessageImage.message_image_id.asc())
+            )
+            image_result = await session.execute(image_stmt)
+            for message_id, data_url in image_result.all():
+                images_by_message.setdefault(message_id, []).append({"data_url": data_url})
+
         return_list = []
         for m in messages:
             assert m.created is not None
+            message_id = m.message_id
+            if message_id is None:
+                continue
             return_list.append(
                 {
-                    "message_id": str(m.message_id),
+                    "message_id": str(message_id),
                     "role": m.role,
                     "content": m.content,
+                    "images": images_by_message.get(message_id, []),
                     "created": m.created.isoformat(),
                 }
             )
