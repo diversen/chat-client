@@ -117,50 +117,10 @@ async def config_(request: Request):
     """
     config_values = {
         "default_model": getattr(config, "DEFAULT_MODEL", ""),
-        "tools_callback": getattr(config, "TOOLS_CALLBACK", {}),
         "use_katex": getattr(config, "USE_KATEX", False),
     }
 
     return JSONResponse(config_values)
-
-
-async def json_tools(request: Request):
-    """
-    POST endpoint for calling tools
-
-    A tool can call this endpoint using JSON data.
-    The server will then call a function
-    The JSON data is in the form of which specify the tool to call
-
-    {
-        "module": "ollama_serv.tools.python_exec",
-        "def": "execute",
-    }
-
-    """
-
-    try:
-        await require_user_id_json(request, message="You must be logged in to use tools")
-        data = await request.json()
-        tool = request.path_params["tool"]
-
-        tools_callback = getattr(config, "TOOLS_CALLBACK", {})
-        tool_def = tools_callback.get(tool, {})
-        if not tool_def:
-            return JSONResponse({"tool": tool, "text": "Tool not found"}, status_code=404)
-
-        # import module and call function
-        module = __import__(tool_def["module"], fromlist=[tool_def["def"]])
-        function = getattr(module, tool_def["def"])
-        ret_data = function(data)
-        logger.debug(f"Tool result: {ret_data}")
-        return JSONResponse({"tool": tool, "text": ret_data})
-    except exceptions_validation.JSONError as e:
-        return json_error(str(e), status_code=e.status_code)
-    except Exception:
-        tool_name = request.path_params.get("tool", "unknown")
-        logger.exception(f"Error calling tool {tool_name}")
-        return json_error("Tool execution failed", status_code=500, tool=tool_name)
 
 
 async def _get_model_names():

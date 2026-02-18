@@ -369,17 +369,6 @@ pre code {
 
 }
 
-.executed-code-container {
-    background-color: var(--background-alt);
-    color: var(--text-bright);
-    font-family: "Courier New", Courier, monospace;
-    padding: 7px;
-    border-radius: 8px;
-    overflow: auto;
-    font-size: 0.9em;
-    overflow-x: auto;
-    scrollbar-width: thin;
-}
 
 #scroll-to-bottom {
     justify-content: center;
@@ -507,11 +496,6 @@ a.is-disabled-link {
     opacity: 0.5;
     cursor: not-allowed;
 }
-
-.executed-code-container {
-    margin-top: 10px;
-}
-
 
 .role {
     font-weight: 900;

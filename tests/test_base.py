@@ -7,7 +7,6 @@ import asyncio
 import tempfile
 import os
 from pathlib import Path
-from contextlib import asynccontextmanager
 from unittest.mock import patch, MagicMock
 import sys
 
@@ -84,8 +83,8 @@ class BaseTestCase:
         """Setup before each test method"""
         # Create test client with mocked dependencies
         with patch("chat_client.endpoints.chat_endpoints.config") as mock_config:
-            with patch("chat_client.endpoints.user_endpoints.config") as mock_user_config:
-                with patch("chat_client.endpoints.prompt_endpoints.config") as mock_prompt_config:
+            with patch("chat_client.endpoints.user_endpoints.config"):
+                with patch("chat_client.endpoints.prompt_endpoints.config"):
                     # Mock configuration
                     mock_config.DEFAULT_MODEL = "test-model"
                     mock_config.PROVIDERS = {"test-provider": {"base_url": "http://test", "api_key": "test"}}
@@ -93,7 +92,6 @@ class BaseTestCase:
                     mock_config.TOOL_MODELS = []
                     mock_config.TOOL_REGISTRY = {}
                     mock_config.TOOLS = []
-                    mock_config.TOOLS_CALLBACK = {}
                     mock_config.USE_KATEX = False
 
                     # Import app after mocking config

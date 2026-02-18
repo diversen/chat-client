@@ -1,7 +1,6 @@
 import logging
 from pathlib import Path
 from chat_client.core.api_utils import get_provider_models
-import os
 
 
 # SMTP
@@ -46,39 +45,14 @@ REQUEST_MAX_SIZE = 10 * 1024 * 1024
 # Use mathjax for rendering math
 USE_KATEX = True
 
-# Tools that can be called from the frontend
-#
-# Only available tool is python execution.
-# Very simple PYTHON_EXEC_TEMPLATE but unasafe
-# PYTHON_EXEC_TEMPLATE = "python3 {filename}"
-# A docker image that can be used to execute python code in a secure environment
-# See: https://github.com/diversen/secure-python
-#
-# PYTHON_EXEC_TEMPLATE = (
-#     "docker run --network none --init --rm --memory=256m --memory-swap=256m "
-#     "--cpus='0.5' --ulimit nproc=2000:2000 --ulimit stack=67108864 "
-#     "-v {filename}:/sandbox/script.py secure-python script.py"
-# )
-
-# TOOLS_CALLBACK = {
-#     # this tool may be called on /tools/python
-#     # The tool will call the function execute in the module ollama_client.tools.python_exec
-#     # The result will be added to the dialog
-#     # Uncomment in order to run python code
-#     "python": {
-#         "module": "chat_client.tools.python_exec",
-#         "def": "execute",
-#     }
-# }
-
 PROVIDERS = {
     # "openai": {
     #     "base_url": "https://api.openai.com/v1",
-    #     "api_key": os.getenv("OPENAI_API_KEY"),
+    #     "api_key": "API_KEY",
     # },
     # "gemini": {
     #     "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
-    #     "api_key": os.getenv("GEMINI_API_KEY"),
+    #     "api_key": "API_KEY",
     # },
     "ollama": {
         "base_url": "http://localhost:11434/v1",

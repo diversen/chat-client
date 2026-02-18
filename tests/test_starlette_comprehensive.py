@@ -6,7 +6,6 @@ Tests all major functionality with proper mocking.
 import os
 import sys
 from unittest.mock import patch, MagicMock
-import json
 
 # Add project root to path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -283,24 +282,6 @@ class TestStarletteBackend:
                 mock_logger.error.assert_called_once()
                 print("  ✓ Error logging works")
 
-    def test_tool_endpoints(self):
-        """Test tool execution endpoints"""
-        print("Testing tool endpoints...")
-
-        with TestClient(self.app) as client:
-            # Test tool execution without auth
-            response = client.post("/tools/python", json={"code": "print('test')"})
-            assert response.status_code == 401
-            print("  ✓ Tool endpoints require authentication")
-
-            # Test tool execution with auth but non-existent tool
-            with patch("chat_client.core.user_session.is_logged_in", return_value=1):
-                response = client.post("/tools/nonexistent", json={"data": "test"})
-                assert response.status_code == 404
-                data = response.json()
-                assert "Tool not found" in data["text"]
-                print("  ✓ Non-existent tool returns 404")
-
     def test_validation_and_error_cases(self):
         """Test validation errors and edge cases"""
         print("Testing validation and error cases...")
@@ -377,9 +358,9 @@ class TestStarletteBackend:
             # Test the main chat route separately
             with patch("chat_client.core.user_session.is_logged_in", return_value=False):
                 response = client.get("/", follow_redirects=False)
-                assert response.status_code == 307, f"Main route should redirect when not authenticated"
+                assert response.status_code == 307, "Main route should redirect when not authenticated"
                 location = response.headers.get("location", "")
-                assert "/user/login" in location, f"Main route should redirect to login"
+                assert "/user/login" in location, "Main route should redirect to login"
 
             print("  ✓ Protected routes require authentication")
 
@@ -390,7 +371,6 @@ class TestStarletteBackend:
             self.test_user_endpoints,
             self.test_prompt_endpoints,
             self.test_error_endpoints,
-            self.test_tool_endpoints,
             self.test_validation_and_error_cases,
         ]
 

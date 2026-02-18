@@ -2,10 +2,9 @@
 Tests for chat endpoints (chat page, streaming, models, dialogs, messages)
 """
 
-import json
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
-from tests.test_base import BaseTestCase, mock_openai_client, mock_llm_response
+from tests.test_base import BaseTestCase, mock_openai_client
 
 
 class TestChatEndpoints(BaseTestCase):
@@ -84,7 +83,6 @@ class TestChatEndpoints(BaseTestCase):
         assert response.status_code == 200
         data = response.json()
         assert "default_model" in data
-        assert "tools_callback" in data
         assert "use_katex" in data
 
     def test_list_models(self):
@@ -353,54 +351,6 @@ class TestChatEndpoints(BaseTestCase):
         assert response.status_code == 200
         data = response.json()
         assert data["error"] is False
-
-    @patch("chat_client.core.user_session.is_logged_in")
-    def test_json_tools_not_authenticated(self, mock_logged_in):
-        """Test POST /tools/{tool} when not authenticated"""
-        mock_logged_in.return_value = False
-
-        response = self.client.post("/tools/python", json={"code": "print('hello')"})
-
-        assert response.status_code == 401
-        data = response.json()
-        assert data["error"] is True
-        assert "must be logged in" in data["message"]
-
-    @patch("chat_client.core.user_session.is_logged_in")
-    def test_json_tools_tool_not_found(self, mock_logged_in):
-        """Test POST /tools/{tool} with non-existent tool"""
-        mock_logged_in.return_value = 1
-
-        response = self.client.post("/tools/nonexistent", json={"code": "print('hello')"})
-
-        assert response.status_code == 404
-        data = response.json()
-        assert "Tool not found" in data["text"]
-
-    @patch("builtins.__import__")
-    @patch("chat_client.endpoints.chat_endpoints.config")
-    @patch("chat_client.core.user_session.is_logged_in")
-    def test_json_tools_with_valid_tool(self, mock_logged_in, mock_config, mock_import):
-        """Test POST /tools/{tool} with valid tool"""
-        # Mock the tools callback configuration
-        mock_tools_callback = {"python": {"module": "chat_client.tools.python_exec", "def": "execute"}}
-
-        mock_logged_in.return_value = 1
-        mock_config.TOOLS_CALLBACK = mock_tools_callback
-
-        # Mock the module and function
-        mock_module = MagicMock()
-        mock_function = MagicMock()
-        mock_function.return_value = "Hello World"
-        mock_module.execute = mock_function
-        mock_import.return_value = mock_module
-
-        response = self.client.post("/tools/python", json={"code": "print('Hello World')"})
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["tool"] == "python"
-        assert data["text"] == "Hello World"
 
     @patch("chat_client.endpoints.chat_endpoints.OpenAI")
     @patch("chat_client.repositories.user_repository.get_profile")
