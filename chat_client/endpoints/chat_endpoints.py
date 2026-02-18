@@ -1,5 +1,4 @@
 from starlette.requests import Request
-from starlette.routing import Route
 from starlette.responses import StreamingResponse, JSONResponse, RedirectResponse
 
 from openai import OpenAI
@@ -295,18 +294,3 @@ async def update_message(request: Request):
         logger.exception("Error updating message")
         return json_error("Error updating message", status_code=500)
 
-
-routes_chat: list = [
-    Route("/", chat_page),
-    Route("/chat/{dialog_id:str}", chat_page),
-    Route("/chat", chat_response_stream, methods=["POST"]),
-    Route("/tools/{tool:str}", json_tools, methods=["POST"]),
-    Route("/config", config_),
-    Route("/list", list_models, methods=["GET"]),
-    Route("/chat/create-dialog", create_dialog, methods=["POST"]),
-    Route("/chat/create-message/{dialog_id}", create_message, methods=["POST"]),
-    Route("/chat/update-message/{message_id}", update_message, methods=["POST"]),
-    Route("/chat/delete-dialog/{dialog_id}", delete_dialog, methods=["POST"]),
-    Route("/chat/get-dialog/{dialog_id}", get_dialog, methods=["GET"]),
-    Route("/chat/get-messages/{dialog_id}", get_messages, methods=["GET"]),
-]

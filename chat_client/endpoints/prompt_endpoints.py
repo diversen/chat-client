@@ -1,6 +1,5 @@
 """Starlette routes for Prompt CRUD."""
 
-from starlette.routing import Route
 from starlette.requests import Request
 from starlette.responses import RedirectResponse
 from chat_client.core.templates import get_templates
@@ -178,15 +177,3 @@ async def prompt_delete_post(request: Request):
     except exceptions_validation.UserValidate as e:
         return json_error(str(e), status_code=400)
 
-
-routes_prompt = [
-    Route("/prompt", prompt_list_get, methods=["GET"]),
-    Route("/prompt/json", prompt_list_json, methods=["GET"]),
-    Route("/prompt/create", prompt_create_get, methods=["GET"]),
-    Route("/prompt/create", prompt_create_post, methods=["POST"]),
-    Route("/prompt/{prompt_id:int}", prompt_detail, methods=["GET"]),
-    Route("/prompt/{prompt_id:int}/edit", prompt_edit_get, methods=["GET"]),
-    Route("/prompt/{prompt_id:int}/edit", prompt_edit_post, methods=["POST"]),
-    Route("/prompt/{prompt_id:int}/delete", prompt_delete_post, methods=["POST"]),
-    Route("/prompt/{prompt_id:int}/json", prompt_detail_json, methods=["GET"]),
-]

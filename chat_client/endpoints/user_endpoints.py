@@ -1,5 +1,4 @@
 from starlette.requests import Request
-from starlette.routing import Route
 from starlette.responses import RedirectResponse
 import logging
 from starlette.responses import Response
@@ -271,23 +270,3 @@ async def is_logged_in(request: Request):
 
     return json_success(message="You are logged in")
 
-
-routes_user: list = [
-    Route("/captcha", captcha_, methods=["GET"]),
-    Route("/user/signup", signup_get, methods=["GET"]),
-    Route("/user/signup", signup_post, methods=["POST"]),
-    Route("/user/login", login_get, methods=["GET"]),
-    Route("/user/login", login_post, methods=["POST"]),
-    Route("/user/verify", verify_get, methods=["GET"]),
-    Route("/user/verify", verify_post, methods=["POST"]),
-    Route("/user/logout", logout_get, methods=["GET"]),
-    Route("/user/reset", reset_password_get, methods=["GET"]),
-    Route("/user/reset", reset_password_post, methods=["POST"]),
-    Route("/user/new-password", new_password_get, methods=["GET"]),
-    Route("/user/new-password", new_password_post, methods=["POST"]),
-    Route("/user/dialogs", list_dialogs, methods=["GET"]),
-    Route("/user/dialogs/json", list_dialogs_json, methods=["GET"]),
-    Route("/user/profile", profile, methods=["GET"]),
-    Route("/user/profile", profile_post, methods=["POST"]),
-    Route("/user/is-logged-in", is_logged_in, methods=["GET"]),
-]
