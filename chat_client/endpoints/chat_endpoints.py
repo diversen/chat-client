@@ -115,13 +115,13 @@ async def config_(request: Request):
     """
     GET frontend configuration
     """
-    config_ = {
+    config_values = {
         "default_model": getattr(config, "DEFAULT_MODEL", ""),
         "tools_callback": getattr(config, "TOOLS_CALLBACK", {}),
         "use_katex": getattr(config, "USE_KATEX", False),
     }
 
-    return JSONResponse(config_)
+    return JSONResponse(config_values)
 
 
 async def json_tools(request: Request):
