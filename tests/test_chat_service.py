@@ -141,3 +141,138 @@ def test_chat_response_stream_closes_provider_stream_after_normal_completion():
     assert len(chunks) == 1
     assert "hello" in chunks[0]
     assert stream.closed is True
+
+
+def test_chat_response_stream_uses_two_phase_loop_for_tools():
+    tool_choice = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content="",
+                    tool_calls=[
+                        SimpleNamespace(
+                            id="call_utc",
+                            type="function",
+                            function=SimpleNamespace(name="get_locale_date_time", arguments='{"timezone":"UTC"}'),
+                        ),
+                        SimpleNamespace(
+                            id="call_ny",
+                            type="function",
+                            function=SimpleNamespace(
+                                name="get_locale_date_time",
+                                arguments='{"timezone":"America/New_York"}',
+                            ),
+                        ),
+                    ],
+                ),
+                finish_reason="tool_calls",
+            )
+        ]
+    )
+    final_stream = DummyStream([_chunk("comparison", finish_reason="stop")])
+    create_calls = []
+
+    def _create(**kwargs):
+        create_calls.append(kwargs)
+        if kwargs.get("stream") is False:
+            return tool_choice
+        return final_stream
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=_create)))
+    request = DummyRequest(disconnected_after_calls=999)
+    executed_calls = []
+
+    async def _get_profile(_user_id):
+        return {"system_message": ""}
+
+    def _tool_executor(tool_call):
+        executed_calls.append(tool_call)
+        timezone = chat_service.parse_tool_arguments(tool_call, logging.getLogger("test")).get("timezone", "")
+        return f"time for {timezone}"
+
+    async def _run():
+        chunks = []
+        async for chunk in chat_service.chat_response_stream(
+            request,
+            messages=[{"role": "user", "content": "compare times"}],
+            model="tool-model",
+            logged_in=1,
+            get_profile=_get_profile,
+            openai_client_cls=lambda **_: client,
+            provider_info_resolver=lambda _model: {},
+            tool_models=["tool-model"],
+            tools_loader=lambda: [{"type": "function", "function": {"name": "get_locale_date_time"}}],
+            tool_executor=_tool_executor,
+            logger=logging.getLogger("test"),
+        ):
+            chunks.append(chunk)
+        return chunks
+
+    chunks = asyncio.run(_run())
+
+    assert len(create_calls) == 2
+    assert create_calls[0]["stream"] is False
+    assert "tools" in create_calls[0]
+    assert create_calls[1]["stream"] is True
+    assert "tools" not in create_calls[1]
+    assert len(executed_calls) == 2
+    assert chat_service.parse_tool_arguments(executed_calls[0], logging.getLogger("test")) == {"timezone": "UTC"}
+    assert chat_service.parse_tool_arguments(executed_calls[1], logging.getLogger("test")) == {
+        "timezone": "America/New_York"
+    }
+    second_call_messages = create_calls[1]["messages"]
+    assert second_call_messages[1]["role"] == "assistant"
+    assert len(second_call_messages[1]["tool_calls"]) == 2
+    assert second_call_messages[2]["tool_call_id"] == "call_utc"
+    assert second_call_messages[3]["tool_call_id"] == "call_ny"
+    assert len(chunks) == 1
+    assert "comparison" in chunks[0]
+    assert final_stream.closed is True
+
+
+def test_chat_response_stream_tools_model_without_tool_calls_returns_single_chunk():
+    no_tool_choice = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                message=SimpleNamespace(content="no tool needed", tool_calls=None),
+                finish_reason="stop",
+            )
+        ]
+    )
+    create_calls = []
+
+    def _create(**kwargs):
+        create_calls.append(kwargs)
+        return no_tool_choice
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=_create)))
+    request = DummyRequest(disconnected_after_calls=999)
+
+    async def _get_profile(_user_id):
+        return {"system_message": ""}
+
+    async def _run():
+        chunks = []
+        async for chunk in chat_service.chat_response_stream(
+            request,
+            messages=[{"role": "user", "content": "hello"}],
+            model="tool-model",
+            logged_in=1,
+            get_profile=_get_profile,
+            openai_client_cls=lambda **_: client,
+            provider_info_resolver=lambda _model: {},
+            tool_models=["tool-model"],
+            tools_loader=lambda: [{"type": "function", "function": {"name": "get_locale_date_time"}}],
+            tool_executor=lambda _tool_call: "",
+            logger=logging.getLogger("test"),
+        ):
+            chunks.append(chunk)
+        return chunks
+
+    chunks = asyncio.run(_run())
+
+    assert len(create_calls) == 1
+    assert create_calls[0]["stream"] is False
+    assert len(chunks) == 1
+    assert "no tool needed" in chunks[0]
+    assert '"finish_reason": "stop"' in chunks[0]

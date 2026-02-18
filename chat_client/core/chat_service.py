@@ -153,6 +153,67 @@ def parse_tool_arguments(tool_call: dict[str, Any], logger: logging.Logger) -> d
     return {}
 
 
+def _normalize_tool_calls(raw_tool_calls: Any) -> list[dict[str, Any]]:
+    normalized: list[dict[str, Any]] = []
+    if not isinstance(raw_tool_calls, list):
+        return normalized
+
+    for index, raw_call in enumerate(raw_tool_calls):
+        function = getattr(raw_call, "function", None)
+        name = str(getattr(function, "name", "") or "").strip()
+        if not name:
+            continue
+
+        arguments = getattr(function, "arguments", "{}")
+        if not isinstance(arguments, str):
+            arguments = "{}"
+
+        call_id = getattr(raw_call, "id", None)
+        if not isinstance(call_id, str) or not call_id.strip():
+            call_id = f"tool_call_{index}"
+
+        call_type = getattr(raw_call, "type", None)
+        if not isinstance(call_type, str) or not call_type.strip():
+            call_type = "function"
+
+        normalized.append(
+            {
+                "id": call_id,
+                "type": call_type,
+                "function": {
+                    "name": name,
+                    "arguments": arguments,
+                },
+            }
+        )
+
+    return normalized
+
+
+def _sse_chunk_json(content: str, *, finish_reason: str) -> str:
+    payload = {
+        "choices": [
+            {
+                "delta": {"content": content},
+                "finish_reason": finish_reason,
+            }
+        ]
+    }
+    return json.dumps(payload)
+
+
+def _summarize_assistant_message_for_log(assistant_message: Any, finish_reason: Any) -> dict[str, Any]:
+    content = str(getattr(assistant_message, "content", "") or "")
+    summary: dict[str, Any] = {
+        "finish_reason": str(finish_reason or ""),
+        "content": content,
+    }
+    tool_calls = _normalize_tool_calls(getattr(assistant_message, "tool_calls", None))
+    if tool_calls:
+        summary["tool_calls"] = tool_calls
+    return summary
+
+
 async def chat_response_stream(
     request: Request,
     messages: list[dict[str, Any]],
@@ -181,80 +242,83 @@ async def chat_response_stream(
             base_url=provider_info.get("base_url"),
         )
 
-        chat_args: dict[str, Any] = {
-            "model": model,
-            "messages": messages,
-            "stream": True,
-        }
-
-        if model in tool_models:
-            chat_args["tools"] = tools_loader()
-
-        stream_response = client.chat.completions.create(**chat_args)
-        tool_call: dict[str, Any] = {}
-        disconnected = False
-        try:
-            for chunk in stream_response:
-                if await request.is_disconnected():
-                    disconnected = True
-                    break
-
-                delta = chunk.choices[0].delta
-
-                if delta.tool_calls:
-                    call = delta.tool_calls[0]
-                    if not tool_call:
-                        tool_call = {
-                            "id": call.id,
-                            "type": call.type,
-                            "function": {"name": "", "arguments": ""},
-                        }
-
-                    if call.function and call.function.name:
-                        tool_call["function"]["name"] += call.function.name
-                    if call.function and call.function.arguments:
-                        tool_call["function"]["arguments"] += call.function.arguments
-
-                if chunk.choices[0].finish_reason == "tool_calls":
-                    break
-
-                model_dict = chunk.model_dump()
-                json_chunk = json.dumps(model_dict)
-                yield f"data: {json_chunk}\n\n"
-        finally:
-            _close_stream(stream_response, logger)
-
-        if disconnected:
-            return
-
-        if tool_call:
-            result = tool_executor(tool_call)
-
-            messages.append({"role": "assistant", "tool_calls": [tool_call]})
-            messages.append(
-                {
-                    "role": "tool",
-                    "tool_call_id": tool_call["id"],
-                    "content": result,
-                }
-            )
-
-            tool_response = client.chat.completions.create(
+        tools_enabled = model in tool_models
+        if not tools_enabled:
+            stream_response = client.chat.completions.create(
                 model=model,
                 messages=messages,
                 stream=True,
             )
-
+            disconnected = False
             try:
-                for chunk in tool_response:
+                for chunk in stream_response:
                     if await request.is_disconnected():
+                        disconnected = True
                         break
 
                     model_dict = chunk.model_dump()
                     json_chunk = json.dumps(model_dict)
                     yield f"data: {json_chunk}\n\n"
             finally:
-                _close_stream(tool_response, logger)
+                _close_stream(stream_response, logger)
+
+            if disconnected:
+                return
+            return
+
+        tool_decision_response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            tools=tools_loader(),
+            stream=False,
+        )
+        choices = getattr(tool_decision_response, "choices", None)
+        if not isinstance(choices, list) or not choices:
+            return
+
+        first_choice = choices[0]
+        assistant_message = getattr(first_choice, "message", None)
+        logger.info(
+            "First non-streaming assistant message: %s",
+            _summarize_assistant_message_for_log(assistant_message, getattr(first_choice, "finish_reason", None)),
+        )
+        tool_calls = _normalize_tool_calls(getattr(assistant_message, "tool_calls", None))
+
+        if tool_calls:
+            tool_results: list[tuple[dict[str, Any], Any]] = []
+            for tool_call in tool_calls:
+                result = tool_executor(tool_call)
+                tool_results.append((tool_call, result))
+
+            messages.append({"role": "assistant", "tool_calls": tool_calls})
+            for tool_call, result in tool_results:
+                messages.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_call["id"],
+                        "content": result,
+                    }
+                )
+
+            final_response = client.chat.completions.create(
+                model=model,
+                messages=messages,
+                stream=True,
+            )
+            try:
+                for chunk in final_response:
+                    if await request.is_disconnected():
+                        return
+                    model_dict = chunk.model_dump()
+                    json_chunk = json.dumps(model_dict)
+                    yield f"data: {json_chunk}\n\n"
+            finally:
+                _close_stream(final_response, logger)
+            return
+
+        final_content = str(getattr(assistant_message, "content", "") or "")
+        finish_reason = str(getattr(first_choice, "finish_reason", "") or "stop")
+        yield f"data: {_sse_chunk_json(final_content, finish_reason=finish_reason)}\n\n"
 
     except OpenAIError as error:
         logger.exception("OpenAI error")
