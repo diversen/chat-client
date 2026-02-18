@@ -21,8 +21,7 @@ Example are e.g. `ollama` or `openai` etc.
 * copy dialog message to clipboard
 * load and continue saved dialogs
 * Upload images (use vision models)
-* tool support (if enabled)
-* python execution (if enabled)
+* MCP tool support (if enabled)
 * supports ollama and openai models (and others that models that support the openai api)
 * easily enable all chat models (or any other provider that can use the openai api)
 
@@ -30,8 +29,8 @@ Example are e.g. `ollama` or `openai` etc.
 
 Install latest version of chat-client globaly:
 
-<!-- LATEST-VERSION-PIPX -->
-	pipx install git+https://github.com/diversen/chat-client@v2.3.26
+<!-- LATEST-VERSION-UV -->
+	uv tool install git+https://github.com/diversen/chat-client@v2.3.26
 
 Make a dir for configuration and data:
 
@@ -63,8 +62,8 @@ You should checkout the `./data/config.py` file and change the configuration to 
 
 Upgrade to latest version
 
-<!-- LATEST-VERSION-PIPX-FORCE -->
-	pipx install git+https://github.com/diversen/chat-client@v2.3.26 --force
+<!-- LATEST-VERSION-UV-FORCE -->
+	uv tool install git+https://github.com/diversen/chat-client@v2.3.26 --force
 
 And then restart the running server instance. 
 

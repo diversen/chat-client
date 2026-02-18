@@ -97,15 +97,15 @@ include-package-data = true
 [tool.setuptools.package-data]
 chat_client = ["templates/**", "static/**", "config-dist.py", "migrations/**"]
 
-[tool.bump_version.replace_patterns.pipx]
+[tool.bump_version.replace_patterns.uv]
 file = "README.md"
-search = "<!-- LATEST-VERSION-PIPX -->"
-replace = "\tpipx install git+https://github.com/diversen/chat-client@{version}\n"
+search = "<!-- LATEST-VERSION-UV -->"
+replace = "\tuv tool install git+https://github.com/diversen/chat-client@{version}\n"
 
-[tool.bump_version.replace_patterns.pipx_force]
+[tool.bump_version.replace_patterns.uv_force]
 file = "README.md"
-search = "<!-- LATEST-VERSION-PIPX-FORCE -->"
-replace = "\tpipx install git+https://github.com/diversen/chat-client@{version} --force\n"
+search = "<!-- LATEST-VERSION-UV-FORCE -->"
+replace = "\tuv tool install git+https://github.com/diversen/chat-client@{version} --force\n"
 
 [tool.setuptools.packages.find]
 where = [""]
