@@ -82,48 +82,20 @@ if "ollama" in PROVIDERS:
         exit()
 
 
-TOOL_MODELS = ["gpt-40-mini"]
+# Models that should receive MCP tool definitions.
+MCP_MODELS = ["gpt-40-mini"]
+
+# MCP server integration (remote JSON-RPC over HTTP)
+# Tools are loaded from MCP `tools/list` and executed via MCP `tools/call`.
+MCP_SERVER_URL = "http://127.0.0.1:5000/mcp"
+MCP_AUTH_TOKEN = "your-very-secret-token"  # Set bearer token / OAuth access token when required.
+MCP_TIMEOUT_SECONDS = 20.0
+MCP_TOOLS_CACHE_SECONDS = 60.0
+
+# Optional hosted MCP example:
+# MCP_SERVER_URL = "https://mcp.context7.com/mcp"
+# MCP_AUTH_TOKEN = "ctx7sk-..."
 
 
-# # Model tools configuration
-
-# # In my expirence most ollama models are not very good at handling tools
-# # And also: If using tools with a model you loss the ability to stream the response
-# # The response will be returned as a single response
-# # But anyway here is an example of how to use tools with models
-
-# def get_current_time(timezone: str) -> str:
-
-#     import datetime
-#     import pytz
-
-#     try:
-#         now = datetime.datetime.now(pytz.timezone(timezone))
-#         return f"The current time in {timezone} is {now.strftime('%H:%M:%S')}."
-#     except Exception:
-#         return f"Invalid timezone: {timezone}"
-
-
-# # Tool registry
-# TOOL_REGISTRY = {"get_current_time": get_current_time}
-
-# # Tools
-# TOOLS = [
-#     {
-#         "type": "function",
-#         "function": {
-#             "name": "get_current_time",
-#             "description": "Returns the current time in a specific timezone",
-#             "parameters": {
-#                 "type": "object",
-#                 "properties": {
-#                     "timezone": {
-#                         "type": "string",
-#                         "description": "Timezone in IANA format, e.g. 'Europe/Copenhagen'",
-#                     }
-#                 },
-#                 "required": ["timezone"],
-#             },
-#         },
-#     }
-# ]
+# In my expirence most ollama models are not very good at handling tools.
+# If using tools with a model you also loss the ability to stream the response.

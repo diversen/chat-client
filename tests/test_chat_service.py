@@ -99,7 +99,7 @@ def test_chat_response_stream_closes_provider_stream_when_client_disconnects():
             openai_client_cls=lambda **_: client,
             provider_info_resolver=lambda _model: {},
             tool_models=[],
-            tools=[],
+            tools_loader=lambda: [],
             tool_executor=lambda _tool_call: "",
             logger=logging.getLogger("test"),
         ):
@@ -130,7 +130,7 @@ def test_chat_response_stream_closes_provider_stream_after_normal_completion():
             openai_client_cls=lambda **_: client,
             provider_info_resolver=lambda _model: {},
             tool_models=[],
-            tools=[],
+            tools_loader=lambda: [],
             tool_executor=lambda _tool_call: "",
             logger=logging.getLogger("test"),
         ):

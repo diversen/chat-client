@@ -132,13 +132,25 @@ def execute_tool(tool_call: dict[str, Any], tool_registry: dict[str, Callable[..
     Execute a model tool call from the configured registry.
     """
     func_name = tool_call["function"]["name"]
-    args = json.loads(tool_call["function"]["arguments"])
+    args = parse_tool_arguments(tool_call, logger)
     logger.info(f"Executing tool: {func_name}({args})")
 
     if func_name in tool_registry:
         return tool_registry[func_name](**args)
 
     return f"Unknown tool: {func_name}"
+
+
+def parse_tool_arguments(tool_call: dict[str, Any], logger: logging.Logger) -> dict[str, Any]:
+    raw_args = tool_call.get("function", {}).get("arguments", "{}")
+    try:
+        parsed = json.loads(raw_args)
+    except json.JSONDecodeError:
+        logger.exception("Invalid tool call arguments JSON")
+        return {}
+    if isinstance(parsed, dict):
+        return parsed
+    return {}
 
 
 async def chat_response_stream(
@@ -151,7 +163,7 @@ async def chat_response_stream(
     openai_client_cls: Callable[..., Any],
     provider_info_resolver: Callable[[str], dict[str, Any]],
     tool_models: list[str],
-    tools: list[dict[str, Any]],
+    tools_loader: Callable[[], list[dict[str, Any]]],
     tool_executor: Callable[[dict[str, Any]], Any],
     logger: logging.Logger,
 ) -> AsyncIterator[str]:
@@ -176,7 +188,7 @@ async def chat_response_stream(
         }
 
         if model in tool_models:
-            chat_args["tools"] = tools
+            chat_args["tools"] = tools_loader()
 
         stream_response = client.chat.completions.create(**chat_args)
         tool_call: dict[str, Any] = {}
@@ -247,8 +259,11 @@ async def chat_response_stream(
     except OpenAIError as error:
         logger.exception("OpenAI error")
         yield f"data: {json.dumps({'error': map_openai_error_message(error)})}\n\n"
-    except Exception:
+    except Exception as error:
         logger.exception("Streaming error")
-        yield f"data: {json.dumps({'error': 'Streaming failed'})}\n\n"
+        error_message = "Streaming failed"
+        if error.__class__.__name__ == "MCPClientError":
+            error_message = str(error) or "MCP request failed"
+        yield f"data: {json.dumps({'error': error_message})}\n\n"
     finally:
         logger.info("Closing stream")

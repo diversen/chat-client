@@ -89,9 +89,11 @@ class BaseTestCase:
                     mock_config.DEFAULT_MODEL = "test-model"
                     mock_config.PROVIDERS = {"test-provider": {"base_url": "http://test", "api_key": "test"}}
                     mock_config.MODELS = {"test-model": "test-provider"}
-                    mock_config.TOOL_MODELS = []
-                    mock_config.TOOL_REGISTRY = {}
-                    mock_config.TOOLS = []
+                    mock_config.MCP_MODELS = []
+                    mock_config.MCP_SERVER_URL = "http://127.0.0.1:5000/mcp"
+                    mock_config.MCP_AUTH_TOKEN = ""
+                    mock_config.MCP_TIMEOUT_SECONDS = 5.0
+                    mock_config.MCP_TOOLS_CACHE_SECONDS = 0.0
                     mock_config.USE_KATEX = False
 
                     # Import app after mocking config

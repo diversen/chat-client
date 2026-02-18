@@ -4,8 +4,10 @@ from starlette.responses import StreamingResponse, JSONResponse, RedirectRespons
 from openai import OpenAI
 from chat_client.core import base_context
 from chat_client.core import chat_service
+from chat_client.core import mcp_client
 import data.config as config
 import logging
+import time
 from chat_client.core.templates import get_templates
 from chat_client.repositories import chat_repository, user_repository, prompt_repository
 from chat_client.core import exceptions_validation
@@ -30,9 +32,14 @@ templates = get_templates()
 MODELS = getattr(config, "MODELS", {})
 PROVIDERS = getattr(config, "PROVIDERS", {})
 
-TOOL_REGISTRY = getattr(config, "TOOL_REGISTRY", {})
-TOOLS = getattr(config, "TOOLS", [])
-TOOL_MODELS = getattr(config, "TOOL_MODELS", [])
+MCP_MODELS = getattr(config, "MCP_MODELS", [])
+MCP_SERVER_URL = getattr(config, "MCP_SERVER_URL", "")
+MCP_AUTH_TOKEN = getattr(config, "MCP_AUTH_TOKEN", "")
+MCP_TIMEOUT_SECONDS = float(getattr(config, "MCP_TIMEOUT_SECONDS", 20.0))
+MCP_TOOLS_CACHE_SECONDS = float(getattr(config, "MCP_TOOLS_CACHE_SECONDS", 60.0))
+
+_mcp_tools_cache: list[dict] = []
+_mcp_tools_cache_at: float = 0.0
 
 
 def _resolve_provider_info(model: str) -> dict:
@@ -67,11 +74,39 @@ async def chat_page(request: Request):
     return templates.TemplateResponse("home/chat.html", context)
 
 
+def _list_mcp_tools() -> list[dict]:
+    """
+    Load MCP tools in OpenAI schema format with a small TTL cache.
+    """
+    global _mcp_tools_cache, _mcp_tools_cache_at
+    now = time.monotonic()
+    if _mcp_tools_cache and (now - _mcp_tools_cache_at) < MCP_TOOLS_CACHE_SECONDS:
+        return _mcp_tools_cache
+
+    tools = mcp_client.list_tools_openai_schema(
+        server_url=MCP_SERVER_URL,
+        auth_token=MCP_AUTH_TOKEN,
+        timeout_seconds=MCP_TIMEOUT_SECONDS,
+    )
+    _mcp_tools_cache = tools
+    _mcp_tools_cache_at = now
+    return tools
+
+
 def _execute_tool(tool_call):
     """
-    Execute a tool call
+    Execute a tool call via MCP.
     """
-    return chat_service.execute_tool(tool_call, TOOL_REGISTRY, logger)
+    func_name = tool_call["function"]["name"]
+    args = chat_service.parse_tool_arguments(tool_call, logger)
+    logger.info(f"Executing MCP tool: {func_name}({args})")
+    return mcp_client.call_tool(
+        server_url=MCP_SERVER_URL,
+        auth_token=MCP_AUTH_TOKEN,
+        timeout_seconds=MCP_TIMEOUT_SECONDS,
+        name=func_name,
+        arguments=args,
+    )
 
 
 def _normalize_chat_messages(messages: list) -> list:
@@ -90,8 +125,8 @@ async def _chat_response_stream(request: Request, messages, model, logged_in):
         get_profile=user_repository.get_profile,
         openai_client_cls=OpenAI,
         provider_info_resolver=_resolve_provider_info,
-        tool_models=TOOL_MODELS,
-        tools=TOOLS,
+        tool_models=MCP_MODELS,
+        tools_loader=_list_mcp_tools,
         tool_executor=_execute_tool,
         logger=logger,
     ):

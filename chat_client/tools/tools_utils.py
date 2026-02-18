@@ -5,7 +5,7 @@ import data.config as config
 
 logger: Logger = logging.getLogger(__name__)
 tools_available = getattr(config, "TOOLS_AVAILABLE", [])
-tools_models = getattr(config, "TOOL_MODELS", [])
+tools_models = getattr(config, "MCP_MODELS", [])
 
 
 def is_tools_supported(model: str):
