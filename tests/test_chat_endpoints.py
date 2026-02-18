@@ -235,11 +235,25 @@ class TestChatEndpoints(BaseTestCase):
         mock_logged_in.return_value = 1
         mock_create.return_value = 123  # message_id
 
-        response = self.client.post("/chat/create-message/test-dialog", json={"content": "Test message", "role": "user"})
+        response = self.client.post(
+            "/chat/create-message/test-dialog",
+            json={
+                "content": "Test message",
+                "role": "user",
+                "images": [{"data_url": "data:image/png;base64,AAAA"}],
+            },
+        )
 
         assert response.status_code == 200
         data = response.json()
         assert data["message_id"] == 123
+        mock_create.assert_called_once_with(
+            1,
+            "test-dialog",
+            "user",
+            "Test message",
+            [{"data_url": "data:image/png;base64,AAAA"}],
+        )
 
     @patch("chat_client.core.user_session.is_logged_in")
     def test_get_dialog_not_authenticated(self, mock_logged_in):
