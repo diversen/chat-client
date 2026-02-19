@@ -4,6 +4,7 @@ Middleware for the application
 
 import json
 from base64 import b64decode, b64encode
+from typing import Any
 
 from starlette.middleware import Middleware
 
@@ -17,6 +18,7 @@ from itsdangerous import BadSignature, TimestampSigner
 # NOTE: GZIP cannot be used with streaming responses
 from starlette.responses import JSONResponse
 from starlette.requests import Request
+from starlette.types import Message, Receive, Scope, Send
 import data.config as config
 import logging
 
@@ -87,14 +89,14 @@ class SessionMiddlewareNoResignUnlessChanged:
         if domain is not None:
             self.security_flags += f"; domain={domain}"
 
-    async def __call__(self, scope, receive, send):
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         if scope["type"] not in ("http", "websocket"):
             await self.app(scope, receive, send)
             return
 
         connection = HTTPConnection(scope)
         initial_session_was_empty = True
-        initial_session_data: dict = {}
+        initial_session_data: dict[str, Any] = {}
 
         if self.session_cookie in connection.cookies:
             cookie_data = connection.cookies[self.session_cookie].encode("utf-8")
@@ -108,7 +110,7 @@ class SessionMiddlewareNoResignUnlessChanged:
         else:
             scope["session"] = {}
 
-        async def send_wrapper(message):
+        async def send_wrapper(message: Message) -> None:
             if message["type"] == "http.response.start":
                 headers = MutableHeaders(scope=message)
                 current_session_data = dict(scope["session"])

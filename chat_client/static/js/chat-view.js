@@ -65,7 +65,7 @@ function hideEditForm(container) {
     messageActions.style.display = '';
 }
 
-function renderEditMessageButton(container, originalMessage, onEdit) {
+function renderEditMessageButton(container, onEdit) {
     const messageActions = container.querySelector('.message-actions');
 
     const editButton = document.createElement('a');
@@ -77,7 +77,9 @@ function renderEditMessageButton(container, originalMessage, onEdit) {
 
     editButton.addEventListener('click', (e) => {
         e.preventDefault();
-        showEditForm(container, originalMessage, onEdit);
+        const contentElement = container.querySelector('.content');
+        const currentMessage = contentElement ? contentElement.innerText : '';
+        showEditForm(container, currentMessage, onEdit);
     });
 }
 
@@ -185,7 +187,7 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
             renderCopyMessageButton(container, message);
 
             if (messageId) {
-                renderEditMessageButton(container, message, onEdit);
+                renderEditMessageButton(container, onEdit);
             }
             responsesElem.appendChild(container);
             return container;

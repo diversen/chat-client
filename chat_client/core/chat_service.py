@@ -10,6 +10,7 @@ from starlette.requests import Request
 
 GENERIC_OPENAI_ERROR_MESSAGE = "An error occurred. Please try again later."
 IMAGE_MODALITY_ERROR_MESSAGE = "The selected model does not support image inputs. Remove attached images or choose a vision model."
+TOOL_ROUTER_MAX_TOKENS = 64
 
 
 def _close_stream(stream: Any, logger: logging.Logger) -> None:
@@ -191,18 +192,6 @@ def _normalize_tool_calls(raw_tool_calls: Any) -> list[dict[str, Any]]:
     return normalized
 
 
-def _sse_chunk_json(content: str, *, finish_reason: str) -> str:
-    payload = {
-        "choices": [
-            {
-                "delta": {"content": content},
-                "finish_reason": finish_reason,
-            }
-        ]
-    }
-    return json.dumps(payload)
-
-
 def _summarize_assistant_message_for_log(assistant_message: Any, finish_reason: Any) -> dict[str, Any]:
     content = str(getattr(assistant_message, "content", "") or "")
     summary: dict[str, Any] = {
@@ -271,6 +260,7 @@ async def chat_response_stream(
             model=model,
             messages=messages,
             tools=tools_loader(),
+            max_tokens=TOOL_ROUTER_MAX_TOKENS,
             stream=False,
         )
         choices = getattr(tool_decision_response, "choices", None)
@@ -334,9 +324,21 @@ async def chat_response_stream(
                 _close_stream(final_response, logger)
             return
 
-        final_content = str(getattr(assistant_message, "content", "") or "")
-        finish_reason = str(getattr(first_choice, "finish_reason", "") or "stop")
-        yield f"data: {_sse_chunk_json(final_content, finish_reason=finish_reason)}\n\n"
+        final_response = client.chat.completions.create(
+            model=model,
+            messages=messages,
+            stream=True,
+        )
+        try:
+            for chunk in final_response:
+                if await request.is_disconnected():
+                    return
+                model_dict = chunk.model_dump()
+                json_chunk = json.dumps(model_dict)
+                yield f"data: {json_chunk}\n\n"
+        finally:
+            _close_stream(final_response, logger)
+        return
 
     except OpenAIError as error:
         logger.exception("OpenAI error")

@@ -217,9 +217,7 @@ def test_chat_response_stream_uses_two_phase_loop_for_tools():
     assert "tools" not in create_calls[1]
     assert len(executed_calls) == 2
     assert chat_service.parse_tool_arguments(executed_calls[0], logging.getLogger("test")) == {"timezone": "UTC"}
-    assert chat_service.parse_tool_arguments(executed_calls[1], logging.getLogger("test")) == {
-        "timezone": "America/New_York"
-    }
+    assert chat_service.parse_tool_arguments(executed_calls[1], logging.getLogger("test")) == {"timezone": "America/New_York"}
     second_call_messages = create_calls[1]["messages"]
     assert second_call_messages[1]["role"] == "assistant"
     assert len(second_call_messages[1]["tool_calls"]) == 2
@@ -232,7 +230,7 @@ def test_chat_response_stream_uses_two_phase_loop_for_tools():
     assert final_stream.closed is True
 
 
-def test_chat_response_stream_tools_model_without_tool_calls_returns_single_chunk():
+def test_chat_response_stream_tools_model_without_tool_calls_streams_on_second_call():
     no_tool_choice = SimpleNamespace(
         choices=[
             SimpleNamespace(
@@ -241,11 +239,14 @@ def test_chat_response_stream_tools_model_without_tool_calls_returns_single_chun
             )
         ]
     )
+    final_stream = DummyStream([_chunk("streamed final", finish_reason="stop")])
     create_calls = []
 
     def _create(**kwargs):
         create_calls.append(kwargs)
-        return no_tool_choice
+        if kwargs.get("stream") is False:
+            return no_tool_choice
+        return final_stream
 
     client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=_create)))
     request = DummyRequest(disconnected_after_calls=999)
@@ -273,8 +274,10 @@ def test_chat_response_stream_tools_model_without_tool_calls_returns_single_chun
 
     chunks = asyncio.run(_run())
 
-    assert len(create_calls) == 1
+    assert len(create_calls) == 2
     assert create_calls[0]["stream"] is False
+    assert create_calls[0]["max_tokens"] == chat_service.TOOL_ROUTER_MAX_TOKENS
+    assert create_calls[1]["stream"] is True
     assert len(chunks) == 1
-    assert "no tool needed" in chunks[0]
-    assert '"finish_reason": "stop"' in chunks[0]
+    assert "streamed final" in chunks[0]
+    assert final_stream.closed is True

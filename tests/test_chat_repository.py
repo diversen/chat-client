@@ -68,24 +68,24 @@ def test_update_message_deletes_newer_tool_call_events():
                     text("UPDATE message SET created = '2020-01-01 00:00:00' WHERE message_id = :message_id"),
                     {"message_id": message_id},
                 )
-                await session.execute(
-                    text("UPDATE tool_call_event SET created = '2019-01-01 00:00:00' WHERE tool_call_id = 'call_old'")
-                )
-                await session.execute(
-                    text("UPDATE tool_call_event SET created = '2021-01-01 00:00:00' WHERE tool_call_id = 'call_new'")
-                )
+                await session.execute(text("UPDATE tool_call_event SET created = '2019-01-01 00:00:00' WHERE tool_call_id = 'call_old'"))
+                await session.execute(text("UPDATE tool_call_event SET created = '2021-01-01 00:00:00' WHERE tool_call_id = 'call_new'"))
                 await session.commit()
 
             await chat_repository.update_message(user_id, int(message_id), "Edited")
 
             async with session_factory() as session:
                 rows = (
-                    await session.execute(
-                        select(ToolCallEvent.tool_call_id).where(ToolCallEvent.dialog_id == dialog_id).order_by(
-                            ToolCallEvent.tool_call_id.asc()
+                    (
+                        await session.execute(
+                            select(ToolCallEvent.tool_call_id)
+                            .where(ToolCallEvent.dialog_id == dialog_id)
+                            .order_by(ToolCallEvent.tool_call_id.asc())
                         )
                     )
-                ).scalars().all()
+                    .scalars()
+                    .all()
+                )
 
             assert rows == ["call_old"]
         finally:
