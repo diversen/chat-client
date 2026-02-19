@@ -83,8 +83,10 @@ if "ollama" in PROVIDERS:
 
 
 # Models that should receive MCP tool definitions.
-MCP_MODELS = ["gpt-40-mini"]
+# MCP_MODELS = ["gpt-40-mini"]
 
+# MCP is disabled when MCP_MODELS is empty.
+MCP_MODELS = []
 # MCP server integration (remote JSON-RPC over HTTP)
 # Tools are loaded from MCP `tools/list` and executed via MCP `tools/call`.
 MCP_SERVER_URL = "http://127.0.0.1:5000/mcp"

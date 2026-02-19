@@ -8,6 +8,7 @@ config.py
 data
 chat_client.egg-info
 prompt.md
+uv.lock
 
 # Playwright
 /test-results/

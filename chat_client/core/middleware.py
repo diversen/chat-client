@@ -2,10 +2,15 @@
 Middleware for the application
 """
 
+import json
+from base64 import b64decode, b64encode
+
 from starlette.middleware import Middleware
 
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.middleware.sessions import SessionMiddleware
+from starlette.datastructures import MutableHeaders
+from starlette.requests import HTTPConnection
+from itsdangerous import BadSignature, TimestampSigner
 
 # from starlette.middleware.cors import CORSMiddleware
 # from starlette.middleware.gzip import GZipMiddleware
@@ -54,10 +59,90 @@ class LimitRequestSizeMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
+class SessionMiddlewareNoResignUnlessChanged:
+    """
+    Session middleware that only emits Set-Cookie when session content changes.
+    This avoids stale concurrent responses overwriting a fresher auth session cookie.
+    """
+
+    def __init__(
+        self,
+        app,
+        secret_key: str,
+        session_cookie: str = "session",
+        max_age: int | None = 14 * 24 * 60 * 60,
+        path: str = "/",
+        same_site: str = "lax",
+        https_only: bool = False,
+        domain: str | None = None,
+    ):
+        self.app = app
+        self.signer = TimestampSigner(str(secret_key))
+        self.session_cookie = session_cookie
+        self.max_age = max_age
+        self.path = path
+        self.security_flags = "httponly; samesite=" + same_site
+        if https_only:
+            self.security_flags += "; secure"
+        if domain is not None:
+            self.security_flags += f"; domain={domain}"
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] not in ("http", "websocket"):
+            await self.app(scope, receive, send)
+            return
+
+        connection = HTTPConnection(scope)
+        initial_session_was_empty = True
+        initial_session_data: dict = {}
+
+        if self.session_cookie in connection.cookies:
+            cookie_data = connection.cookies[self.session_cookie].encode("utf-8")
+            try:
+                cookie_data = self.signer.unsign(cookie_data, max_age=self.max_age)
+                initial_session_data = json.loads(b64decode(cookie_data))
+                scope["session"] = dict(initial_session_data)
+                initial_session_was_empty = False
+            except BadSignature:
+                scope["session"] = {}
+        else:
+            scope["session"] = {}
+
+        async def send_wrapper(message):
+            if message["type"] == "http.response.start":
+                headers = MutableHeaders(scope=message)
+                current_session_data = dict(scope["session"])
+                session_changed = current_session_data != initial_session_data
+
+                if current_session_data and session_changed:
+                    data = b64encode(json.dumps(current_session_data).encode("utf-8"))
+                    data = self.signer.sign(data)
+                    header_value = "{session_cookie}={data}; path={path}; {max_age}{security_flags}".format(
+                        session_cookie=self.session_cookie,
+                        data=data.decode("utf-8"),
+                        path=self.path,
+                        max_age=f"Max-Age={self.max_age}; " if self.max_age else "",
+                        security_flags=self.security_flags,
+                    )
+                    headers.append("Set-Cookie", header_value)
+                elif not current_session_data and not initial_session_was_empty:
+                    header_value = "{session_cookie}={data}; path={path}; {expires}{security_flags}".format(
+                        session_cookie=self.session_cookie,
+                        data="null",
+                        path=self.path,
+                        expires="expires=Thu, 01 Jan 1970 00:00:00 GMT; ",
+                        security_flags=self.security_flags,
+                    )
+                    headers.append("Set-Cookie", header_value)
+            await send(message)
+
+        await self.app(scope, receive, send_wrapper)
+
+
 max_age = getattr(config, "SESSION_MAX_AGE", 14 * 24 * 60 * 60)  # 14 days default
 session_cookie = getattr(config, "SESSION_COOKIE", "chat_client_session")
 session_middleware = Middleware(
-    SessionMiddleware,
+    SessionMiddlewareNoResignUnlessChanged,
     secret_key=getattr(config, "SESSION_SECRET_KEY", "SECRET_KEY"),
     session_cookie=session_cookie,
     https_only=getattr(config, "SESSION_HTTPS_ONLY", True),
