@@ -65,6 +65,10 @@ function createChatService() {
                     if (typeof data.error === 'string' && data.error.trim()) {
                         throw new Error(data.error.trim());
                     }
+                    if (data.tool_call) {
+                        yield { toolCall: data.tool_call };
+                        continue;
+                    }
 
                     const delta = data.choices?.[0]?.delta ?? {};
                     const finishReason = data.choices?.[0]?.finish_reason;
@@ -102,6 +106,10 @@ function createChatService() {
 
             if (typeof data.error === 'string' && data.error.trim()) {
                 throw new Error(data.error.trim());
+            }
+            if (data.tool_call) {
+                yield { toolCall: data.tool_call };
+                return;
             }
             const delta = data.choices?.[0]?.delta ?? {};
             if (delta.content) yield { content: delta.content };

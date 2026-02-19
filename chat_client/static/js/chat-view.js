@@ -197,6 +197,56 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
             await renderStreamedResponseText(contentElement, message);
             await addCopyButtons(contentElement, config);
         },
+        renderStaticToolMessage(toolMessage, beforeElement = null) {
+            const { container, contentElement } = createMessageElement('Tool');
+            const toolName = String(toolMessage?.tool_name || 'unknown_tool');
+            const toolCallId = String(toolMessage?.tool_call_id || '');
+            const argumentsJson = String(toolMessage?.arguments_json || '{}');
+            const resultContent = String(toolMessage?.content || '');
+            const errorText = String(toolMessage?.error_text || '');
+
+            const details = document.createElement('details');
+            details.className = 'tool-call-details';
+            details.open = false;
+
+            const summary = document.createElement('summary');
+            summary.textContent = `MCP tool: ${toolName}`;
+            details.appendChild(summary);
+
+            const metadata = document.createElement('div');
+            metadata.className = 'tool-call-meta';
+
+            const callId = document.createElement('p');
+            callId.innerHTML = '<strong>Call ID:</strong> ';
+            callId.append(toolCallId);
+            metadata.appendChild(callId);
+
+            const argsLabel = document.createElement('p');
+            argsLabel.innerHTML = '<strong>Arguments:</strong>';
+            metadata.appendChild(argsLabel);
+
+            const argsPre = document.createElement('pre');
+            argsPre.textContent = argumentsJson;
+            metadata.appendChild(argsPre);
+
+            const resultLabel = document.createElement('p');
+            resultLabel.innerHTML = `<strong>${errorText ? 'Error' : 'Result'}:</strong>`;
+            metadata.appendChild(resultLabel);
+
+            const resultPre = document.createElement('pre');
+            resultPre.textContent = errorText || resultContent;
+            metadata.appendChild(resultPre);
+
+            details.appendChild(metadata);
+            contentElement.appendChild(details);
+
+            if (beforeElement && beforeElement.parentNode === responsesElem) {
+                responsesElem.insertBefore(container, beforeElement);
+            } else {
+                responsesElem.appendChild(container);
+            }
+            return container;
+        },
         createAssistantContainer() {
             const { container, contentElement, loader } = createMessageElement('Assistant');
             responsesElem.appendChild(container);

@@ -1,10 +1,11 @@
 from chat_client.core import exceptions_validation
 
-from chat_client.models import Dialog, Message, Image, MessageImage
+from chat_client.models import Dialog, Message, Image, MessageImage, ToolCallEvent
 from chat_client.database.db_session import async_session
 import uuid
 import logging
-from sqlalchemy import select, func, update
+import json
+from sqlalchemy import select, func, update, delete
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -115,23 +116,76 @@ async def get_messages(user_id: int, dialog_id: str):
             for message_id, data_url in image_result.all():
                 images_by_message.setdefault(message_id, []).append({"data_url": data_url})
 
-        return_list = []
+        combined_rows: list[tuple] = []
         for m in messages:
             assert m.created is not None
             message_id = m.message_id
             if message_id is None:
                 continue
-            return_list.append(
-                {
-                    "message_id": str(message_id),
-                    "role": m.role,
-                    "content": m.content,
-                    "images": images_by_message.get(message_id, []),
-                    "created": m.created.isoformat(),
-                }
+            combined_rows.append(
+                (
+                    m.created,
+                    {
+                        "message_id": str(message_id),
+                        "role": m.role,
+                        "content": m.content,
+                        "images": images_by_message.get(message_id, []),
+                        "created": m.created.isoformat(),
+                    },
+                )
             )
 
-        return return_list
+        tool_stmt = (
+            select(ToolCallEvent)
+            .where(ToolCallEvent.dialog_id == dialog_id, ToolCallEvent.user_id == user_id)
+            .order_by(ToolCallEvent.created.asc())
+        )
+        tool_result = await session.execute(tool_stmt)
+        tool_events = tool_result.scalars().all()
+        for event in tool_events:
+            assert event.created is not None
+            combined_rows.append(
+                (
+                    event.created,
+                    {
+                        "message_id": None,
+                        "role": "tool",
+                        "content": event.result_text if event.result_text else event.error_text,
+                        "images": [],
+                        "created": event.created.isoformat(),
+                        "tool_call_id": event.tool_call_id,
+                        "tool_name": event.tool_name,
+                        "arguments_json": event.arguments_json,
+                        "error_text": event.error_text,
+                    },
+                )
+            )
+
+        combined_rows.sort(key=lambda row: row[0])
+        return [row[1] for row in combined_rows]
+
+
+async def create_tool_call_event(
+    user_id: int,
+    dialog_id: str,
+    tool_call_id: str,
+    tool_name: str,
+    arguments: dict,
+    result_text: str = "",
+    error_text: str = "",
+):
+    async with async_session() as session:
+        event = ToolCallEvent(
+            user_id=user_id,
+            dialog_id=dialog_id,
+            tool_call_id=tool_call_id,
+            tool_name=tool_name,
+            arguments_json=json.dumps(arguments),
+            result_text=result_text,
+            error_text=error_text,
+        )
+        session.add(event)
+        await session.commit()
 
 
 async def delete_dialog(user_id: int, dialog_id: str):
@@ -226,6 +280,14 @@ async def update_message(user_id: int, message_id: int, new_content: str):
             .values(active=0)
         )
         await session.execute(deactivate_stmt)
+
+        # Remove tool call events that belong to turns after the edited message.
+        delete_tool_events_stmt = delete(ToolCallEvent).where(
+            ToolCallEvent.dialog_id == message.dialog_id,
+            ToolCallEvent.user_id == user_id,
+            ToolCallEvent.created > message.created,
+        )
+        await session.execute(delete_tool_events_stmt)
 
         await session.commit()
 

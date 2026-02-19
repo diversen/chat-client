@@ -16,6 +16,7 @@ class ChatMessageRequest(BaseModel):
 class ChatStreamRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
     model: str
+    dialog_id: str = ""
     messages: list[ChatMessageRequest] = Field(default_factory=list)
 
 

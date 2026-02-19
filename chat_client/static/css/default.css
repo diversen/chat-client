@@ -513,6 +513,32 @@ a.is-disabled-link {
     color: dimgray;
 }
 
+.role_tool {
+    color: var(--links);
+}
+
+.tool-call-details {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.02);
+}
+
+.tool-call-details summary {
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.tool-call-meta pre {
+    background: rgba(0, 0, 0, 0.03);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    margin-top: 6px;
+}
+
 table {
     border-collapse: collapse;
     margin-bottom: 10px;

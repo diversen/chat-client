@@ -225,8 +225,10 @@ def test_chat_response_stream_uses_two_phase_loop_for_tools():
     assert len(second_call_messages[1]["tool_calls"]) == 2
     assert second_call_messages[2]["tool_call_id"] == "call_utc"
     assert second_call_messages[3]["tool_call_id"] == "call_ny"
-    assert len(chunks) == 1
-    assert "comparison" in chunks[0]
+    assert len(chunks) == 3
+    assert '"tool_call"' in chunks[0]
+    assert '"tool_call"' in chunks[1]
+    assert "comparison" in chunks[2]
     assert final_stream.closed is True
 
 

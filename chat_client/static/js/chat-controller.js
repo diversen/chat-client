@@ -352,7 +352,11 @@ class ConversationController {
         this.updateSendButtonState();
 
         try {
-            for await (const chunk of this.chat.stream({ model: this.view.getSelectedModel(), messages: this.messages }, this.abortController.signal)) {
+            for await (const chunk of this.chat.stream({
+                model: this.view.getSelectedModel(),
+                dialog_id: this.dialogId || '',
+                messages: this.messages,
+            }, this.abortController.signal)) {
                 ui.loader.classList.add('hidden');
 
                 if (chunk.reasoningOpenClose === 'open') ui.appendReasoning('');
@@ -360,6 +364,9 @@ class ConversationController {
 
                 if (chunk.reasoning) await ui.appendContent(chunk.reasoning);
                 if (chunk.content) await ui.appendContent(chunk.content, Boolean(chunk.done));
+                if (this.config.show_mcp_tool_calls && chunk.toolCall) {
+                    this.view.renderStaticToolMessage(chunk.toolCall, ui.container);
+                }
             }
         } catch (error) {
             ui.loader.classList.add('hidden');
@@ -394,10 +401,10 @@ class ConversationController {
     }
 
     async loadDialog(savedMessages) {
-        this.messages = savedMessages.slice();
+        this.messages = savedMessages.filter((msg) => msg.role === 'user' || msg.role === 'assistant');
         responsesElem.innerHTML = '';
 
-        for (const msg of this.messages) {
+        for (const msg of savedMessages) {
             if (msg.role === 'user') {
                 this.view.renderStaticUserMessage(
                     msg.content,
@@ -407,6 +414,8 @@ class ConversationController {
                     },
                     msg.images || [],
                 );
+            } else if (msg.role === 'tool' && this.config.show_mcp_tool_calls) {
+                this.view.renderStaticToolMessage(msg);
             } else {
                 await this.view.renderStaticAssistantMessage(msg.content, msg.message_id);
             }

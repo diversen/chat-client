@@ -8,6 +8,7 @@ from chat_client.core import mcp_client
 import data.config as config
 import logging
 import time
+import json
 from chat_client.core.templates import get_templates
 from chat_client.repositories import chat_repository, user_repository, prompt_repository
 from chat_client.core import exceptions_validation
@@ -37,6 +38,7 @@ MCP_SERVER_URL = getattr(config, "MCP_SERVER_URL", "")
 MCP_AUTH_TOKEN = getattr(config, "MCP_AUTH_TOKEN", "")
 MCP_TIMEOUT_SECONDS = float(getattr(config, "MCP_TIMEOUT_SECONDS", 20.0))
 MCP_TOOLS_CACHE_SECONDS = float(getattr(config, "MCP_TOOLS_CACHE_SECONDS", 60.0))
+SHOW_MCP_TOOL_CALLS = bool(getattr(config, "SHOW_MCP_TOOL_CALLS", False))
 
 _mcp_tools_cache: list[dict] = []
 _mcp_tools_cache_at: float = 0.0
@@ -109,6 +111,15 @@ def _execute_tool(tool_call):
     )
 
 
+def _serialize_tool_content(result) -> str:
+    if isinstance(result, str):
+        return result
+    try:
+        return json.dumps(result, ensure_ascii=True)
+    except TypeError:
+        return str(result)
+
+
 def _normalize_chat_messages(messages: list) -> list:
     """
     Convert user messages with uploaded images into OpenAI content parts.
@@ -116,7 +127,30 @@ def _normalize_chat_messages(messages: list) -> list:
     return chat_service.normalize_chat_messages(messages)
 
 
-async def _chat_response_stream(request: Request, messages, model, logged_in):
+async def _chat_response_stream(request: Request, messages, model, logged_in, dialog_id: str):
+    async def _tool_executor_with_persist(tool_call):
+        result_text = ""
+        error_text = ""
+        try:
+            result = _execute_tool(tool_call)
+            result_text = _serialize_tool_content(result)
+            return result
+        except Exception as error:
+            error_text = str(error)
+            raise
+        finally:
+            if dialog_id:
+                parsed_args = chat_service.parse_tool_arguments(tool_call, logger)
+                await chat_repository.create_tool_call_event(
+                    user_id=logged_in,
+                    dialog_id=dialog_id,
+                    tool_call_id=str(tool_call.get("id", "")),
+                    tool_name=str(tool_call.get("function", {}).get("name", "")),
+                    arguments=parsed_args,
+                    result_text=result_text,
+                    error_text=error_text,
+                )
+
     async for chunk in chat_service.chat_response_stream(
         request,
         messages,
@@ -127,7 +161,7 @@ async def _chat_response_stream(request: Request, messages, model, logged_in):
         provider_info_resolver=_resolve_provider_info,
         tool_models=MCP_MODELS,
         tools_loader=_list_mcp_tools,
-        tool_executor=_execute_tool,
+        tool_executor=_tool_executor_with_persist,
         logger=logger,
     ):
         yield chunk
@@ -138,8 +172,11 @@ async def chat_response_stream(request: Request):
         logged_in = await require_user_id_json(request, message="You must be logged in to use the chat")
         payload = await parse_json_payload(request, ChatStreamRequest)
         messages = _normalize_chat_messages([message.model_dump() for message in payload.messages])
+        dialog_id = str(payload.dialog_id).strip()
+        if dialog_id:
+            await chat_repository.get_dialog(logged_in, dialog_id)
         return StreamingResponse(
-            _chat_response_stream(request, messages, payload.model, logged_in),
+            _chat_response_stream(request, messages, payload.model, logged_in, dialog_id),
             media_type="text/event-stream",
         )
     except exceptions_validation.JSONError as e:
@@ -153,6 +190,7 @@ async def config_(request: Request):
     config_values = {
         "default_model": getattr(config, "DEFAULT_MODEL", ""),
         "use_katex": getattr(config, "USE_KATEX", False),
+        "show_mcp_tool_calls": SHOW_MCP_TOOL_CALLS,
     }
 
     return JSONResponse(config_values)
@@ -245,6 +283,8 @@ async def get_messages(request: Request):
         if not dialog_id:
             raise exceptions_validation.UserValidate("Dialog id is required")
         messages = await chat_repository.get_messages(user_id, dialog_id)
+        if not SHOW_MCP_TOOL_CALLS:
+            messages = [message for message in messages if message.get("role") != "tool"]
         return JSONResponse(messages)
     except exceptions_validation.UserValidate as e:
         return json_error(str(e), status_code=400)

@@ -149,6 +149,28 @@ class MessageImage(Base):
     )
 
 
+class ToolCallEvent(Base):
+    __tablename__ = "tool_call_event"
+    __table_args__ = (
+        Index("tool_call_event_dialog_id", "dialog_id"),
+        Index("tool_call_event_user_id", "user_id"),
+        Index("tool_call_event_tool_call_id", "tool_call_id"),
+        {"sqlite_autoincrement": True},
+    )
+
+    tool_call_event_id: Mapped[int | None] = mapped_column(primary_key=True, autoincrement=True, init=False)
+    dialog_id: Mapped[str] = mapped_column(ForeignKey("dialog.dialog_id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    tool_call_id: Mapped[str] = mapped_column(Text, nullable=False)
+    tool_name: Mapped[str] = mapped_column(Text, nullable=False)
+    arguments_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    result_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    error_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False, init=False
+    )
+
+
 class Prompt(Base):
     __tablename__ = "prompt"
     __table_args__ = (

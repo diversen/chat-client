@@ -84,6 +84,7 @@ class TestChatEndpoints(BaseTestCase):
         data = response.json()
         assert "default_model" in data
         assert "use_katex" in data
+        assert "show_mcp_tool_calls" in data
 
     def test_list_models(self):
         """Test GET /list (available models)"""

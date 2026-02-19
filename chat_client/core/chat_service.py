@@ -1,6 +1,7 @@
 import json
 import logging
 from collections.abc import AsyncIterator, Callable
+from inspect import isawaitable
 from typing import Any
 
 from openai import OpenAIError
@@ -288,7 +289,24 @@ async def chat_response_stream(
             tool_results: list[tuple[dict[str, Any], Any]] = []
             for tool_call in tool_calls:
                 result = tool_executor(tool_call)
+                if isawaitable(result):
+                    result = await result
                 tool_results.append((tool_call, result))
+                yield (
+                    "data: "
+                    + json.dumps(
+                        {
+                            "tool_call": {
+                                "tool_call_id": tool_call["id"],
+                                "tool_name": tool_call["function"]["name"],
+                                "arguments_json": tool_call["function"]["arguments"],
+                                "content": str(result),
+                                "error_text": "",
+                            }
+                        }
+                    )
+                    + "\n\n"
+                )
 
             messages.append({"role": "assistant", "tool_calls": tool_calls})
             for tool_call, result in tool_results:
