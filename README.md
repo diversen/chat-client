@@ -30,7 +30,7 @@ Example are e.g. `ollama` or `openai` etc.
 Install latest version of chat-client globaly:
 
 <!-- LATEST-VERSION-UV -->
-	uv tool install git+https://github.com/diversen/chat-client@v2.3.28
+	uv tool install git+https://github.com/diversen/chat-client@v2.3.29
 
 Make a dir for configuration and data:
 
@@ -63,7 +63,7 @@ You should checkout the `./data/config.py` file and change the configuration to 
 Upgrade to latest version
 
 <!-- LATEST-VERSION-UV-FORCE -->
-	uv tool install git+https://github.com/diversen/chat-client@v2.3.28 --force
+	uv tool install git+https://github.com/diversen/chat-client@v2.3.29 --force
 
 And then restart the running server instance. 
 
