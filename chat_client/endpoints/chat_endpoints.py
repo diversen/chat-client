@@ -194,7 +194,7 @@ async def create_message(request: Request):
     Save message to database
     """
     try:
-        user_id = await require_user_id_json(request, message="You must be logged in create a message")
+        user_id = await require_user_id_json(request, message="You must be logged in in order to create a message")
         dialog_id = str(request.path_params.get("dialog_id", "")).strip()
         if not dialog_id:
             raise exceptions_validation.UserValidate("Dialog id is required")
