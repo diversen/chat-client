@@ -54,10 +54,15 @@ PROVIDERS = {
     #     "base_url": "https://generativelanguage.googleapis.com/v1beta/openai/",
     #     "api_key": "API_KEY",
     # },
+    # "vllm": {
+    #     "base_url": "http://localhost:8000/v1",
+    #     "api_key": "ollama",
+    # },
     "ollama": {
         "base_url": "http://localhost:11434/v1",
         "api_key": "ollama",
     },
+    
 }
 
 # Set a Default model
