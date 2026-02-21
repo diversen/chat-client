@@ -241,6 +241,22 @@ nav svg {
     margin-bottom: 0;
 }
 
+.markdown-table {
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.markdown-table table {
+  width: 100%;
+  min-width: 600px;
+  border-collapse: collapse;
+}
+
+.markdown-table {
+  overscroll-behavior-x: contain;
+}
+
 #responses p {
     margin-top: 0;
 }
