@@ -362,6 +362,7 @@ class ConversationController {
                 if (this.config.show_mcp_tool_calls && chunk.toolCall) {
                     this.view.renderStaticToolMessage(chunk.toolCall, ui.container);
                 }
+                this.view.relaxAnchorSpacer();
             }
         } catch (error) {
             ui.loader.classList.add('hidden');
@@ -392,6 +393,7 @@ class ConversationController {
 
             this.messages.push({ ...assistantMessage, message_id: assistantMessageId });
             this.abortController = new AbortController();
+            this.view.clearAnchorSpacer();
         }
     }
 

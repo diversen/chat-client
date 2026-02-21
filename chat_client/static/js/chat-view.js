@@ -35,9 +35,24 @@ function ensureScrollRoomForMessage(container, navOffset) {
     const doc = document.documentElement;
     const maxScrollY = Math.max(0, doc.scrollHeight - window.innerHeight);
     const extraScrollNeeded = Math.max(0, targetScrollY - maxScrollY);
-    const spacer = getOrCreateAnchorSpacer();
-    spacer.style.height = `${Math.ceil(extraScrollNeeded)}px`;
+    setAnchorSpacerHeight(extraScrollNeeded, false);
     return targetScrollY;
+}
+
+function getAnchorSpacerHeight() {
+    const spacer = getOrCreateAnchorSpacer();
+    const inlineHeight = parseFloat(spacer.style.height);
+    if (Number.isFinite(inlineHeight)) {
+        return Math.max(0, inlineHeight);
+    }
+    const computedHeight = parseFloat(window.getComputedStyle(spacer).height);
+    return Number.isFinite(computedHeight) ? Math.max(0, computedHeight) : 0;
+}
+
+function setAnchorSpacerHeight(heightPx, animate = false) {
+    const spacer = getOrCreateAnchorSpacer();
+    spacer.style.transition = animate ? 'height 180ms ease-out' : 'none';
+    spacer.style.height = `${Math.max(0, Math.ceil(heightPx))}px`;
 }
 
 function createMessageElement(role, messageId = null) {
@@ -342,6 +357,14 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
         getSelectedModel() { return selectModelElem.value; },
         attachCopy(container, text) { renderCopyMessageButton(container, text); },
         hideEditForm(container) { hideEditForm(container); },
+        relaxAnchorSpacer(stepPx = 24) {
+            const current = getAnchorSpacerHeight();
+            if (current <= 0) return;
+            setAnchorSpacerHeight(current - stepPx, true);
+        },
+        clearAnchorSpacer() {
+            setAnchorSpacerHeight(0, false);
+        },
         async scrollMessageToTop(container) {
             if (!container) return;
 
