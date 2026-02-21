@@ -342,30 +342,37 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
         getSelectedModel() { return selectModelElem.value; },
         attachCopy(container, text) { renderCopyMessageButton(container, text); },
         hideEditForm(container) { hideEditForm(container); },
-        scrollMessageToTop(container) {
+        async scrollMessageToTop(container) {
             if (!container) return;
-            const topBar = document.querySelector('.top-bar');
-            const navOffset = topBar ? topBar.getBoundingClientRect().height : 80;
+
+            const getNavOffset = () => {
+                const topBar = document.querySelector('.top-bar');
+                return topBar ? topBar.getBoundingClientRect().height : 80;
+            };
 
             const align = () => {
                 if (!container.isConnected) return;
+                const navOffset = getNavOffset();
                 ensureScrollRoomForMessage(container, navOffset);
                 container.style.scrollMarginTop = `${Math.ceil(navOffset)}px`;
                 container.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
             };
 
-            // Align immediately, then retry across a few frames for late layout changes.
-            align();
-            let attemptsRemaining = 4;
-            const realign = () => {
-                if (!container.isConnected) return;
-                align();
-                attemptsRemaining -= 1;
-                if (attemptsRemaining > 0) {
-                    requestAnimationFrame(realign);
-                }
+            const isAligned = () => {
+                if (!container.isConnected) return true;
+                const navOffset = getNavOffset();
+                const top = container.getBoundingClientRect().top;
+                return Math.abs(top - navOffset) <= 2;
             };
-            requestAnimationFrame(realign);
+
+            // Wait for stable alignment before returning.
+            let attemptsRemaining = 12;
+            while (attemptsRemaining > 0) {
+                align();
+                await new Promise((resolve) => requestAnimationFrame(resolve));
+                if (isAligned()) break;
+                attemptsRemaining -= 1;
+            }
         },
         scrollToLastMessage() {
             window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });

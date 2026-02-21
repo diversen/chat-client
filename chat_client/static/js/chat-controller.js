@@ -299,7 +299,7 @@ class ConversationController {
                 images,
             );
 
-            this.view.scrollMessageToTop(userContainer);
+            await this.view.scrollMessageToTop(userContainer);
 
             await this.renderAssistantMessage();
         } catch (error) {
