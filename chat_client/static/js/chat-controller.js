@@ -281,13 +281,13 @@ class ConversationController {
                 this.dialogId = await this.storage.createDialog(title);
             }
 
-            this.messages.push(message);
-
             const userMessageId = await this.storage.createMessage(this.dialogId, {
                 role: 'user',
                 content: messageTextForStorage,
                 images,
             });
+
+            this.messages.push({ ...message, message_id: userMessageId });
 
             this.view.clearInput();
             this.clearPendingImages();
@@ -338,7 +338,8 @@ class ConversationController {
     }
 
     updateMessagesArray(editedMessageId, newContent) {
-        const index = this.messages.findIndex(m => m.message_id === editedMessageId || m.id === editedMessageId);
+        const targetId = String(editedMessageId);
+        const index = this.messages.findIndex((m) => String(m.message_id ?? m.id ?? '') === targetId);
         if (index === -1) return;
         if (this.messages[index]) this.messages[index].content = newContent;
         this.messages.splice(index + 1);
