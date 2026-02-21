@@ -318,6 +318,7 @@ class ConversationController {
 
         this.view.hideEditForm(container);
         this.removeMessagesAfter(container);
+        await this.view.scrollMessageToTop(container);
         this.updateMessagesArray(messageId, newContent);
         await this.renderAssistantMessage();
     }
