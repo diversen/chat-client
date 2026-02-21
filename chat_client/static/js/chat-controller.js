@@ -271,8 +271,6 @@ class ConversationController {
             const userMessage = messageElem.value.trim();
             const images = this.pendingImages.map((img) => ({ data_url: img.dataUrl }));
             if (!this.validateUserMessage(userMessage)) return;
-            const isContinuingDialog = this.messages.length > 0;
-
             const message = { role: 'user', content: userMessage, images: images };
             const messageTextForStorage = userMessage || `[${images.length} image${images.length > 1 ? 's' : ''} attached]`;
 
@@ -301,11 +299,7 @@ class ConversationController {
                 images,
             );
 
-            if (isContinuingDialog) {
-                this.view.scrollMessageToTop(userContainer);
-            } else {
-                this.view.scrollToLastMessage();
-            }
+            this.view.scrollMessageToTop(userContainer);
 
             await this.renderAssistantMessage();
         } catch (error) {

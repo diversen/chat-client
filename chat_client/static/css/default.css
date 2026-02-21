@@ -261,6 +261,11 @@ nav svg {
     margin-top: 0;
 }
 
+.responses-anchor-spacer {
+    height: 0;
+    pointer-events: none;
+}
+
 .copy-button {
     cursor: pointer;
     padding: 5px;

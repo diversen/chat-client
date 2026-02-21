@@ -11,6 +11,35 @@ import {
 import { addCopyButtons } from './app-copy-buttons.js';
 import { copyIcon, checkIcon, editIcon } from './app-icons.js';
 
+const ANCHOR_SPACER_CLASS = 'responses-anchor-spacer';
+
+function getOrCreateAnchorSpacer() {
+    let spacer = responsesElem.querySelector(`.${ANCHOR_SPACER_CLASS}`);
+    if (!spacer) {
+        spacer = document.createElement('div');
+        spacer.className = ANCHOR_SPACER_CLASS;
+        spacer.setAttribute('aria-hidden', 'true');
+        responsesElem.appendChild(spacer);
+    }
+    return spacer;
+}
+
+function appendBeforeAnchorSpacer(element) {
+    const spacer = getOrCreateAnchorSpacer();
+    responsesElem.insertBefore(element, spacer);
+}
+
+function ensureScrollRoomForMessage(container, navOffset) {
+    const targetTop = container.getBoundingClientRect().top + window.scrollY - navOffset;
+    const targetScrollY = Math.max(0, targetTop);
+    const doc = document.documentElement;
+    const maxScrollY = Math.max(0, doc.scrollHeight - window.innerHeight);
+    const extraScrollNeeded = Math.max(0, targetScrollY - maxScrollY);
+    const spacer = getOrCreateAnchorSpacer();
+    spacer.style.height = `${Math.ceil(extraScrollNeeded)}px`;
+    return targetScrollY;
+}
+
 function createMessageElement(role, messageId = null) {
     const containerClass = `${role.toLowerCase()}-message`;
     const messageContainer = document.createElement('div');
@@ -189,12 +218,12 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
             if (messageId) {
                 renderEditMessageButton(container, onEdit);
             }
-            responsesElem.appendChild(container);
+            appendBeforeAnchorSpacer(container);
             return container;
         },
         async renderStaticAssistantMessage(message, messageId = null) {
             const { container, contentElement } = createMessageElement('Assistant', messageId);
-            responsesElem.appendChild(container);
+            appendBeforeAnchorSpacer(container);
             renderCopyMessageButton(container, message);
             await renderStreamedResponseText(contentElement, message);
             await addCopyButtons(contentElement, config);
@@ -245,13 +274,13 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
             if (beforeElement && beforeElement.parentNode === responsesElem) {
                 responsesElem.insertBefore(container, beforeElement);
             } else {
-                responsesElem.appendChild(container);
+                appendBeforeAnchorSpacer(container);
             }
             return container;
         },
         createAssistantContainer() {
             const { container, contentElement, loader } = createMessageElement('Assistant');
-            responsesElem.appendChild(container);
+            appendBeforeAnchorSpacer(container);
             loader.classList.remove('hidden');
 
             const hiddenContentElem = document.createElement('div');
@@ -315,9 +344,10 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
         hideEditForm(container) { hideEditForm(container); },
         scrollMessageToTop(container) {
             if (!container) return;
-            const navOffset = 80;
-            const targetTop = container.getBoundingClientRect().top + window.scrollY - navOffset;
-            window.scrollTo({ top: Math.max(0, targetTop), behavior: 'auto' });
+            const topBar = document.querySelector('.top-bar');
+            const navOffset = topBar ? topBar.getBoundingClientRect().height : 80;
+            const targetScrollY = ensureScrollRoomForMessage(container, navOffset);
+            window.scrollTo({ top: targetScrollY, behavior: 'auto' });
         },
         scrollToLastMessage() {
             window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
