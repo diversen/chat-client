@@ -248,7 +248,7 @@ nav svg {
 }
 
 .markdown-table table {
-  width: 100%;
+  width: max-content; 
   min-width: 600px;
   border-collapse: collapse;
 }
