@@ -18,9 +18,7 @@ function initPromptsEditPage() {
         }
 
         const title = document.getElementById('title').value.trim();
-        const prompt =
-            document.getElementById('custom-prompt').value.trim();
-            document.getElementById('prompt').value.trim();
+        const prompt = document.getElementById('custom-prompt').value.trim();
 
         if (!title) {
             Flash.setMessage('Please enter a title.', 'error');
