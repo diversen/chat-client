@@ -261,6 +261,12 @@ nav svg {
     margin-top: 0;
 }
 
+.user-message,
+.assistant-message,
+.tool-message {
+    scroll-margin-top: var(--main-menu-top);
+}
+
 .responses-anchor-spacer {
     height: 0;
     pointer-events: none;
@@ -521,6 +527,7 @@ a.is-disabled-link {
 .role {
     font-weight: 900;
     font-size: 1.1em;
+    margin-top: 0;
     margin-bottom: 2px;
     display: flex;
     gap: 5px;

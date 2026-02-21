@@ -346,8 +346,26 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
             if (!container) return;
             const topBar = document.querySelector('.top-bar');
             const navOffset = topBar ? topBar.getBoundingClientRect().height : 80;
-            const targetScrollY = ensureScrollRoomForMessage(container, navOffset);
-            window.scrollTo({ top: targetScrollY, behavior: 'auto' });
+
+            const align = () => {
+                if (!container.isConnected) return;
+                ensureScrollRoomForMessage(container, navOffset);
+                container.style.scrollMarginTop = `${Math.ceil(navOffset)}px`;
+                container.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
+            };
+
+            // Align immediately, then retry across a few frames for late layout changes.
+            align();
+            let attemptsRemaining = 4;
+            const realign = () => {
+                if (!container.isConnected) return;
+                align();
+                attemptsRemaining -= 1;
+                if (attemptsRemaining > 0) {
+                    requestAnimationFrame(realign);
+                }
+            };
+            requestAnimationFrame(realign);
         },
         scrollToLastMessage() {
             window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
