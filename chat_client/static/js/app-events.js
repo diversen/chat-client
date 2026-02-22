@@ -5,6 +5,15 @@ import {
     promptElem,
 } from '/static/js/app-elements.js';
 
+function isLikelyPhoneDevice() {
+    if (navigator.userAgentData && typeof navigator.userAgentData.mobile === 'boolean') {
+        return navigator.userAgentData.mobile;
+    }
+
+    const userAgent = navigator.userAgent || '';
+    return /(iPhone|iPod|Android.*Mobile|Windows Phone|Mobile)/i.test(userAgent);
+}
+
 function initAppEvents() {
     if (!messageElem) {
         return;
@@ -50,7 +59,9 @@ function initAppEvents() {
         }
 
         messageElem.style.display = 'unset';
-        messageElem.focus();
+        if (window.location.pathname === '/' || !isLikelyPhoneDevice()) {
+            messageElem.focus();
+        }
         updateScrollToBottomPosition();
     }
 
