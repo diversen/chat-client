@@ -208,9 +208,7 @@ async def chat_response_stream(
     request: Request,
     messages: list[dict[str, Any]],
     model: str,
-    logged_in: int,
     *,
-    get_profile: Callable[[int], Any],
     openai_client_cls: Callable[..., Any],
     provider_info_resolver: Callable[[str], dict[str, Any]],
     tool_models: list[str],
@@ -218,12 +216,6 @@ async def chat_response_stream(
     tool_executor: Callable[[dict[str, Any]], Any],
     logger: logging.Logger,
 ) -> AsyncIterator[str]:
-    profile = await get_profile(logged_in)
-    if "system_message" in profile and profile["system_message"]:
-        system_message = profile["system_message"]
-        logger.debug(f"System message: {system_message}")
-        messages.insert(0, {"role": "user", "content": system_message})
-
     try:
         provider_info = provider_info_resolver(model)
 

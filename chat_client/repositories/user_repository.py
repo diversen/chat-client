@@ -222,7 +222,7 @@ async def update_profile(request: Request):
 
     form_data = await request.json()
 
-    allowed_fields = {"username", "dark_theme", "system_message"}
+    allowed_fields = {"username", "dark_theme"}
     if not allowed_fields.issuperset(form_data.keys()):
         raise exceptions_validation.UserValidate("Invalid form fields")
 

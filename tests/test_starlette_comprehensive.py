@@ -35,25 +35,24 @@ class TestStarletteBackend:
 
             # Test chat streaming with authentication
             with patch("chat_client.core.user_session.is_logged_in", return_value=1):
-                with patch("chat_client.repositories.user_repository.get_profile", return_value={"system_message": ""}):
-                    with patch("chat_client.endpoints.chat_endpoints.OpenAI") as mock_openai:
-                        # Mock the streaming response
-                        mock_response = MagicMock()
-                        mock_response.choices = [MagicMock()]
-                        mock_response.choices[0].delta = MagicMock()
-                        mock_response.choices[0].delta.content = "Test response"
-                        mock_response.choices[0].delta.tool_calls = None
-                        mock_response.choices[0].finish_reason = "stop"
-                        mock_response.model_dump.return_value = {"choices": [{"delta": {"content": "Test"}}]}
+                with patch("chat_client.endpoints.chat_endpoints.OpenAI") as mock_openai:
+                    # Mock the streaming response
+                    mock_response = MagicMock()
+                    mock_response.choices = [MagicMock()]
+                    mock_response.choices[0].delta = MagicMock()
+                    mock_response.choices[0].delta.content = "Test response"
+                    mock_response.choices[0].delta.tool_calls = None
+                    mock_response.choices[0].finish_reason = "stop"
+                    mock_response.model_dump.return_value = {"choices": [{"delta": {"content": "Test"}}]}
 
-                        mock_client = MagicMock()
-                        mock_client.chat.completions.create.return_value = [mock_response]
-                        mock_openai.return_value = mock_client
+                    mock_client = MagicMock()
+                    mock_client.chat.completions.create.return_value = [mock_response]
+                    mock_openai.return_value = mock_client
 
-                        response = client.post("/chat", json={"messages": [{"role": "user", "content": "Hello"}], "model": "test-model"})
-                        assert response.status_code == 200
-                        assert "text/event-stream" in response.headers["content-type"]
-                        print("  ✓ Chat streaming works when authenticated")
+                    response = client.post("/chat", json={"messages": [{"role": "user", "content": "Hello"}], "model": "test-model"})
+                    assert response.status_code == 200
+                    assert "text/event-stream" in response.headers["content-type"]
+                    print("  ✓ Chat streaming works when authenticated")
 
             # Test dialog creation without auth
             response = client.post("/chat/create-dialog", json={"title": "Test Dialog"})
@@ -178,7 +177,7 @@ class TestStarletteBackend:
                 # Get profile
                 with patch(
                     "chat_client.repositories.user_repository.get_profile",
-                    return_value={"email": "test@example.com", "system_message": "Test system message"},
+                    return_value={"email": "test@example.com", "username": "test-user"},
                 ):
                     response = client.get("/user/profile")
                     assert response.status_code == 200
@@ -187,7 +186,7 @@ class TestStarletteBackend:
 
                 # Update profile
                 with patch("chat_client.repositories.user_repository.update_profile", return_value=True):
-                    response = client.post("/user/profile", json={"system_message": "Updated system message"})
+                    response = client.post("/user/profile", json={"username": "Updated user"})
                     assert response.status_code == 200
                     data = response.json()
                     assert data["error"] is False

@@ -123,12 +123,10 @@ class TestChatEndpoints(BaseTestCase):
         assert data["error"] is True
 
     @patch("chat_client.endpoints.chat_endpoints.OpenAI")
-    @patch("chat_client.repositories.user_repository.get_profile")
     @patch("chat_client.core.user_session.is_logged_in")
-    def test_chat_response_stream_authenticated(self, mock_logged_in, mock_profile, mock_openai_class):
+    def test_chat_response_stream_authenticated(self, mock_logged_in, mock_openai_class):
         """Test POST /chat when authenticated"""
         mock_logged_in.return_value = 1
-        mock_profile.return_value = {"system_message": ""}
 
         # Mock OpenAI client
         mock_client = mock_openai_client()
@@ -140,12 +138,10 @@ class TestChatEndpoints(BaseTestCase):
         assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
 
     @patch("chat_client.endpoints.chat_endpoints.OpenAI")
-    @patch("chat_client.repositories.user_repository.get_profile")
     @patch("chat_client.core.user_session.is_logged_in")
-    def test_chat_response_stream_with_images(self, mock_logged_in, mock_profile, mock_openai_class):
+    def test_chat_response_stream_with_images(self, mock_logged_in, mock_openai_class):
         """Test POST /chat converts uploaded images into model content parts"""
         mock_logged_in.return_value = 1
-        mock_profile.return_value = {"system_message": ""}
 
         mock_client = mock_openai_client()
         mock_openai_class.return_value = mock_client
@@ -352,27 +348,3 @@ class TestChatEndpoints(BaseTestCase):
         assert response.status_code == 200
         data = response.json()
         assert data["error"] is False
-
-    @patch("chat_client.endpoints.chat_endpoints.OpenAI")
-    @patch("chat_client.repositories.user_repository.get_profile")
-    @patch("chat_client.core.user_session.is_logged_in")
-    def test_chat_streaming_with_system_message(self, mock_logged_in, mock_profile, mock_openai_class):
-        """Test chat streaming with system message in user profile"""
-        mock_logged_in.return_value = 1
-        mock_profile.return_value = {"system_message": "You are a helpful assistant."}
-
-        # Mock OpenAI client
-        mock_client = mock_openai_client()
-        mock_openai_class.return_value = mock_client
-
-        response = self.client.post("/chat", json={"messages": [{"role": "user", "content": "Hello"}], "model": "test-model"})
-
-        assert response.status_code == 200
-        assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
-
-        # Check that create was called with system message prepended
-        args, kwargs = mock_client.chat.completions.create.call_args
-        messages = kwargs["messages"]
-        assert len(messages) == 2  # system message + user message
-        assert messages[0]["role"] == "user"
-        assert messages[0]["content"] == "You are a helpful assistant."

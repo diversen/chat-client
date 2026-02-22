@@ -85,17 +85,12 @@ def test_chat_response_stream_closes_provider_stream_when_client_disconnects():
     client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **_: stream)))
     request = DummyRequest(disconnected_after_calls=1)
 
-    async def _get_profile(_user_id):
-        return {"system_message": ""}
-
     async def _run():
         chunks = []
         async for chunk in chat_service.chat_response_stream(
             request,
             messages=[{"role": "user", "content": "hi"}],
             model="test-model",
-            logged_in=1,
-            get_profile=_get_profile,
             openai_client_cls=lambda **_: client,
             provider_info_resolver=lambda _model: {},
             tool_models=[],
@@ -116,17 +111,12 @@ def test_chat_response_stream_closes_provider_stream_after_normal_completion():
     client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **_: stream)))
     request = DummyRequest(disconnected_after_calls=999)
 
-    async def _get_profile(_user_id):
-        return {"system_message": ""}
-
     async def _run():
         chunks = []
         async for chunk in chat_service.chat_response_stream(
             request,
             messages=[{"role": "user", "content": "hi"}],
             model="test-model",
-            logged_in=1,
-            get_profile=_get_profile,
             openai_client_cls=lambda **_: client,
             provider_info_resolver=lambda _model: {},
             tool_models=[],
@@ -182,9 +172,6 @@ def test_chat_response_stream_uses_two_phase_loop_for_tools():
     request = DummyRequest(disconnected_after_calls=999)
     executed_calls = []
 
-    async def _get_profile(_user_id):
-        return {"system_message": ""}
-
     def _tool_executor(tool_call):
         executed_calls.append(tool_call)
         timezone = chat_service.parse_tool_arguments(tool_call, logging.getLogger("test")).get("timezone", "")
@@ -196,8 +183,6 @@ def test_chat_response_stream_uses_two_phase_loop_for_tools():
             request,
             messages=[{"role": "user", "content": "compare times"}],
             model="tool-model",
-            logged_in=1,
-            get_profile=_get_profile,
             openai_client_cls=lambda **_: client,
             provider_info_resolver=lambda _model: {},
             tool_models=["tool-model"],
@@ -251,17 +236,12 @@ def test_chat_response_stream_tools_model_without_tool_calls_streams_on_second_c
     client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=_create)))
     request = DummyRequest(disconnected_after_calls=999)
 
-    async def _get_profile(_user_id):
-        return {"system_message": ""}
-
     async def _run():
         chunks = []
         async for chunk in chat_service.chat_response_stream(
             request,
             messages=[{"role": "user", "content": "hello"}],
             model="tool-model",
-            logged_in=1,
-            get_profile=_get_profile,
             openai_client_cls=lambda **_: client,
             provider_info_resolver=lambda _model: {},
             tool_models=["tool-model"],

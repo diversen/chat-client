@@ -236,7 +236,7 @@ class TestUserEndpoints(BaseTestCase):
     def test_profile_get_authenticated(self, mock_logged_in, mock_get_profile):
         """Test GET /user/profile when authenticated"""
         mock_logged_in.return_value = 1
-        mock_get_profile.return_value = {"email": "test@example.com", "system_message": "Test system message"}
+        mock_get_profile.return_value = {"email": "test@example.com", "username": "test-user"}
 
         response = self.client.get("/user/profile")
         assert response.status_code == 200
@@ -249,7 +249,7 @@ class TestUserEndpoints(BaseTestCase):
         mock_logged_in.return_value = 1
         mock_update.return_value = True
 
-        response = self.client.post("/user/profile", json={"system_message": "Updated system message"})
+        response = self.client.post("/user/profile", json={"username": "Updated user"})
 
         assert response.status_code == 200
         data = response.json()

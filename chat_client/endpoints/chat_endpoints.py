@@ -155,8 +155,6 @@ async def _chat_response_stream(request: Request, messages, model, logged_in, di
         request,
         messages,
         model,
-        logged_in,
-        get_profile=user_repository.get_profile,
         openai_client_cls=OpenAI,
         provider_info_resolver=_resolve_provider_info,
         tool_models=MCP_MODELS,
