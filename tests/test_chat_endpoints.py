@@ -86,6 +86,7 @@ class TestChatEndpoints(BaseTestCase):
         assert "use_katex" in data
         assert "show_mcp_tool_calls" in data
         assert "system_message_models" in data
+        assert "vision_models" in data
 
     def test_list_models(self):
         """Test GET /list (available models)"""
@@ -138,6 +139,7 @@ class TestChatEndpoints(BaseTestCase):
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
 
+    @patch("chat_client.endpoints.chat_endpoints.VISION_MODELS", ["test-model"])
     @patch("chat_client.endpoints.chat_endpoints.OpenAI")
     @patch("chat_client.core.user_session.is_logged_in")
     def test_chat_response_stream_with_images(self, mock_logged_in, mock_openai_class):
@@ -170,6 +172,38 @@ class TestChatEndpoints(BaseTestCase):
         assert isinstance(called_messages[0]["content"], list)
         assert called_messages[0]["content"][0]["type"] == "text"
         assert called_messages[0]["content"][1]["type"] == "image_url"
+
+    @patch("chat_client.endpoints.chat_endpoints.VISION_MODELS", [])
+    @patch("chat_client.endpoints.chat_endpoints.OpenAI")
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_chat_response_stream_with_images_strips_for_non_vision_model(self, mock_logged_in, mock_openai_class):
+        """Test POST /chat strips image uploads when model is not vision-enabled"""
+        mock_logged_in.return_value = 1
+
+        mock_client = mock_openai_client()
+        mock_openai_class.return_value = mock_client
+
+        response = self.client.post(
+            "/chat",
+            json={
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Describe this",
+                        "images": [
+                            {"data_url": "data:image/png;base64,AAAA"},
+                        ],
+                    }
+                ],
+                "model": "test-model",
+            },
+        )
+
+        assert response.status_code == 200
+        _ = response.content
+        called_messages = mock_client.chat.completions.create.call_args.kwargs["messages"]
+        assert called_messages[0]["role"] == "user"
+        assert called_messages[0]["content"] == "Describe this"
 
     @patch("chat_client.core.user_session.is_logged_in")
     def test_create_dialog_not_authenticated(self, mock_logged_in):
@@ -224,6 +258,7 @@ class TestChatEndpoints(BaseTestCase):
         data = response.json()
         assert data["error"] is True
 
+    @patch("chat_client.endpoints.chat_endpoints.VISION_MODELS", ["test-model"])
     @patch("chat_client.repositories.chat_repository.create_message")
     @patch("chat_client.core.user_session.is_logged_in")
     def test_create_message_authenticated(self, mock_logged_in, mock_create):
@@ -236,6 +271,7 @@ class TestChatEndpoints(BaseTestCase):
             json={
                 "content": "Test message",
                 "role": "user",
+                "model": "test-model",
                 "images": [{"data_url": "data:image/png;base64,AAAA"}],
             },
         )
@@ -250,6 +286,27 @@ class TestChatEndpoints(BaseTestCase):
             "Test message",
             [{"data_url": "data:image/png;base64,AAAA"}],
         )
+
+    @patch("chat_client.endpoints.chat_endpoints.VISION_MODELS", [])
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_create_message_rejects_non_vision_model_when_images_present(self, mock_logged_in):
+        """Test POST /chat/create-message/{dialog_id} rejects images for non-vision model"""
+        mock_logged_in.return_value = 1
+
+        response = self.client.post(
+            "/chat/create-message/test-dialog",
+            json={
+                "content": "Test message",
+                "role": "user",
+                "model": "test-model",
+                "images": [{"data_url": "data:image/png;base64,AAAA"}],
+            },
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert data["error"] is True
+        assert "does not support image inputs" in data["message"]
 
     @patch("chat_client.core.user_session.is_logged_in")
     def test_get_dialog_not_authenticated(self, mock_logged_in):

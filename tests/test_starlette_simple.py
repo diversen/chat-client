@@ -39,6 +39,7 @@ def test_basic_routes():
         assert response.status_code == 200, f"Config endpoint failed: {response.text}"
         data = response.json()
         assert "default_model" in data
+        assert "vision_models" in data
         print("✓ Config endpoint works")
 
         # Test models list endpoint

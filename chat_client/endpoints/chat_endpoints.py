@@ -40,6 +40,8 @@ MCP_TIMEOUT_SECONDS = float(getattr(config, "MCP_TIMEOUT_SECONDS", 20.0))
 MCP_TOOLS_CACHE_SECONDS = float(getattr(config, "MCP_TOOLS_CACHE_SECONDS", 60.0))
 SHOW_MCP_TOOL_CALLS = bool(getattr(config, "SHOW_MCP_TOOL_CALLS", False))
 SYSTEM_MESSAGE_MODELS = getattr(config, "SYSTEM_MESSAGE_MODELS", [])
+VISION_MODELS = getattr(config, "VISION_MODELS", [])
+DEBUG_CHAT_PAYLOAD_LOGS = True
 
 _mcp_tools_cache: list[dict] = []
 _mcp_tools_cache_at: float = 0.0
@@ -128,6 +130,45 @@ def _normalize_chat_messages(messages: list) -> list:
     return chat_service.normalize_chat_messages(messages)
 
 
+def _strip_images_from_messages(messages: list[dict]) -> list[dict]:
+    """
+    Remove image attachments from messages before sending to non-vision models.
+    """
+    stripped: list[dict] = []
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+        message_copy = dict(message)
+        message_copy["images"] = []
+        stripped.append(message_copy)
+    return stripped
+
+
+def _summarize_messages_for_log(messages: list[dict]) -> list[dict]:
+    """
+    Compact message summary for temporary chat payload debugging.
+    """
+    summaries: list[dict] = []
+    for index, message in enumerate(messages):
+        if not isinstance(message, dict):
+            summaries.append({"index": index, "invalid": True})
+            continue
+        role = str(message.get("role", "")).strip()
+        content = str(message.get("content", ""))
+        images = message.get("images", [])
+        image_count = len(images) if isinstance(images, list) else 0
+        summaries.append(
+            {
+                "index": index,
+                "role": role,
+                "has_images": image_count > 0,
+                "image_count": image_count,
+                "content_preview": content[:120],
+            }
+        )
+    return summaries
+
+
 async def _chat_response_stream(request: Request, messages, model, logged_in, dialog_id: str):
     async def _tool_executor_with_persist(tool_call):
         result_text = ""
@@ -170,7 +211,30 @@ async def chat_response_stream(request: Request):
     try:
         logged_in = await require_user_id_json(request, message="You must be logged in to use the chat")
         payload = await parse_json_payload(request, ChatStreamRequest)
-        messages = _normalize_chat_messages([message.model_dump() for message in payload.messages])
+        raw_messages = [message.model_dump() for message in payload.messages]
+        stripped_images = False
+        if DEBUG_CHAT_PAYLOAD_LOGS:
+            logger.warning(
+                "[CHAT-DEBUG] /chat input model=%s vision=%s messages=%s",
+                payload.model,
+                payload.model in VISION_MODELS,
+                _summarize_messages_for_log(raw_messages),
+            )
+        if payload.model not in VISION_MODELS:
+            raw_messages = _strip_images_from_messages(raw_messages)
+            stripped_images = True
+        if DEBUG_CHAT_PAYLOAD_LOGS:
+            logger.warning(
+                "[CHAT-DEBUG] /chat post-strip stripped_images=%s messages=%s",
+                stripped_images,
+                _summarize_messages_for_log(raw_messages),
+            )
+        messages = _normalize_chat_messages(raw_messages)
+        if DEBUG_CHAT_PAYLOAD_LOGS:
+            logger.warning(
+                "[CHAT-DEBUG] /chat normalized messages=%s",
+                _summarize_messages_for_log(messages),
+            )
         dialog_id = str(payload.dialog_id).strip()
         if dialog_id:
             await chat_repository.get_dialog(logged_in, dialog_id)
@@ -191,6 +255,7 @@ async def config_(request: Request):
         "use_katex": getattr(config, "USE_KATEX", False),
         "show_mcp_tool_calls": SHOW_MCP_TOOL_CALLS,
         "system_message_models": SYSTEM_MESSAGE_MODELS,
+        "vision_models": VISION_MODELS,
     }
 
     return JSONResponse(config_values)
@@ -238,6 +303,12 @@ async def create_message(request: Request):
             raise exceptions_validation.UserValidate("Dialog id is required")
 
         payload = await parse_json_payload(request, CreateMessageRequest)
+        if payload.role == "user" and payload.images:
+            selected_model = payload.model.strip()
+            if not selected_model:
+                raise exceptions_validation.UserValidate("Model is required when attaching images")
+            if selected_model not in VISION_MODELS:
+                raise exceptions_validation.UserValidate(chat_service.IMAGE_MODALITY_ERROR_MESSAGE)
         message_id = await chat_repository.create_message(
             user_id,
             dialog_id,

@@ -29,6 +29,7 @@ class CreateMessageRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
     role: str
     content: str
+    model: str = ""
     images: list[UploadedImageRequest] = Field(default_factory=list)
 
 

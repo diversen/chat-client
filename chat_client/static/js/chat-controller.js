@@ -11,6 +11,7 @@ import {
     imageInputElem,
     imagePreviewElem,
     attachImageButtonElem,
+    selectModelElem,
     imagePreviewModalElem,
     imagePreviewModalImageElem,
     imagePreviewModalCloseElem,
@@ -41,12 +42,30 @@ class ConversationController {
         this.pendingImages = [];
 
         this.wireUI();
+        this.updateImageAttachmentUI();
         this.updateSendButtonState();
+    }
+
+    isVisionModelSelected() {
+        const selectedModel = this.view.getSelectedModel();
+        const visionModels = Array.isArray(this.config.vision_models) ? this.config.vision_models : [];
+        return visionModels.includes(selectedModel);
+    }
+
+    updateImageAttachmentUI() {
+        const isVisionModel = this.isVisionModelSelected();
+        attachImageButtonElem.classList.toggle('hidden', !isVisionModel);
+        attachImageButtonElem.disabled = !isVisionModel;
+        imageInputElem.disabled = !isVisionModel;
+
+        if (!isVisionModel && this.pendingImages.length > 0) {
+            this.clearPendingImages();
+        }
     }
 
     updateSendButtonState() {
         const hasText = messageElem.value.trim().length > 0;
-        const hasImages = this.pendingImages.length > 0;
+        const hasImages = this.isVisionModelSelected() && this.pendingImages.length > 0;
         const canSend = !this.isStreaming && (hasText || hasImages);
 
         if (canSend) {
@@ -117,6 +136,13 @@ class ConversationController {
     }
 
     async handleImageSelection(files) {
+        if (!this.isVisionModelSelected()) {
+            this.clearPendingImages();
+            imageInputElem.value = '';
+            Flash.setMessage('The selected model does not support image inputs.', 'notice');
+            return;
+        }
+
         const selectedFiles = Array.from(files || []);
         if (!selectedFiles.length) return;
 
@@ -161,8 +187,19 @@ class ConversationController {
         });
 
         attachImageButtonElem.addEventListener('click', () => {
+            if (!this.isVisionModelSelected()) {
+                Flash.setMessage('The selected model does not support image inputs.', 'notice');
+                return;
+            }
             imageInputElem.click();
         });
+
+        if (selectModelElem) {
+            selectModelElem.addEventListener('change', () => {
+                this.updateImageAttachmentUI();
+                this.updateSendButtonState();
+            });
+        }
 
         imageInputElem.addEventListener('change', async (event) => {
             await this.handleImageSelection(event.target.files);
@@ -261,7 +298,7 @@ class ConversationController {
     }
 
     validateUserMessage(userMessage) {
-        const hasImages = this.pendingImages.length > 0;
+        const hasImages = this.isVisionModelSelected() && this.pendingImages.length > 0;
         return !!(this.isStreaming === false && (userMessage || hasImages));
     }
 
@@ -275,7 +312,9 @@ class ConversationController {
         try {
             await this.auth.ensure();
             const userMessage = messageElem.value.trim();
-            const images = this.pendingImages.map((img) => ({ data_url: img.dataUrl }));
+            const images = this.isVisionModelSelected()
+                ? this.pendingImages.map((img) => ({ data_url: img.dataUrl }))
+                : [];
             if (!this.validateUserMessage(userMessage)) return;
             const message = { role: 'user', content: userMessage, images: images };
             const messageTextForStorage = userMessage || `[${images.length} image${images.length > 1 ? 's' : ''} attached]`;
@@ -301,6 +340,7 @@ class ConversationController {
             const userMessageId = await this.storage.createMessage(this.dialogId, {
                 role: 'user',
                 content: messageTextForStorage,
+                model: this.view.getSelectedModel(),
                 images,
             });
 

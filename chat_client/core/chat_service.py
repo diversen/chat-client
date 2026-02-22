@@ -129,6 +129,21 @@ def normalize_chat_messages(messages: list[Any]) -> list[dict[str, Any]]:
     return normalized
 
 
+def has_image_inputs(messages: list[Any]) -> bool:
+    """
+    Check whether any user message includes attached images.
+    """
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+        if str(message.get("role", "")) != "user":
+            continue
+        images = message.get("images", [])
+        if isinstance(images, list) and len(images) > 0:
+            return True
+    return False
+
+
 def execute_tool(tool_call: dict[str, Any], tool_registry: dict[str, Callable[..., Any]], logger: logging.Logger) -> Any:
     """
     Execute a model tool call from the configured registry.

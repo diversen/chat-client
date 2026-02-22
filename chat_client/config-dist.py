@@ -86,9 +86,10 @@ if "ollama" in PROVIDERS:
         print("b) Edit the config.py file and remove the provider ollama")
         exit()
 
+
+VISION_MODELS = []
 # System models are models that are capable of injecting initial system instruction into the model template.
 # Not all models supports this, so we need to specify which models that should receive system instructions.
-
 SYSTEM_MESSAGE_MODELS: list = []
 
 # Models that should receive MCP tool definitions.

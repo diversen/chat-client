@@ -328,6 +328,10 @@ nav svg {
     cursor: pointer;
 }
 
+.actions button.hidden {
+    display: none;
+}
+
 .actions svg {
     fill: var(--selection);
     width: 40px;
