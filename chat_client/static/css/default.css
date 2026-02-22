@@ -108,7 +108,7 @@ nav svg {
     margin-right: auto;
     box-sizing: border-box;
     overflow: visible;
-    padding: 0 0 calc(20px + var(--prompt-height, 120px));
+    padding: 0px 10px calc(20px + var(--prompt-height, 120px));
     scrollbar-width: thin;
     white-space: normal;
     margin-top: 0;
@@ -257,14 +257,17 @@ nav svg {
   overscroll-behavior-x: contain;
 }
 
-#responses p {
-    margin-top: 0;
-}
 
 .user-message,
 .assistant-message,
 .tool-message {
     scroll-margin-top: var(--main-menu-top);
+    padding: 10px 0;
+}
+
+
+#responses p {
+    margin-top: 0;
 }
 
 .responses-anchor-spacer {
