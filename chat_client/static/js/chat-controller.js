@@ -274,9 +274,22 @@ class ConversationController {
             const message = { role: 'user', content: userMessage, images: images };
             const messageTextForStorage = userMessage || `[${images.length} image${images.length > 1 ? 's' : ''} attached]`;
 
-            if (this.messages.length === 0) {
+            if (!this.dialogId) {
                 const title = userMessage || `Image message (${images.length})`;
                 this.dialogId = await this.storage.createDialog(title);
+
+                // If this chat started from a custom prompt, persist that prompt
+                // as the first message only when the user sends their first addition.
+                if (this.messages.length > 0) {
+                    for (const priorMessage of this.messages) {
+                        if (priorMessage.role !== 'user') continue;
+                        await this.storage.createMessage(this.dialogId, {
+                            role: 'user',
+                            content: priorMessage.content,
+                            images: priorMessage.images || [],
+                        });
+                    }
+                }
             }
 
             const userMessageId = await this.storage.createMessage(this.dialogId, {
@@ -433,10 +446,21 @@ class ConversationController {
             const promptData = await Requests.asyncGetJson(`/prompt/${promptID}/json`);
             const promptText = promptData.prompt.prompt;
 
-            this.dialogId = await this.storage.createDialog(promptText);
-            await this.storage.createMessage(this.dialogId, { role: 'user', content: promptText });
-            window.history.replaceState({}, document.title, `/chat/${this.dialogId}`);
-            await this.initializeDialog(this.dialogId);
+            const promptContainer = this.view.renderStaticUserMessage(
+                promptText,
+                null,
+                async (id, newContent, container) => {
+                    await this.handleMessageUpdate(id, newContent, container);
+                },
+                [],
+            );
+            await this.view.scrollMessageToTop(promptContainer);
+
+            this.messages = [{ role: 'user', content: promptText, images: [] }];
+
+            const url = new URL(window.location.href);
+            url.searchParams.delete('id');
+            window.history.replaceState({}, document.title, `${url.pathname}${url.search}`);
         } catch (error) {
             console.error('Error in initializeFromPrompt:', error);
             Flash.setMessage('An error occurred while initializing from prompt.', 'error');
