@@ -61,8 +61,9 @@ function setAnchorSpacerHeight(heightPx, animate = false) {
     spacer.style.height = `${Math.max(0, Math.ceil(heightPx))}px`;
 }
 
-function createMessageElement(role, messageId = null) {
-    const containerClass = `${role.toLowerCase()}-message`;
+function createMessageElement(role, messageId = null, containerRole = null) {
+    const resolvedContainerRole = (containerRole || role).toLowerCase();
+    const containerClass = `${resolvedContainerRole}-message`;
     const messageContainer = document.createElement('div');
     messageContainer.classList.add(containerClass);
 
@@ -226,8 +227,9 @@ function createMessageImages(images = []) {
 
 function createChatView({ config, renderStreamedResponseText, updateContentDiff }) {
     return {
-        renderStaticUserMessage(message, messageId = null, onEdit, images = []) {
-            const { container, contentElement } = createMessageElement('User', messageId);
+        renderStaticUserMessage(message, messageId = null, onEdit, images = [], displayRole = 'User') {
+            const safeDisplayRole = String(displayRole || 'User');
+            const { container, contentElement } = createMessageElement(safeDisplayRole, messageId, 'User');
             const imagePreview = createMessageImages(images);
             if (imagePreview) {
                 contentElement.insertAdjacentElement('beforebegin', imagePreview);

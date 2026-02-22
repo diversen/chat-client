@@ -265,6 +265,12 @@ class ConversationController {
         return !!(this.isStreaming === false && (userMessage || hasImages));
     }
 
+    getInitialPromptRole() {
+        const selectedModel = this.view.getSelectedModel();
+        const systemMessageModels = Array.isArray(this.config.system_message_models) ? this.config.system_message_models : [];
+        return systemMessageModels.includes(selectedModel) ? 'system' : 'user';
+    }
+
     async sendUserMessage() {
         try {
             await this.auth.ensure();
@@ -282,9 +288,9 @@ class ConversationController {
                 // as the first message only when the user sends their first addition.
                 if (this.messages.length > 0) {
                     for (const priorMessage of this.messages) {
-                        if (priorMessage.role !== 'user') continue;
+                        if (priorMessage.role !== 'user' && priorMessage.role !== 'system') continue;
                         await this.storage.createMessage(this.dialogId, {
-                            role: 'user',
+                            role: priorMessage.role,
                             content: priorMessage.content,
                             images: priorMessage.images || [],
                         });
@@ -410,11 +416,12 @@ class ConversationController {
     }
 
     async loadDialog(savedMessages) {
-        this.messages = savedMessages.filter((msg) => msg.role === 'user' || msg.role === 'assistant');
+        this.messages = savedMessages.filter((msg) => msg.role === 'user' || msg.role === 'system' || msg.role === 'assistant');
         responsesElem.innerHTML = '';
 
         for (const msg of savedMessages) {
-            if (msg.role === 'user') {
+            if (msg.role === 'user' || msg.role === 'system') {
+                const displayRole = msg.role === 'system' ? 'System' : 'User';
                 this.view.renderStaticUserMessage(
                     msg.content,
                     msg.message_id,
@@ -422,6 +429,7 @@ class ConversationController {
                         await this.handleMessageUpdate(id, newContent, container);
                     },
                     msg.images || [],
+                    displayRole,
                 );
             } else if (msg.role === 'tool' && this.config.show_mcp_tool_calls) {
                 this.view.renderStaticToolMessage(msg);
@@ -445,6 +453,7 @@ class ConversationController {
         try {
             const promptData = await Requests.asyncGetJson(`/prompt/${promptID}/json`);
             const promptText = promptData.prompt.prompt;
+            const promptRole = this.getInitialPromptRole();
 
             const promptContainer = this.view.renderStaticUserMessage(
                 promptText,
@@ -453,10 +462,11 @@ class ConversationController {
                     await this.handleMessageUpdate(id, newContent, container);
                 },
                 [],
+                promptRole === 'system' ? 'System' : 'User',
             );
             await this.view.scrollMessageToTop(promptContainer);
 
-            this.messages = [{ role: 'user', content: promptText, images: [] }];
+            this.messages = [{ role: promptRole, content: promptText, images: [] }];
 
             const url = new URL(window.location.href);
             url.searchParams.delete('id');

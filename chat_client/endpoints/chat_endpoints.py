@@ -39,6 +39,7 @@ MCP_AUTH_TOKEN = getattr(config, "MCP_AUTH_TOKEN", "")
 MCP_TIMEOUT_SECONDS = float(getattr(config, "MCP_TIMEOUT_SECONDS", 20.0))
 MCP_TOOLS_CACHE_SECONDS = float(getattr(config, "MCP_TOOLS_CACHE_SECONDS", 60.0))
 SHOW_MCP_TOOL_CALLS = bool(getattr(config, "SHOW_MCP_TOOL_CALLS", False))
+SYSTEM_MESSAGE_MODELS = getattr(config, "SYSTEM_MESSAGE_MODELS", [])
 
 _mcp_tools_cache: list[dict] = []
 _mcp_tools_cache_at: float = 0.0
@@ -189,6 +190,7 @@ async def config_(request: Request):
         "default_model": getattr(config, "DEFAULT_MODEL", ""),
         "use_katex": getattr(config, "USE_KATEX", False),
         "show_mcp_tool_calls": SHOW_MCP_TOOL_CALLS,
+        "system_message_models": SYSTEM_MESSAGE_MODELS,
     }
 
     return JSONResponse(config_values)
