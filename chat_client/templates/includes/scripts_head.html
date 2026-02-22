@@ -7,13 +7,20 @@
 {% endif %}
 
 <meta name="viewport" content="width=device-width initial-scale=1.0 interactive-widget=resizes-content">
+<meta name="color-scheme" content="light dark">
 
-{% if profile.dark_theme %}
+{% set theme_preference = profile.theme_preference if profile.theme_preference in ["light", "dark", "system"] else "system" %}
+{% if theme_preference == "dark" %}
 <link id="theme-select" rel="stylesheet" href="/static/css/dark.css?version={{ version }}">
 <link rel="stylesheet" href="/static/dist/atom-one-dark.css?version={{ version }}">
+{% elif theme_preference == "light" %}
+<link id="theme-select" rel="stylesheet" href="/static/css/light.css?version={{ version }}">
+<link rel="stylesheet" href="/static/dist/atom-one-light.css?version={{ version }}">
 {% else %}
 <link id="theme-select" rel="stylesheet" href="/static/css/light.css?version={{ version }}">
 <link rel="stylesheet" href="/static/dist/atom-one-light.css?version={{ version }}">
+<link rel="stylesheet" href="/static/css/dark.css?version={{ version }}" media="(prefers-color-scheme: dark)">
+<link rel="stylesheet" href="/static/dist/atom-one-dark.css?version={{ version }}" media="(prefers-color-scheme: dark)">
 {% endif %}
 
 {% if use_katex %}

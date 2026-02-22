@@ -9,15 +9,19 @@
 
 <main class="default-container">
     <h3>Profile</h3>
+    {% set theme_preference = profile.theme_preference if profile.theme_preference in ["light", "dark", "system"] else "system" %}
 
     <form method="post" action="/user/profile" class="profile-form">
         <label for="username">Your Username</label>
         <input type="text" id="username" name="username" placeholder="Your username" aria-label="Username"
             value="{{ profile.username }}" autocomplete="off" required>
-        <div class="checkbox-container">
-            <label for="dark_theme">Dark theme</label>
-            <input type="checkbox" aria-label="Dark mode" value="1" id="dark_theme" name="dark_theme" {% if
-                profile.dark_theme %}checked{% endif %}>
+        <div>
+            <label for="theme_preference">Theme</label>
+            <select id="theme_preference" name="theme_preference" aria-label="Theme preference">
+                <option value="system" {% if theme_preference == "system" %}selected{% endif %}>System default</option>
+                <option value="light" {% if theme_preference == "light" %}selected{% endif %}>Light</option>
+                <option value="dark" {% if theme_preference == "dark" %}selected{% endif %}>Dark</option>
+            </select>
         </div>
         <button id="save">Save</button>
     </form>

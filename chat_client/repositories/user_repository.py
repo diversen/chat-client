@@ -18,6 +18,7 @@ from sqlalchemy import select
 from chat_client.database.db_session import async_session
 
 logger: logging.Logger = logging.getLogger(__name__)
+THEME_PREFERENCES = {"system", "light", "dark"}
 
 
 def _password_hash(password: str, cost: int = 12) -> str:
@@ -222,14 +223,29 @@ async def update_profile(request: Request):
 
     form_data = await request.json()
 
-    allowed_fields = {"username", "dark_theme"}
+    allowed_fields = {"username", "dark_theme", "theme_preference"}
     if not allowed_fields.issuperset(form_data.keys()):
         raise exceptions_validation.UserValidate("Invalid form fields")
+
+    theme_preference = form_data.get("theme_preference")
+    if theme_preference is not None:
+        if not isinstance(theme_preference, str):
+            raise exceptions_validation.UserValidate("Invalid theme preference")
+        theme_preference = theme_preference.strip().lower()
+        if theme_preference not in THEME_PREFERENCES:
+            raise exceptions_validation.UserValidate("Invalid theme preference")
+        form_data["theme_preference"] = theme_preference
+    elif "dark_theme" in form_data:
+        form_data["theme_preference"] = "dark" if bool(form_data.get("dark_theme")) else "light"
 
     async with async_session() as session:
         cache = DatabaseCache(session)
         cache_key = f"user_{user_id}"
-        await cache.set(cache_key, form_data)
+        current_profile = await cache.get(cache_key)
+        if not isinstance(current_profile, dict):
+            current_profile = {}
+        merged_profile = {**current_profile, **form_data}
+        await cache.set(cache_key, _normalize_profile_theme(merged_profile))
 
 
 async def get_profile(user_id: int):
@@ -242,4 +258,27 @@ async def get_profile(user_id: int):
         profile = await cache.get(cache_key)
         if not profile:
             profile = {}
-        return profile
+        if not isinstance(profile, dict):
+            profile = {}
+        return _normalize_profile_theme(profile)
+
+
+def _normalize_profile_theme(profile: dict) -> dict:
+    normalized_profile = dict(profile)
+    theme_preference = normalized_profile.get("theme_preference")
+
+    if isinstance(theme_preference, str):
+        theme_preference = theme_preference.strip().lower()
+    if theme_preference not in THEME_PREFERENCES:
+        if "dark_theme" in normalized_profile:
+            theme_preference = "dark" if bool(normalized_profile.get("dark_theme")) else "light"
+        else:
+            theme_preference = "system"
+
+    normalized_profile["theme_preference"] = theme_preference
+    if theme_preference == "system":
+        normalized_profile.pop("dark_theme", None)
+    else:
+        normalized_profile["dark_theme"] = theme_preference == "dark"
+
+    return normalized_profile

@@ -16,7 +16,7 @@ function initUsersProfilePage() {
         try {
             const jsonData = {
                 username: document.getElementById('username')?.value,
-                dark_theme: document.getElementById('dark_theme')?.checked,
+                theme_preference: document.getElementById('theme_preference')?.value,
             };
 
             await Requests.asyncPostJson('/user/profile', jsonData);
