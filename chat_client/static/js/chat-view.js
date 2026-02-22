@@ -30,12 +30,18 @@ function appendBeforeAnchorSpacer(element) {
 }
 
 function ensureScrollRoomForMessage(container, navOffset) {
+    const currentSpacerHeight = getAnchorSpacerHeight();
     const targetTop = container.getBoundingClientRect().top + window.scrollY - navOffset;
     const targetScrollY = Math.max(0, targetTop);
     const doc = document.documentElement;
-    const maxScrollY = Math.max(0, doc.scrollHeight - window.innerHeight);
-    const extraScrollNeeded = Math.max(0, targetScrollY - maxScrollY);
-    setAnchorSpacerHeight(extraScrollNeeded, false);
+    // Compute max scroll without the existing spacer so we don't collapse
+    // spacer room that is still required for top alignment.
+    const baseScrollHeight = Math.max(0, doc.scrollHeight - currentSpacerHeight);
+    // Keep this unclamped: when content is shorter than viewport, the negative
+    // delta tells us exactly how much spacer is needed to make top alignment possible.
+    const baseScrollDelta = baseScrollHeight - window.innerHeight;
+    const requiredSpacerHeight = Math.max(0, targetScrollY - baseScrollDelta);
+    setAnchorSpacerHeight(requiredSpacerHeight, false);
     return targetScrollY;
 }
 
