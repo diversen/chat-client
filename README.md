@@ -16,9 +16,9 @@ Create a user and log into the interface using `gemma3:270m` running fairly well
 
 ## Requirements
 
-Access to a chat service that can use the OpenAI API. This can be a local or remote instance of the chat service. 
+Access to a chat service that can use the OpenAI API. This can be a local or remote instance of a LLM server. The server should support the OpenAI API.
 
-Can connect to models served by `ollama`, `vllm`, `openai`, `gemini` etc.  
+Can connect to models served by e.g. `ollama` or `vllm`. It can serve models from e.g. `openai` or `gemini`.  
 
 ## Features
 
@@ -33,8 +33,7 @@ Can connect to models served by `ollama`, `vllm`, `openai`, `gemini` etc.
 * Custom system prompts
 * Tool calling using MCP (Model-Controller-Plugin) architecture. 
 
-
-## Installation using pipx
+## Installation using uv
 
 Install latest version of chat-client globally:
 
