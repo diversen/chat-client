@@ -3,17 +3,15 @@ import { markdownItTable } from '/static/dist/markdown-it-table.js';
 /**
  * markdown-it is loaded in the head of the HTML file.
  */
-const md = markdownit('commonmark');
 const mdNoHTML = markdownit('commonmark', { html: false });
 
-md.use(markdownItTable);
 mdNoHTML.use(markdownItTable);
 
 /**
  * Add target/_blank + rel noopener noreferrer to links
  */
 const defaultLinkOpen =
-  md.renderer.rules.link_open ||
+  mdNoHTML.renderer.rules.link_open ||
   function (tokens, idx, options, env, self) {
     return self.renderToken(tokens, idx, options);
   };
@@ -38,7 +36,6 @@ const mdLinkOpen = function (tokens, idx, options, env, self) {
   return defaultLinkOpen(tokens, idx, options, env, self);
 };
 
-md.renderer.rules.link_open = mdLinkOpen;
 mdNoHTML.renderer.rules.link_open = mdLinkOpen;
 
 /**
@@ -70,7 +67,6 @@ function addTableWrapper(instance) {
   };
 }
 
-addTableWrapper(md);
 addTableWrapper(mdNoHTML);
 
-export { md, mdNoHTML };
+export { mdNoHTML };
