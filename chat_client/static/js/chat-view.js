@@ -365,14 +365,6 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
         getSelectedModel() { return selectModelElem.value; },
         attachCopy(container, text) { renderCopyMessageButton(container, text); },
         hideEditForm(container) { hideEditForm(container); },
-        relaxAnchorSpacer(stepPx = 24) {
-            const current = getAnchorSpacerHeight();
-            if (current <= 0) return;
-            setAnchorSpacerHeight(current - stepPx, true);
-        },
-        clearAnchorSpacer() {
-            setAnchorSpacerHeight(0, false);
-        },
         async scrollMessageToTop(container) {
             if (!container) return;
 
