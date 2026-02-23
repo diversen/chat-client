@@ -6,6 +6,12 @@ Use the simple `chat-client` to chat with a local or remote LLM.
 
 Install as a python tool and run the server. Then connect to the server using the web interface.
 
+## Demo
+
+Try the demo at: https://chat.10kilobyte.com
+
+Create a user and log into the interface using `gemma3:270m` running fairly well on CPU. 
+
 ## Requirements
 
 Access to a chat service that can use the OpenAI API. This can be a local or remote instance of the chat service. 
@@ -17,13 +23,13 @@ Can connect to models served by `ollama`, `vllm`, `openai`, `gemini` etc.
 * User authentication and registration
 * Highlight code
 * Highlight KaTeX math
-* Dark and light mode
-* User dialog history
-* User dialog management (delete dialogs)
+* Dark, light, system mode
+* Chat history
+* Chat management (edit, continue, or delete chats)
 * Copy dialog message to clipboard
-* Load and continue saved dialogs
-* Upload images (use vision models)
-* MCP tool support (if enabled)
+* Upload images. Supports vision models.
+* Custom system prompts
+* Tool calling using MCP (Model-Controller-Plugin) architecture. 
 
 
 ## Installation using pipx
