@@ -61,6 +61,18 @@ function setAnchorSpacerHeight(heightPx, animate = false) {
     spacer.style.height = `${Math.max(0, Math.ceil(heightPx))}px`;
 }
 
+function getBaseScrollHeight() {
+    const doc = document.documentElement;
+    return Math.max(0, doc.scrollHeight - getAnchorSpacerHeight());
+}
+
+function consumeAnchorSpacerBy(usedHeightPx, animate = false) {
+    if (!Number.isFinite(usedHeightPx) || usedHeightPx <= 0) return;
+    const current = getAnchorSpacerHeight();
+    if (current <= 0) return;
+    setAnchorSpacerHeight(Math.max(0, current - usedHeightPx), animate);
+}
+
 function createMessageElement(role, messageId = null, containerRole = null) {
     const resolvedContainerRole = (containerRole || role).toLowerCase();
     const containerClass = `${resolvedContainerRole}-message`;
@@ -312,6 +324,7 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
 
             let streamedResponseText = '';
             let reasoningActive = false;
+            let lastBaseScrollHeight = getBaseScrollHeight();
 
             return {
                 container,
@@ -333,11 +346,21 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                 },
                 async appendContent(text, force = false) {
                     streamedResponseText += text;
+                    const beforeBaseScrollHeight = lastBaseScrollHeight;
                     await updateContentDiff(contentElement, hiddenContentElem, streamedResponseText, force);
+                    const afterBaseScrollHeight = getBaseScrollHeight();
+                    const consumedHeight = Math.max(0, afterBaseScrollHeight - beforeBaseScrollHeight);
+                    consumeAnchorSpacerBy(consumedHeight, false);
+                    lastBaseScrollHeight = afterBaseScrollHeight;
                 },
                 async finalize() {
                     this.closeReasoningIfOpen();
+                    const beforeBaseScrollHeight = lastBaseScrollHeight;
                     await updateContentDiff(contentElement, hiddenContentElem, streamedResponseText, true);
+                    const afterBaseScrollHeight = getBaseScrollHeight();
+                    const consumedHeight = Math.max(0, afterBaseScrollHeight - beforeBaseScrollHeight);
+                    consumeAnchorSpacerBy(consumedHeight, false);
+                    lastBaseScrollHeight = afterBaseScrollHeight;
                     return streamedResponseText;
                 },
             };
