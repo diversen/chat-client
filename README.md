@@ -4,7 +4,7 @@ Use the simple `chat-client` to chat with a local or remote LLM.
 	
 [![chat-client](docs/screenshot.png)](docs/screenshot.png)
 
-Install as a python tool and run the server. Then connect to the server using the web interface.
+Install as a python tool with a sqlite3 backend and run the server. Then connect to the server using the web interface.
 
 ## Demo
 
@@ -31,7 +31,7 @@ Can connect to models served by e.g. `ollama` or `vllm`. It can serve models fro
 * Copy dialog message to clipboard
 * Upload images. Supports vision models.
 * Custom system prompts
-* Tool calling using MCP (Model-Controller-Plugin) architecture. 
+* Tool calling using MCP (Model Context Protocol) protocol. 
 
 ## Installation using uv
 
@@ -43,7 +43,7 @@ Install latest version of chat-client globally:
 Initialize the configuration and data dir:
 
 ```bash
-# Generate config and data dir
+# Generate data dir with data/config.py file
 chat-client
 
 # Run initial migrations
@@ -51,9 +51,11 @@ chat-client init-system
 
 # create a user
 chat-client create-user
+```
 
-# start dev server. This will work if ollama is installed and running
-# You should have access to all ollama models
+Edit the `data/config.py` file to set the LLM provider and a model you want to use. Then start the server:
+
+```
 chat-client server-dev
 ```
 
