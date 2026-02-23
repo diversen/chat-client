@@ -4,7 +4,7 @@ Use the simple `chat-client` to chat with a local or remote LLM.
 	
 [![chat-client](docs/screenshot.png)](docs/screenshot.png)
 
-Install as a python tool with a sqlite3 backend and run the server. Then connect to the server using the web interface.
+Simple python tool utilizing a sqlite3 backend and a minimal HTML / JavaScript frontend.
 
 ## Demo
 
@@ -16,9 +16,9 @@ Create a user and log into the interface using `gemma3:270m` running fairly well
 
 ## Requirements
 
-Access to a chat service that can use the OpenAI API. This can be a local or remote instance of a LLM server. The server should support the OpenAI API.
+Access to any chat service that can use the OpenAI API. This can be a local or remote instance of a LLM server. The server should support the OpenAI API.
 
-Can connect to models served by e.g. `ollama` or `vllm`. It can serve models from e.g. `openai` or `google`.  
+You can connect to local models served by `ollama` or `vllm` instances. Or serve models from remote APIs like `openai` or `google`.  
 
 ## Features
 
