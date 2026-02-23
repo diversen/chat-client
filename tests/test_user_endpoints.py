@@ -181,6 +181,20 @@ class TestUserEndpoints(BaseTestCase):
         assert data["error"] is True
         assert "User not found" in data["message"]
 
+    @patch("chat_client.repositories.user_repository.reset_password")
+    def test_reset_password_post_invalid_email(self, mock_reset):
+        """Test password reset with invalid email format"""
+        from chat_client.core.exceptions_validation import UserValidate
+
+        mock_reset.side_effect = UserValidate("Invalid email")
+
+        response = self.client.post("/user/reset", json={"email": "not-an-email"})
+
+        assert response.status_code == 400
+        data = response.json()
+        assert data["error"] is True
+        assert "Invalid email" in data["message"]
+
     def test_new_password_get(self):
         """Test GET /user/new-password with token"""
         response = self.client.get("/user/new-password?token=test-token")

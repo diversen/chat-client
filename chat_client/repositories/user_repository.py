@@ -159,6 +159,7 @@ async def login_user(request: Request):
 async def reset_password(request: Request):
     form = await request.form()
     email = str(form.get("email"))
+    _is_valid_email(email)
 
     await _validate_captcha(request)
 
