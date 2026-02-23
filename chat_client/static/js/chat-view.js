@@ -315,7 +315,11 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
         },
         createAssistantContainer() {
             const { container, contentElement, loader } = createMessageElement('Assistant');
+            const beforeBaseScrollHeight = getBaseScrollHeight();
             appendBeforeAnchorSpacer(container);
+            const afterBaseScrollHeight = getBaseScrollHeight();
+            const consumedOnInsert = Math.max(0, afterBaseScrollHeight - beforeBaseScrollHeight);
+            consumeAnchorSpacerBy(consumedOnInsert, false);
             loader.classList.remove('hidden');
 
             const hiddenContentElem = document.createElement('div');
@@ -401,7 +405,7 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                 const navOffset = getNavOffset();
                 ensureScrollRoomForMessage(container, navOffset);
                 container.style.scrollMarginTop = `${Math.ceil(navOffset)}px`;
-                container.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'auto' });
+                container.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'smooth' });
             };
 
             const isAligned = () => {
