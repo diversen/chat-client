@@ -1,47 +1,42 @@
 # chat client
 
 Use the simple `chat-client` to chat with a local or remote LLM.
-
+	
 [![chat-client](docs/screenshot.png)](docs/screenshot.png)
+
+Install as a python tool and run the server. Then connect to the server using the web interface.
 
 ## Requirements
 
 Access to a chat service that can use the OpenAI API. This can be a local or remote instance of the chat service. 
 
-Example are e.g. `ollama` or `openai` etc. 
+Can connect to models served by `ollama`, `vllm`, `openai`, `gemini` etc.  
 
 ## Features
 
-* user authentication and registration
-* highlight code
-* highlight KaTeX math
-* dark and light mode
-* user dialog history
-* user dialog management (delete dialogs)
-* copy dialog message to clipboard
-* load and continue saved dialogs
+* User authentication and registration
+* Highlight code
+* Highlight KaTeX math
+* Dark and light mode
+* User dialog history
+* User dialog management (delete dialogs)
+* Copy dialog message to clipboard
+* Load and continue saved dialogs
 * Upload images (use vision models)
 * MCP tool support (if enabled)
-* supports ollama and openai models (and others that models that support the openai api)
-* easily enable all chat models (or any other provider that can use the openai api)
+
 
 ## Installation using pipx
 
-Install latest version of chat-client globaly:
+Install latest version of chat-client globally:
 
 <!-- LATEST-VERSION-UV -->
 	uv tool install git+https://github.com/diversen/chat-client@v2.3.35
 
-Make a dir for configuration and data:
-
-```bash
-mkdir chat_test
-cd chat_test
-```
-
 Initialize the configuration and data dir:
 
 ```bash
+# Generate config and data dir
 chat-client
 
 # Run initial migrations
@@ -55,10 +50,9 @@ chat-client create-user
 chat-client server-dev
 ```
 
-All data is stored in `./data/` directory. E.g. `log files` and sqlite3 `database`.
-You should checkout the `./data/config.py` file and change the configuration to fit your needs. 
+All data is stored in `./data/` directory of the running instance. E.g. `log files` and sqlite3 `database`. You should checkout the `./data/config.py` file and change the configuration to fit your needs. 
 
-## Upgrade using pipx
+## Upgrade using uv
 
 Upgrade to latest version
 
@@ -66,16 +60,5 @@ Upgrade to latest version
 	uv tool install git+https://github.com/diversen/chat-client@v2.3.35 --force
 
 And then restart the running server instance. 
-
-## Installation using uv and pip
-
-```bash
-git clone https://github.com/diversen/chat-client.git
-cd chat-client
-uv venv
-source .venv/bin/activate
-uv pip install -r requirements.txt
-uv pip install -e .
-```
 
 MIT © [Dennis Iversen](https://github.com/diversen)
