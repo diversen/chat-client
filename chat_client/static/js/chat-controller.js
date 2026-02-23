@@ -285,16 +285,29 @@ class ConversationController {
     checkScroll(userInteracting) {
         if (!scrollToBottom) return;
 
-        const threshold = 2;
         const doc = document.documentElement;
-        const atBottom = Math.abs((window.innerHeight + window.scrollY) - doc.scrollHeight) <= threshold;
         const hasScrollbar = doc.scrollHeight > window.innerHeight;
+        const distanceFromBottom = Math.max(0, doc.scrollHeight - (window.innerHeight + window.scrollY));
+        const hideThreshold = 12;
+        const showThreshold = 48;
+        const currentlyVisible = scrollToBottom.style.display === 'flex';
 
-        if (hasScrollbar && !atBottom && !userInteracting) {
-            scrollToBottom.style.display = 'flex';
-        } else {
+        if (!hasScrollbar || userInteracting) {
             scrollToBottom.style.display = 'none';
+            return;
         }
+
+        if (distanceFromBottom <= hideThreshold) {
+            scrollToBottom.style.display = 'none';
+            return;
+        }
+
+        if (distanceFromBottom >= showThreshold || currentlyVisible) {
+            scrollToBottom.style.display = 'flex';
+            return;
+        }
+
+        scrollToBottom.style.display = 'none';
     }
 
     validateUserMessage(userMessage) {
