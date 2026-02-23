@@ -10,6 +10,8 @@ Install as a python tool and run the server. Then connect to the server using th
 
 Try the demo at: https://chat.10kilobyte.com
 
+Use the credentials `demo:demo` to log in.
+
 Create a user and log into the interface using `gemma3:270m` running fairly well on CPU. 
 
 ## Requirements
