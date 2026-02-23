@@ -46,6 +46,13 @@ class ConversationController {
         this.updateSendButtonState();
     }
 
+    setEditFormSubmissionEnabled(enabled) {
+        const editSendButtons = responsesElem.querySelectorAll('.edit-form .edit-send');
+        editSendButtons.forEach((button) => {
+            button.disabled = !enabled;
+        });
+    }
+
     isVisionModelSelected() {
         const selectedModel = this.view.getSelectedModel();
         const visionModels = Array.isArray(this.config.vision_models) ? this.config.vision_models : [];
@@ -186,6 +193,15 @@ class ConversationController {
             this.updateSendButtonState();
         });
 
+        messageElem.addEventListener('focus', () => {
+            const openEditForms = responsesElem.querySelectorAll('.edit-form');
+            openEditForms.forEach((editForm) => {
+                const container = editForm.closest('[data-message-id]');
+                if (container) this.view.hideEditForm(container);
+            });
+            this.checkScroll(false);
+        });
+
         attachImageButtonElem.addEventListener('click', () => {
             if (!this.isVisionModelSelected()) {
                 Flash.setMessage('The selected model does not support image inputs.', 'notice');
@@ -249,9 +265,6 @@ class ConversationController {
 
         window.addEventListener('wheel', () => {
             userInteracting = true;
-            if (scrollToBottom) {
-                scrollToBottom.style.display = 'none';
-            }
             clearTimeout(interactionTimeout);
             interactionTimeout = setTimeout(() => {
                 userInteracting = false;
@@ -264,9 +277,6 @@ class ConversationController {
                 return;
             }
             userInteracting = true;
-            if (scrollToBottom) {
-                scrollToBottom.style.display = 'none';
-            }
             clearTimeout(interactionTimeout);
         });
 
@@ -279,20 +289,21 @@ class ConversationController {
         });
 
         window.addEventListener('scroll', () => this.checkScroll(userInteracting), { passive: true });
-        new MutationObserver(() => this.checkScroll(userInteracting)).observe(responsesElem, { childList: true, subtree: true });
+        new MutationObserver(() => {
+            this.checkScroll(userInteracting);
+            if (this.isStreaming) this.setEditFormSubmissionEnabled(false);
+        }).observe(responsesElem, { childList: true, subtree: true });
     }
 
-    checkScroll(userInteracting) {
+    checkScroll(_userInteracting) {
         if (!scrollToBottom) return;
+        const isEditingMessage = Boolean(responsesElem.querySelector('.edit-form'));
 
         const doc = document.documentElement;
         const hasScrollbar = doc.scrollHeight > window.innerHeight;
         const distanceFromBottom = Math.max(0, doc.scrollHeight - (window.innerHeight + window.scrollY));
         const hideThreshold = 12;
-        const showThreshold = 48;
-        const currentlyVisible = scrollToBottom.style.display === 'flex';
-
-        if (!hasScrollbar || userInteracting) {
+        if (!hasScrollbar || isEditingMessage) {
             scrollToBottom.style.display = 'none';
             return;
         }
@@ -302,12 +313,7 @@ class ConversationController {
             return;
         }
 
-        if (distanceFromBottom >= showThreshold || currentlyVisible) {
-            scrollToBottom.style.display = 'flex';
-            return;
-        }
-
-        scrollToBottom.style.display = 'none';
+        scrollToBottom.style.display = 'flex';
     }
 
     validateUserMessage(userMessage) {
@@ -382,6 +388,15 @@ class ConversationController {
     }
 
     async handleMessageUpdate(messageId, newContent, container) {
+        if (this.isStreaming) {
+            const sendButton = container?.querySelector('.edit-form .edit-send');
+            if (sendButton) {
+                sendButton.disabled = true;
+                sendButton.textContent = 'Send';
+            }
+            return;
+        }
+
         await this.storage.updateMessage(messageId, newContent);
 
         const contentElement = container.querySelector('.content');
@@ -417,6 +432,7 @@ class ConversationController {
         this.view.disableNew();
         this.view.enableAbort();
         this.isStreaming = true;
+        this.setEditFormSubmissionEnabled(false);
         this.updateSendButtonState();
 
         try {
@@ -448,6 +464,7 @@ class ConversationController {
             }
         } finally {
             this.isStreaming = false;
+            this.setEditFormSubmissionEnabled(true);
             this.view.disableAbort();
             this.view.enableNew();
             this.updateSendButtonState();
