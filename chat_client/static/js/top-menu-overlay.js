@@ -52,11 +52,13 @@ function initTopMenuOverlay() {
                         return false;
                     }
 
-                    const promptsList = promptsPanel.querySelector('.prompts-list');
-                    if (!promptsList) {
+                    if (!promptsPanel.querySelector('.overlay-header')) {
                         return false;
                     }
-                    promptsList.innerHTML = '';
+
+                    promptsPanel.querySelectorAll('.prompt-item, .no-prompts-message').forEach((item) => {
+                        item.remove();
+                    });
 
                     if (data.prompts && data.prompts.length > 0) {
                         data.prompts.forEach((prompt) => {
@@ -64,14 +66,14 @@ function initTopMenuOverlay() {
                             promptLink.href = `/?id=${prompt.prompt_id}`;
                             promptLink.textContent = prompt.title;
                             promptLink.className = 'prompt-item';
-                            promptsList.appendChild(promptLink);
+                            promptsPanel.appendChild(promptLink);
                         });
                     } else {
                         const createPromptLink = document.createElement('a');
                         createPromptLink.href = '/prompt/create';
                         createPromptLink.textContent = 'New Custom Prompt';
                         createPromptLink.className = 'no-prompts-message';
-                        promptsList.appendChild(createPromptLink);
+                        promptsPanel.appendChild(createPromptLink);
                     }
 
                     return true;

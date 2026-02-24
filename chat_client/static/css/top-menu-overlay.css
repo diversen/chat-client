@@ -68,23 +68,3 @@
     margin-bottom: 8px;
     text-transform: uppercase;
 }
-
-.top-menu-panel-prompts .prompts-list {
-    display: flex;
-    flex-direction: column;
-}
-
-.top-menu-panel-prompts .prompt-item {
-    font-weight: 400;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.top-menu-panel-prompts .no-prompts-message {
-    color: var(--text-secondary);
-    font-size: 0.8em;
-    justify-content: center;
-    font-style: italic;
-    text-transform: none;
-}
