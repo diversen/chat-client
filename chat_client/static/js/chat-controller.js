@@ -108,7 +108,8 @@ class ConversationController {
             remove.type = 'button';
             remove.className = 'image-preview-remove';
             remove.title = `Remove ${img.name}`;
-            remove.textContent = 'x';
+            remove.setAttribute('aria-label', `Remove ${img.name}`);
+            remove.textContent = '×';
             remove.addEventListener('click', () => {
                 this.pendingImages = this.pendingImages.filter((pending) => pending.id !== img.id);
                 this.renderPendingImages();
