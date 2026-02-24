@@ -652,6 +652,10 @@ table {
     max-width: 100%;
 }
 
+#load-more-dialogs {
+    margin-top: 8px;
+}
+
 .dialog {
     display: flex;
     gap: 0.3em;

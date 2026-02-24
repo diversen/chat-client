@@ -9,7 +9,7 @@ from sqlalchemy import select, func, update, delete, exists, or_
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-DIALOGS_PER_PAGE = 10
+DIALOGS_PER_PAGE = 20
 
 
 async def create_dialog(user_id: int, title: str):
