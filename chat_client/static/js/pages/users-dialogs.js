@@ -13,11 +13,32 @@ function initUsersDialogsPage() {
         return;
     }
 
+    const url = new URL(window.location.href);
     let currentPage = 1;
     let isLoading = false;
     let hasMore = true;
-    let currentQuery = '';
+    let currentQuery = String(url.searchParams.get('q') || '').trim();
     let searchTimer = null;
+
+    searchInput.value = currentQuery;
+
+    function syncQueryInUrl(query) {
+        const nextUrl = new URL(window.location.href);
+        if (query) {
+            nextUrl.searchParams.set('q', query);
+        } else {
+            nextUrl.searchParams.delete('q');
+        }
+        window.history.replaceState({}, document.title, `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
+    }
+
+    function getDialogHref(dialogId) {
+        const hrefUrl = new URL(`/chat/${dialogId}`, window.location.origin);
+        if (currentQuery) {
+            hrefUrl.searchParams.set('q', currentQuery);
+        }
+        return `${hrefUrl.pathname}${hrefUrl.search}`;
+    }
 
     async function loadDialogs(page) {
         if (isLoading || !hasMore) return;
@@ -66,14 +87,15 @@ function initUsersDialogsPage() {
 
     function renderDialogs(dialogs) {
         for (const dialog of dialogs) {
+            const dialogHref = getDialogHref(dialog.dialog_id);
             const html = `
                 <div class="dialog">
-                    <a href="/chat/${dialog.dialog_id}" class="delete svg-container" data-id="${dialog.dialog_id}">
+                    <a href="${dialogHref}" class="delete svg-container" data-id="${dialog.dialog_id}">
                         <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e8eaed">
                             <path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z" />
                         </svg>
                     </a>
-                    <a href="/chat/${dialog.dialog_id}">${escapeHtml(dialog.title)}</a>
+                    <a href="${dialogHref}">${escapeHtml(dialog.title)}</a>
                 </div>
             `;
             container.insertAdjacentHTML('beforeend', html);
@@ -118,6 +140,7 @@ function initUsersDialogsPage() {
             return;
         }
         currentQuery = nextQuery;
+        syncQueryInUrl(currentQuery);
         currentPage = 1;
         hasMore = true;
         container.innerHTML = '';
@@ -125,6 +148,13 @@ function initUsersDialogsPage() {
         loadMoreButton.classList.add('hidden');
         loadDialogs(currentPage);
     }
+
+    window.addEventListener('popstate', () => {
+        const params = new URL(window.location.href).searchParams;
+        const queryFromUrl = String(params.get('q') || '').trim();
+        searchInput.value = queryFromUrl;
+        resetAndLoad(queryFromUrl);
+    });
 
     searchForm.addEventListener('submit', (event) => {
         event.preventDefault();
@@ -146,7 +176,7 @@ function initUsersDialogsPage() {
     loadMoreButton.addEventListener('click', () => {
         loadDialogs(currentPage);
     });
-    resetAndLoad('');
+    resetAndLoad(currentQuery);
 }
 
 export { initUsersDialogsPage };
