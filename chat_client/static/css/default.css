@@ -611,8 +611,39 @@ table {
 }
 
 .page-dialogs .default-container {
-    height: auto;
+    height: calc(100dvh - var(--main-menu-top));
     min-height: calc(100dvh - var(--main-menu-top));
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.dialogs-toolbar {
+    flex: 0 0 auto;
+    padding-top: 12px;
+    padding-bottom: 8px;
+    background: var(--background-body);
+}
+
+.dialogs-toolbar h3 {
+    margin: 0 0 8px;
+}
+
+#dialogs-search-form {
+    margin: 0;
+}
+
+#dialogs-search-input {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.dialogs-scroll-area {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 12px;
 }
 
 .dialogs {

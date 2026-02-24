@@ -1,14 +1,18 @@
 {% extends "base.html" %} {% set body_class = 'page-dialogs' %} {% block head %} {% endblock head %} {% block content %}
 
-<main class="default-container">
-    <h3>Dialogs</h3>
-    <form id="dialogs-search-form">
-        <input id="dialogs-search-input" name="q" type="text" placeholder="Search dialogs" autocomplete="off" />
-    </form>
-    <div id="dialogs-container" class="dialogs"></div>
-    <div id="loading" class="loading-spinner hidden"></div>
-    <button id="load-more-dialogs" class="hidden" type="button">Load more</button>
-    <p id="no-dialogs" class="hidden">No dialogs found</p>
+<main class="default-container dialogs-page">
+    <div class="dialogs-toolbar">
+        <h3>Dialogs</h3>
+        <form id="dialogs-search-form">
+            <input id="dialogs-search-input" name="q" type="text" placeholder="Search dialogs" autocomplete="off" />
+        </form>
+    </div>
+    <section class="dialogs-scroll-area">
+        <div id="dialogs-container" class="dialogs"></div>
+        <div id="loading" class="loading-spinner hidden"></div>
+        <button id="load-more-dialogs" class="hidden" type="button">Load more</button>
+        <p id="no-dialogs" class="hidden">No dialogs found</p>
+    </section>
 </main>
 
 <script type="module">
