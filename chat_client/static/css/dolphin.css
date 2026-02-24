@@ -120,7 +120,7 @@ button,
 textarea,
 select {
   color: var(--text-main);
-  background-color: var(--background);
+  background-color: var(--form-background, var(--background));
   font-family: inherit;
   font-size: inherit;
   margin-right: 6px;

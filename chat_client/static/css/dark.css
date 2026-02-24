@@ -9,12 +9,13 @@
     --background-body: #212121;
     --background: #12141e;
     --background-alt: #10131c;
+    --form-background: #12141e;
     --selection: #34a85c;
     --text-main: #efefef;
     --text-bright: #fffaf0;
     --text-muted: #a9b1ba;
     --links: #03a9f4;
-    --focus: #00a5bfab;
+    --focus: #5c6f7f66;
     --border: #333d49;
     --code: white;
     --animation-duration: 0.1s;
