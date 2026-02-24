@@ -60,7 +60,7 @@ async def prompt_create_get(request: Request):
         return user_id_or_response
     context = {
         "request": request,
-        "title": "Create Prompt",
+        "title": "New Custom Prompt",
         "logged_in": True,
     }
     context = await get_context(request, context)

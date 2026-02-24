@@ -68,24 +68,28 @@
     </nav>
 
     {% if not logged_in %}
-    <div class="main-menu-overlay">
-        <a href="/user/login">Log ind</a>
-        <a href="/user/reset">Reset password</a>
-        <a href="/user/signup">Create account</a>
+    <div class="top-menu-overlay" data-mode="main">
+        <div class="top-menu-panel top-menu-panel-main">
+            <a href="/user/login">Log ind</a>
+            <a href="/user/reset">Reset password</a>
+            <a href="/user/signup">Create account</a>
+        </div>
     </div>
     {% else %}
-    <div class="main-menu-overlay">
-        <a href="/user/logout">Log out</a>
-        <a href="/user/profile">Profile</a>
-        <a href="/prompt">Custom Prompts</a>
-        <hr>
-        <a>Version: {{ version }}</a>
-    </div>
-    
-    <div class="custom-prompts-overlay">
-        <div class="overlay-header">Select a Custom Prompt</div>
-        <div class="prompts-list">
-            <!-- Prompts will be loaded dynamically -->
+    <div class="top-menu-overlay" data-mode="main">
+        <div class="top-menu-panel top-menu-panel-main">
+            <a href="/user/logout">Log out</a>
+            <a href="/user/profile">Profile</a>
+            <a href="/prompt">Custom Prompts</a>
+            <hr>
+            <a>Version: {{ version }}</a>
+        </div>
+
+        <div class="top-menu-panel top-menu-panel-prompts">
+            <div class="overlay-header">Select a Custom Prompt</div>
+            <div class="prompts-list">
+                <!-- Prompts will be loaded dynamically -->
+            </div>
         </div>
     </div>
     {% endif %}

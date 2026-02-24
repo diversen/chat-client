@@ -1,0 +1,90 @@
+.top-menu-overlay {
+    display: none;
+    position: fixed;
+    top: calc(var(--main-menu-top) + 2px);
+    right: 8px;
+    background-color: rgba(var(--nav-background-rgb), 0.99);
+    min-width: 250px;
+    max-height: 80vh;
+    overflow-y: auto;
+    scrollbar-width: none;
+    z-index: 110;
+    padding: 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(var(--nav-text-rgb), 0.14);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+}
+
+.top-menu-overlay::-webkit-scrollbar {
+    width: 0;
+}
+
+@media (max-width: 576px) {
+    .top-menu-overlay {
+        right: 0;
+        width: 100%;
+        border-radius: 0 0 10px 10px;
+    }
+}
+
+.top-menu-panel {
+    display: none;
+}
+
+.top-menu-overlay[data-mode="main"] .top-menu-panel-main {
+    display: block;
+}
+
+.top-menu-overlay[data-mode="prompts"] .top-menu-panel-prompts {
+    display: block;
+}
+
+.top-menu-overlay a {
+    display: flex;
+    color: var(--nav-text);
+    font-size: 0.9em;
+    font-weight: 600;
+    text-decoration: none;
+    border-radius: 8px;
+    padding: 9px 10px;
+    transition: background-color 0.2s ease-in-out;
+    text-transform: uppercase;
+}
+
+.top-menu-panel-main a + a {
+    margin-top: 2px;
+}
+
+.top-menu-overlay a:hover {
+    background-color: var(--nav-background-hover);
+}
+
+.top-menu-panel-prompts .overlay-header {
+    color: var(--text-main);
+    font-size: 0.9em;
+    font-weight: 600;
+    padding: 8px;
+    border-bottom: 1px solid var(--nav-background-hover);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+}
+
+.top-menu-panel-prompts .prompts-list {
+    display: flex;
+    flex-direction: column;
+}
+
+.top-menu-panel-prompts .prompt-item {
+    font-weight: 400;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.top-menu-panel-prompts .no-prompts-message {
+    color: var(--text-secondary);
+    font-size: 0.8em;
+    justify-content: center;
+    font-style: italic;
+    text-transform: none;
+}
