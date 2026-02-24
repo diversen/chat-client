@@ -48,7 +48,7 @@ def _before_server_start():
 
 
 @cli.command(help="Start the running Uvicorn dev-server. Notice: By default it watches for changes in current dir.")
-@click.option("--port", default=8000, help="Server port.")
+@click.option("--port", default=1972, help="Server port.")
 @click.option("--workers", default=4, help="Number of workers.")
 @click.option("--host", default="0.0.0.0", help="Server host.")
 @click.option("--log-level", default="info", help="Log level.")
@@ -81,7 +81,7 @@ def server_dev(port: int, workers: int, host: str, log_level: str):
 
 
 @cli.command(help="Start the production gunicorn server.")
-@click.option("--port", default=8000, help="Server port.")
+@click.option("--port", default=1972, help="Server port.")
 @click.option("--workers", default=3, help="Number of workers.")
 @click.option("--host", default="0.0.0.0", help="Server host.")
 def server_prod(port: int, workers: int, host: str):
