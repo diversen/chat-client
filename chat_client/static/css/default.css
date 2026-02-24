@@ -612,8 +612,8 @@ table {
 }
 
 .page-dialogs .default-container {
-    height: calc(100dvh - var(--main-menu-top));
-    min-height: calc(100dvh - var(--main-menu-top));
+    height: calc(100svh - var(--main-menu-top));
+    min-height: calc(100svh - var(--main-menu-top));
     display: flex;
     flex-direction: column;
     overflow: hidden;
@@ -645,7 +645,7 @@ table {
     overflow-y: auto;
     overscroll-behavior-y: contain;
     -webkit-overflow-scrolling: touch;
-    padding-bottom: 12px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
 }
 
 .dialogs {
