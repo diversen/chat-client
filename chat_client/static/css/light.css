@@ -8,7 +8,7 @@
     --background-body: #fff;
     --background: #efefef;
     --background-alt: #f7f7f7;
-    --form-background: #fcfcfc;
+    --form-background: #fff;
     --selection: #9e9e9e;
     --text-main: #363636;
     --text-bright: #000;
@@ -16,6 +16,7 @@
     --links: #0076d1;
     --focus: #6f7f8f66;
     --border: #dbdbdb;
+    --form-border: #e6e6e6;
     --code: #000;
     --animation-duration: 0.1s;
     --button-base: #d0cfcf;

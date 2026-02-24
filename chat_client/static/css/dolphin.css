@@ -178,6 +178,12 @@ textarea {
   resize: vertical;
 }
 
+input:not([type="checkbox"]):not([type="radio"]),
+select,
+textarea {
+  border: 1px solid var(--form-border, var(--border));
+}
+
 textarea:not([cols]) {
   width: 100%;
 }
@@ -242,8 +248,15 @@ legend {
   font-weight: 600;
 }
 
-button:focus, input:focus, select:focus, textarea:focus {
+button:focus {
   box-shadow: 0 0 0 2px var(--focus);
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  box-shadow: none;
+  border-color: var(--focus);
 }
 
 a {
