@@ -608,6 +608,7 @@ table {
  */
 .page-dialogs {
     overflow-x: hidden;
+    overflow-y: hidden;
 }
 
 .page-dialogs .default-container {
@@ -642,6 +643,7 @@ table {
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
+    overscroll-behavior-y: contain;
     -webkit-overflow-scrolling: touch;
     padding-bottom: 12px;
 }
