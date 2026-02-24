@@ -5,11 +5,11 @@ from chat_client.database.db_session import async_session
 import uuid
 import logging
 import json
-from sqlalchemy import select, func, update, delete
+from sqlalchemy import select, func, update, delete, exists, or_
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-DIALOGS_PER_PAGE = 10
+DIALOGS_PER_PAGE = 20
 
 
 async def create_dialog(user_id: int, title: str):
@@ -202,15 +202,34 @@ async def delete_dialog(user_id: int, dialog_id: str):
         await session.commit()
 
 
-async def get_dialogs_info(user_id: int, current_page: int = 1):
+async def get_dialogs_info(user_id: int, current_page: int = 1, query: str = ""):
 
     async with async_session() as session:
+        query = str(query).strip()
+
+        filters = [Dialog.user_id == user_id]
+        if query:
+            pattern = f"%{query}%"
+            message_match_exists = exists(
+                select(1).where(
+                    Message.dialog_id == Dialog.dialog_id,
+                    Message.user_id == user_id,
+                    Message.active == 1,
+                    Message.content.ilike(pattern),
+                )
+            )
+            filters.append(
+                or_(
+                    Dialog.title.ilike(pattern),
+                    message_match_exists,
+                )
+            )
 
         # Fetch dialogs for the current page
         stmt = (
             select(Dialog)
-            .where(Dialog.user_id == user_id)
-            .order_by(Dialog.created.desc())
+            .where(*filters)
+            .order_by(Dialog.created.desc(), Dialog.dialog_id.desc())
             .limit(DIALOGS_PER_PAGE)
             .offset((current_page - 1) * DIALOGS_PER_PAGE)
         )
@@ -218,7 +237,7 @@ async def get_dialogs_info(user_id: int, current_page: int = 1):
         dialogs = result.scalars().all()
 
         # Count total number of dialogs
-        count_stmt = select(func.count()).select_from(Dialog).where(Dialog.user_id == user_id)
+        count_stmt = select(func.count()).select_from(Dialog).where(*filters)
         count_result = await session.execute(count_stmt)
         num_dialogs = count_result.scalar_one()
 
@@ -227,7 +246,7 @@ async def get_dialogs_info(user_id: int, current_page: int = 1):
         prev_page = current_page - 1 if has_prev else 0
         next_page = current_page + 1 if has_next else 0
 
-        logger.warning(f"Dialogs for user {user_id}: {len(dialogs)} found on page {current_page}")
+        logger.warning(f"Dialogs for user {user_id}: {len(dialogs)} found on page {current_page} (query={query!r})")
 
         dialogs_list = []
         for d in dialogs:

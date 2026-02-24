@@ -303,10 +303,35 @@ class TestUserEndpoints(BaseTestCase):
     def test_list_dialogs_json_authenticated(self, mock_logged_in, mock_get_dialogs):
         """Test /user/dialogs/json when authenticated"""
         mock_logged_in.return_value = 1
-        mock_get_dialogs.return_value = [{"dialog_id": "test-dialog", "title": "Test Dialog"}]
+        mock_get_dialogs.return_value = {"dialogs": [{"dialog_id": "test-dialog", "title": "Test Dialog"}], "has_next": False}
 
         response = self.client.get("/user/dialogs/json")
         assert response.status_code == 200
         data = response.json()
         assert data["error"] is False
-        assert len(data["dialogs_info"]) == 1
+        assert len(data["dialogs_info"]["dialogs"]) == 1
+        mock_get_dialogs.assert_called_once_with(1, current_page=1, query="")
+
+    @patch("chat_client.repositories.chat_repository.get_dialogs_info")
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_list_dialogs_json_with_search_query(self, mock_logged_in, mock_get_dialogs):
+        """Test /user/dialogs/json search query handling"""
+        mock_logged_in.return_value = 1
+        mock_get_dialogs.return_value = {"dialogs": [], "has_next": False}
+
+        response = self.client.get("/user/dialogs/json?q=hello&page=2")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["error"] is False
+        mock_get_dialogs.assert_called_once_with(1, current_page=2, query="hello")
+
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_list_dialogs_json_invalid_page(self, mock_logged_in):
+        """Test /user/dialogs/json invalid page parameter"""
+        mock_logged_in.return_value = 1
+
+        response = self.client.get("/user/dialogs/json?page=abc")
+        assert response.status_code == 400
+        data = response.json()
+        assert data["error"] is True
+        assert "Invalid page parameter" in data["message"]

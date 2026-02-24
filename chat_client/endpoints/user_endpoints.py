@@ -204,8 +204,16 @@ async def list_dialogs_json(request: Request):
             message="It seems you have been logged out. Log in again",
             status_code=401,
         )
-        current_page = int(request.query_params.get("page", 1))
-        dialogs_info = await chat_repository.get_dialogs_info(user_id, current_page=current_page)
+        page_raw = str(request.query_params.get("page", "1")).strip()
+        try:
+            current_page = int(page_raw)
+        except ValueError:
+            raise exceptions_validation.JSONError("Invalid page parameter", status_code=400)
+        if current_page < 1:
+            raise exceptions_validation.JSONError("Invalid page parameter", status_code=400)
+
+        query = str(request.query_params.get("q", "")).strip()
+        dialogs_info = await chat_repository.get_dialogs_info(user_id, current_page=current_page, query=query)
         return json_success(dialogs_info=dialogs_info)
     except exceptions_validation.JSONError as e:
         return json_error(str(e), status_code=e.status_code)

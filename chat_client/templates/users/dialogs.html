@@ -2,8 +2,12 @@
 
 <main class="default-container">
     <h3>Dialogs</h3>
+    <form id="dialogs-search-form">
+        <input id="dialogs-search-input" name="q" type="text" placeholder="Search dialogs" />
+    </form>
     <div id="dialogs-container" class="dialogs"></div>
     <div id="loading" class="loading-spinner hidden"></div>
+    <button id="load-more-dialogs" class="hidden" type="button">Load more</button>
     <p id="no-dialogs" class="hidden">No dialogs found</p>
 </main>
 

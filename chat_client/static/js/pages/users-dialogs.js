@@ -4,39 +4,53 @@ import { Requests } from '/static/js/requests.js';
 function initUsersDialogsPage() {
     const container = document.getElementById('dialogs-container');
     const loading = document.getElementById('loading');
+    const loadMoreButton = document.getElementById('load-more-dialogs');
     const noDialogs = document.getElementById('no-dialogs');
+    const searchForm = document.getElementById('dialogs-search-form');
+    const searchInput = document.getElementById('dialogs-search-input');
 
-    if (!container || !loading || !noDialogs) {
+    if (!container || !loading || !loadMoreButton || !noDialogs || !searchForm || !searchInput) {
         return;
     }
 
     let currentPage = 1;
     let isLoading = false;
     let hasMore = true;
+    let currentQuery = '';
+    let searchTimer = null;
 
     async function loadDialogs(page) {
         if (isLoading || !hasMore) return;
 
         isLoading = true;
         loading.classList.remove('hidden');
+        loadMoreButton.disabled = true;
 
         try {
-            const response = await Requests.asyncGetJson(`/user/dialogs/json?page=${page}`);
+            const response = await Requests.asyncGetJson(`/user/dialogs/json?page=${page}&q=${encodeURIComponent(currentQuery)}`);
             const info = response.dialogs_info;
             if (info.dialogs.length === 0 && currentPage === 1) {
                 noDialogs.classList.remove('hidden');
                 hasMore = false;
+                loadMoreButton.classList.add('hidden');
                 return;
             }
 
+            noDialogs.classList.add('hidden');
             renderDialogs(info.dialogs);
             hasMore = info.has_next;
             currentPage += 1;
+            if (hasMore) {
+                loadMoreButton.classList.remove('hidden');
+            } else {
+                loadMoreButton.classList.add('hidden');
+            }
         } catch (error) {
             console.error(error);
             Flash.setMessage(Requests.getErrorMessage(error, 'An error occurred while loading dialogs.'), 'error');
         } finally {
             isLoading = false;
+            loadMoreButton.disabled = false;
             loading.classList.add('hidden');
         }
     }
@@ -86,48 +100,53 @@ function initUsersDialogsPage() {
             await Requests.asyncPostJson(`/chat/delete-dialog/${dialogId}`, {});
             const dialog = elem.closest('.dialog');
             dialog?.remove();
+            if (container.querySelectorAll('.dialog').length === 0 && !hasMore) {
+                noDialogs.classList.remove('hidden');
+            }
             Flash.setMessage('Dialog deleted successfully', 'success');
         } catch (error) {
             console.error(error);
             Flash.setMessage(Requests.getErrorMessage(error, 'An error occurred while deleting the dialog.'), 'error');
         } finally {
             loading.classList.add('hidden');
-            handleScroll();
         }
     }
 
-    function handleScroll() {
-        if (isLoading || !hasMore) return;
-
-        const dialogs = document.querySelectorAll('.dialog');
-        if (!dialogs.length) return;
-
-        const lastDialog = dialogs[dialogs.length - 1];
-        const rect = lastDialog.getBoundingClientRect();
-
-        if (rect.bottom <= window.innerHeight + 100) {
-            loadDialogs(currentPage);
+    function resetAndLoad(query) {
+        const nextQuery = String(query || '').trim();
+        if (nextQuery === currentQuery && container.children.length > 0) {
+            return;
         }
+        currentQuery = nextQuery;
+        currentPage = 1;
+        hasMore = true;
+        container.innerHTML = '';
+        noDialogs.classList.add('hidden');
+        loadMoreButton.classList.add('hidden');
+        loadDialogs(currentPage);
     }
 
-    function contentExceedsViewport() {
-        const dialogs = document.querySelectorAll('.dialog');
-        if (dialogs.length === 0) {
-            return false;
+    searchForm.addEventListener('submit', (event) => {
+        event.preventDefault();
+        if (searchTimer) {
+            clearTimeout(searchTimer);
+            searchTimer = null;
         }
-
-        const lastDialogRect = dialogs[dialogs.length - 1].getBoundingClientRect();
-        return lastDialogRect.bottom > window.innerHeight;
-    }
-
-    async function initialLoadUntilFull() {
-        while (hasMore && !contentExceedsViewport()) {
-            await loadDialogs(currentPage);
+        resetAndLoad(searchInput.value);
+    });
+    searchInput.addEventListener('input', () => {
+        if (searchTimer) {
+            clearTimeout(searchTimer);
         }
-    }
+        searchTimer = setTimeout(() => {
+            resetAndLoad(searchInput.value);
+        }, 500);
+    });
 
-    window.addEventListener('scroll', handleScroll);
-    initialLoadUntilFull();
+    loadMoreButton.addEventListener('click', () => {
+        loadDialogs(currentPage);
+    });
+    resetAndLoad('');
 }
 
 export { initUsersDialogsPage };
