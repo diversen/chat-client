@@ -52,7 +52,7 @@ function initTopMenuOverlay() {
                         return false;
                     }
 
-                    if (!promptsPanel.querySelector('.overlay-header')) {
+                    if (!promptsPanel.querySelector('.top-menu-header')) {
                         return false;
                     }
 

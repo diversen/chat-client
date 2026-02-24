@@ -30,7 +30,7 @@ test('custom prompt button switches to prompts mode and closes on outside click'
   await expect(mainMenuButton).toHaveAttribute('aria-expanded', 'false');
   await expect(topMenuOverlay).toBeVisible();
   await expect(topMenuOverlay).toHaveAttribute('data-mode', 'prompts');
-  await expect(topMenuOverlay.locator('.top-menu-panel-prompts .overlay-header')).toContainText('Select a Custom Prompt');
+  await expect(topMenuOverlay.locator('.top-menu-panel-prompts .top-menu-header')).toContainText('Select a Custom Prompt');
   await expect(topMenuOverlay.locator('.top-menu-panel-prompts .prompt-item, .top-menu-panel-prompts .no-prompts-message').first()).toBeVisible();
 
   const emptyStateLink = topMenuOverlay.locator('.top-menu-panel-prompts .no-prompts-message');
