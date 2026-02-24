@@ -40,7 +40,7 @@ You can connect to local models served by `ollama` or `vllm` instances. Or serve
 Install latest version of chat-client:
 
 <!-- LATEST-VERSION-UV -->
-	uv tool install git+https://github.com/diversen/chat-client@v2.3.43
+	uv tool install git+https://github.com/diversen/chat-client@v2.3.44
 
 Initialize the configuration and data dir:
 
@@ -70,7 +70,7 @@ All data is stored in `./data/` directory of the running instance. E.g. `log fil
 Upgrade to latest version
 
 <!-- LATEST-VERSION-UV-FORCE -->
-	uv tool install git+https://github.com/diversen/chat-client@v2.3.43 --force
+	uv tool install git+https://github.com/diversen/chat-client@v2.3.44 --force
 
 And then restart the running server instance. 
 
