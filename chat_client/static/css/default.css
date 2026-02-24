@@ -610,6 +610,11 @@ table {
     overflow-x: hidden;
 }
 
+.page-dialogs .default-container {
+    height: auto;
+    min-height: calc(100dvh - var(--main-menu-top));
+}
+
 .dialogs {
     max-width: 100%;
 }
