@@ -1,13 +1,16 @@
 .top-menu-overlay {
+    --top-menu-item-font-size: 0.9em;
+    --top-menu-item-padding: 7px 7px;
     display: none;
     position: fixed;
     top: calc(var(--main-menu-top) + 2px);
     right: 8px;
     background-color: rgba(var(--nav-background-rgb), 0.99);
-    min-width: 250px;
+    width: min(100vw - 16px, 280px);
+    min-width: 220px;
     max-height: 80vh;
     overflow-y: auto;
-    scrollbar-width: none;
+    scrollbar-width: thin;
     z-index: 110;
     padding: 10px;
     border-radius: 10px;
@@ -16,7 +19,12 @@
 }
 
 .top-menu-overlay::-webkit-scrollbar {
-    width: 0;
+    width: 6px;
+}
+
+.top-menu-overlay::-webkit-scrollbar-thumb {
+    background-color: rgba(var(--nav-text-rgb), 0.35);
+    border-radius: 999px;
 }
 
 @media (max-width: 576px) {
@@ -42,28 +50,42 @@
 .top-menu-overlay a {
     display: flex;
     color: var(--nav-text);
-    font-size: 0.85em;
+    font-size: var(--top-menu-item-font-size);
     font-weight: 600;
     text-decoration: none;
     border-radius: 8px;
-    padding: 7px 7px;
+    padding: var(--top-menu-item-padding);
     transition: background-color 0.2s ease-in-out;
-    text-transform: uppercase;
+    text-transform: none;
 }
 
 .top-menu-panel-main a + a {
     margin-top: 2px;
 }
 
+.top-menu-overlay .top-menu-text {
+    display: flex;
+    color: var(--nav-text);
+    font-size: var(--top-menu-item-font-size);
+    font-weight: 600;
+    padding: var(--top-menu-item-padding);
+}
+
 .top-menu-overlay a:hover {
+    background-color: var(--nav-background-hover);
+}
+
+.top-menu-overlay a:focus-visible {
+    outline: 2px solid rgba(var(--nav-text-rgb), 0.6);
+    outline-offset: 2px;
     background-color: var(--nav-background-hover);
 }
 
 .top-menu-panel-prompts .top-menu-header {
     color: var(--text-main);
-    font-size: 0.85em;
+    font-size: var(--top-menu-item-font-size);
     font-weight: 600;
-    padding: 7px 7px;
+    padding: var(--top-menu-item-padding);
     border-bottom: 1px solid var(--nav-background-hover);
     margin-bottom: 8px;
     text-transform: uppercase;
