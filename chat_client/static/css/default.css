@@ -608,7 +608,7 @@ table {
  */
 .page-dialogs {
     overflow-x: hidden;
-    overflow-y: hidden;
+    overflow-y: scroll;
 }
 
 .page-dialogs .default-container {
@@ -646,6 +646,12 @@ table {
     overscroll-behavior-y: contain;
     -webkit-overflow-scrolling: touch;
     padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.dialogs-scroll-area::-webkit-scrollbar {
+    display: none;
 }
 
 .dialogs {
