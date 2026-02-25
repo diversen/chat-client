@@ -12,6 +12,7 @@ import { addCopyButtons } from './app-copy-buttons.js';
 import { copyIcon, checkIcon, editIcon } from './app-icons.js';
 
 const ANCHOR_SPACER_CLASS = 'responses-anchor-spacer';
+const MIN_ANCHOR_SPACER_HEIGHT_PX = 20;
 
 function getOrCreateAnchorSpacer() {
     let spacer = responsesElem.querySelector(`.${ANCHOR_SPACER_CLASS}`);
@@ -58,7 +59,7 @@ function getAnchorSpacerHeight() {
 function setAnchorSpacerHeight(heightPx, animate = false) {
     const spacer = getOrCreateAnchorSpacer();
     spacer.style.transition = animate ? 'height 180ms ease-out' : 'none';
-    spacer.style.height = `${Math.max(0, Math.ceil(heightPx))}px`;
+    spacer.style.height = `${Math.max(MIN_ANCHOR_SPACER_HEIGHT_PX, Math.ceil(heightPx))}px`;
 }
 
 function getBaseScrollHeight() {
@@ -70,7 +71,7 @@ function consumeAnchorSpacerBy(usedHeightPx, animate = false) {
     if (!Number.isFinite(usedHeightPx) || usedHeightPx <= 0) return;
     const current = getAnchorSpacerHeight();
     if (current <= 0) return;
-    setAnchorSpacerHeight(Math.max(0, current - usedHeightPx), animate);
+    setAnchorSpacerHeight(Math.max(MIN_ANCHOR_SPACER_HEIGHT_PX, current - usedHeightPx), animate);
 }
 
 function createMessageElement(role, messageId = null, containerRole = null) {
