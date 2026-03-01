@@ -569,6 +569,13 @@ a.is-disabled-link {
     color: dimgray;
 }
 
+.assistant-status {
+    margin-top: 0;
+    margin-bottom: 6px;
+    font-size: 0.92em;
+    color: var(--text-muted);
+}
+
 .role_tool.tool-toggle {
     cursor: pointer;
     user-select: none;
@@ -596,6 +603,11 @@ a.is-disabled-link {
     cursor: pointer;
     user-select: none;
     margin-bottom: 0;
+    list-style: none;
+}
+
+.thinking-toggle::-webkit-details-marker {
+    display: none;
 }
 
 .thinking-toggle::after {
@@ -604,12 +616,16 @@ a.is-disabled-link {
     opacity: 0.7;
 }
 
-.thinking-toggle[aria-expanded="true"]::after {
+.thinking-block[open] > .thinking-toggle::after {
     content: " ▾";
 }
 
 .thinking-body {
     margin-top: 4px;
+}
+
+.thinking-text {
+    margin: 0;
 }
 
 .tool-message pre {

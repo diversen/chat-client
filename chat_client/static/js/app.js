@@ -98,7 +98,7 @@ function appendRenderedMarkdown(target, markdownText) {
     }
 }
 
-function createThinkingBlock(markdownText) {
+function createThinkingBlock(markdownText, isOpen = false) {
     const block = document.createElement('section');
     block.className = 'thinking-block';
 
@@ -107,29 +107,49 @@ function createThinkingBlock(markdownText) {
     toggle.textContent = 'Thinking';
     toggle.setAttribute('role', 'button');
     toggle.setAttribute('tabindex', '0');
-    toggle.setAttribute('aria-expanded', 'false');
+    toggle.setAttribute('aria-expanded', String(Boolean(isOpen)));
 
     const body = document.createElement('div');
-    body.className = 'thinking-body hidden';
+    body.className = `thinking-body${isOpen ? '' : ' hidden'}`;
     appendRenderedMarkdown(body, markdownText);
-
-    const toggleBody = () => {
-        const isOpen = !body.classList.contains('hidden');
-        body.classList.toggle('hidden', isOpen);
-        toggle.setAttribute('aria-expanded', String(!isOpen));
-    };
-
-    toggle.addEventListener('click', toggleBody);
-    toggle.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            toggleBody();
-        }
-    });
 
     block.appendChild(toggle);
     block.appendChild(body);
     return block;
+}
+
+function bindThinkingToggleEvents(contentElement) {
+    if (!contentElement || contentElement.dataset.thinkingToggleBound === '1') return;
+    contentElement.dataset.thinkingToggleBound = '1';
+
+    const getHeaderFromEventTarget = (target) => {
+        if (!target) return null;
+        const element = target instanceof Element ? target : target.parentElement;
+        if (!element) return null;
+        return element.closest('.thinking-toggle');
+    };
+
+    const toggleForHeader = (header) => {
+        const body = header?.nextElementSibling;
+        if (!body || !body.classList.contains('thinking-body')) return;
+        const isOpen = !body.classList.contains('hidden');
+        body.classList.toggle('hidden', isOpen);
+        header.setAttribute('aria-expanded', String(!isOpen));
+    };
+
+    contentElement.addEventListener('click', (event) => {
+        const header = getHeaderFromEventTarget(event.target);
+        if (!header || !contentElement.contains(header)) return;
+        toggleForHeader(header);
+    });
+
+    contentElement.addEventListener('keydown', (event) => {
+        const header = getHeaderFromEventTarget(event.target);
+        if (!header || !contentElement.contains(header)) return;
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        toggleForHeader(header);
+    });
 }
 
 /**
@@ -140,17 +160,25 @@ async function renderStreamedResponseText(contentElement, streamedResponseText) 
     const startTime = performance.now();
 
     const segments = splitThinkingSegments(streamedResponseText);
+    const previousThinkingStates = Array.from(contentElement.querySelectorAll('.thinking-toggle')).map((header) => {
+        const expanded = String(header.getAttribute('aria-expanded') || '').toLowerCase();
+        return expanded === 'true';
+    });
     contentElement.innerHTML = '';
 
+    let thinkingIndex = 0;
     for (const segment of segments) {
         const normalizedText = modifyStreamedText(segment.text);
         if (segment.type === 'thinking') {
-            const thinkingBlock = createThinkingBlock(normalizedText);
+            const isOpen = previousThinkingStates[thinkingIndex] === true;
+            const thinkingBlock = createThinkingBlock(normalizedText, isOpen);
             contentElement.appendChild(thinkingBlock);
+            thinkingIndex += 1;
             continue;
         }
         appendRenderedMarkdown(contentElement, normalizedText);
     }
+    bindThinkingToggleEvents(contentElement);
 
     // Optimize highlight and KaTeX: run after markdown render
     highlightCodeInElement(contentElement);

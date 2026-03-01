@@ -420,6 +420,19 @@ async def chat_response_stream(
 
             tool_results: list[tuple[dict[str, Any], Any]] = []
             for tool_call in tool_calls:
+                yield (
+                    "data: "
+                    + json.dumps(
+                        {
+                            "tool_status": {
+                                "phase": "start",
+                                "tool_call_id": tool_call["id"],
+                                "tool_name": tool_call["function"]["name"],
+                            }
+                        }
+                    )
+                    + "\n\n"
+                )
                 result = tool_executor(tool_call)
                 if isawaitable(result):
                     result = await result

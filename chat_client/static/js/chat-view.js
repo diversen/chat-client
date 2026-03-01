@@ -394,12 +394,43 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
             consumeAnchorSpacerBy(consumedOnInsert, false);
             loader.classList.remove('hidden');
 
+            let thinkingBlock = null;
+            let thinkingBody = null;
+            let thinkingContent = null;
+
+            const ensureThinkingBlock = () => {
+                if (thinkingBlock) return;
+                thinkingBlock = document.createElement('details');
+                thinkingBlock.className = 'thinking-block';
+                const thinkingToggle = document.createElement('summary');
+                thinkingToggle.className = 'role role_tool thinking-toggle';
+                thinkingToggle.textContent = 'Thinking';
+                thinkingBlock.open = false;
+                thinkingBody = document.createElement('div');
+                thinkingBody.className = 'thinking-body hidden';
+                thinkingContent = document.createElement('div');
+                thinkingContent.className = 'thinking-text';
+                thinkingBody.appendChild(thinkingContent);
+                thinkingBlock.appendChild(thinkingToggle);
+                thinkingBlock.appendChild(thinkingBody);
+                contentElement.insertAdjacentElement('beforebegin', thinkingBlock);
+                thinkingBlock.addEventListener('toggle', () => {
+                    if (!thinkingBody) return;
+                    thinkingBody.classList.toggle('hidden', !thinkingBlock.open);
+                });
+            };
+
             const hiddenContentElem = document.createElement('div');
             hiddenContentElem.classList.add('content');
+            const hiddenThinkingElem = document.createElement('div');
+            hiddenThinkingElem.classList.add('thinking-text');
             contentElement.classList.add('content');
+            const statusElement = document.createElement('p');
+            statusElement.className = 'assistant-status hidden';
+            contentElement.insertAdjacentElement('beforebegin', statusElement);
 
             let streamedResponseText = '';
-            let reasoningActive = false;
+            let reasoningText = '';
             let lastBaseScrollHeight = getBaseScrollHeight();
 
             return {
@@ -407,18 +438,34 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                 loader,
                 hiddenContentElem,
                 contentElement,
-                appendReasoning(text) {
-                    if (!reasoningActive) {
-                        streamedResponseText += '<thinking>\n';
-                        reasoningActive = true;
+                statusElement,
+                setStatus(text) {
+                    const safeText = String(text || '').trim();
+                    if (!safeText) {
+                        statusElement.textContent = '';
+                        statusElement.classList.add('hidden');
+                        return;
                     }
-                    streamedResponseText += text;
+                    statusElement.textContent = safeText;
+                    statusElement.classList.remove('hidden');
+                },
+                clearStatus() {
+                    statusElement.textContent = '';
+                    statusElement.classList.add('hidden');
+                },
+                async appendReasoning(text, force = false) {
+                    ensureThinkingBlock();
+                    if (!thinkingContent) return;
+                    reasoningText += text;
+                    const beforeBaseScrollHeight = lastBaseScrollHeight;
+                    await updateContentDiff(thinkingContent, hiddenThinkingElem, reasoningText, force);
+                    const afterBaseScrollHeight = getBaseScrollHeight();
+                    const consumedHeight = Math.max(0, afterBaseScrollHeight - beforeBaseScrollHeight);
+                    consumeAnchorSpacerBy(consumedHeight, false);
+                    lastBaseScrollHeight = afterBaseScrollHeight;
                 },
                 closeReasoningIfOpen() {
-                    if (reasoningActive) {
-                        streamedResponseText += ' </thinking>\n\n';
-                        reasoningActive = false;
-                    }
+                    // Thinking is rendered in a dedicated block outside streamed response content.
                 },
                 async appendContent(text, force = false) {
                     streamedResponseText += text;
@@ -430,14 +477,23 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                     lastBaseScrollHeight = afterBaseScrollHeight;
                 },
                 async finalize() {
-                    this.closeReasoningIfOpen();
+                    if (reasoningText.trim()) {
+                        await this.appendReasoning('', true);
+                    }
                     const beforeBaseScrollHeight = lastBaseScrollHeight;
                     await updateContentDiff(contentElement, hiddenContentElem, streamedResponseText, true);
                     const afterBaseScrollHeight = getBaseScrollHeight();
                     const consumedHeight = Math.max(0, afterBaseScrollHeight - beforeBaseScrollHeight);
                     consumeAnchorSpacerBy(consumedHeight, false);
                     lastBaseScrollHeight = afterBaseScrollHeight;
-                    return streamedResponseText;
+                    let persistedText = streamedResponseText;
+                    if (reasoningText.trim()) {
+                        persistedText = `<thinking>\n${reasoningText}\n</thinking>\n\n${streamedResponseText}`;
+                    }
+                    return {
+                        displayText: streamedResponseText,
+                        persistedText,
+                    };
                 },
             };
         },

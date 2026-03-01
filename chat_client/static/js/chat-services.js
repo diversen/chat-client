@@ -65,6 +65,10 @@ function createChatService() {
                     if (typeof data.error === 'string' && data.error.trim()) {
                         throw new Error(data.error.trim());
                     }
+                    if (data.tool_status) {
+                        yield { toolStatus: data.tool_status };
+                        continue;
+                    }
                     if (data.tool_call) {
                         yield { toolCall: data.tool_call };
                         continue;
@@ -106,6 +110,10 @@ function createChatService() {
 
             if (typeof data.error === 'string' && data.error.trim()) {
                 throw new Error(data.error.trim());
+            }
+            if (data.tool_status) {
+                yield { toolStatus: data.tool_status };
+                return;
             }
             if (data.tool_call) {
                 yield { toolCall: data.tool_call };

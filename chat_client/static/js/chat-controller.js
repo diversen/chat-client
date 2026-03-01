@@ -446,6 +446,7 @@ class ConversationController {
         const ensureAssistantContainer = () => {
             if (!ui) {
                 ui = this.view.createAssistantContainer();
+                ui.setStatus('Thinking...');
             }
             return ui;
         };
@@ -454,14 +455,17 @@ class ConversationController {
             if (!ui) return;
 
             ui.loader.classList.add('hidden');
+            ui.clearStatus();
             await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
-            const finalText = await ui.finalize();
+            const finalized = await ui.finalize();
+            const displayText = String(finalized?.displayText || '');
+            const persistedText = String(finalized?.persistedText || displayText);
 
-            if (hasVisibleAssistantContent(finalText)) {
+            if (hasVisibleAssistantContent(displayText)) {
                 await addCopyButtons(ui.contentElement, this.config);
-                this.view.attachCopy(ui.container, finalText);
-                const assistantMessage = { role: 'assistant', content: finalText };
+                this.view.attachCopy(ui.container, displayText);
+                const assistantMessage = { role: 'assistant', content: persistedText };
                 assistantSegments.push({ message: assistantMessage, container: ui.container });
             } else {
                 ui.container.remove();
@@ -471,11 +475,19 @@ class ConversationController {
         };
 
         try {
+            ensureAssistantContainer();
             for await (const chunk of this.chat.stream({
                 model: this.view.getSelectedModel(),
                 dialog_id: this.dialogId || '',
                 messages: this.messages,
             }, this.abortController.signal)) {
+                if (chunk.toolStatus) {
+                    const activeUi = ensureAssistantContainer();
+                    activeUi.loader.classList.remove('hidden');
+                    const toolName = String(chunk.toolStatus.tool_name || 'tool');
+                    activeUi.setStatus(`Calling tool: ${toolName}...`);
+                    continue;
+                }
                 if (this.config.show_tool_calls && chunk.toolCall) {
                     await finalizeAssistantContainer();
                     this.view.renderStaticToolMessage(chunk.toolCall);
@@ -484,11 +496,14 @@ class ConversationController {
 
                 const activeUi = ensureAssistantContainer();
                 activeUi.loader.classList.add('hidden');
+                if (chunk.content || chunk.reasoning || chunk.reasoningOpenClose) {
+                    activeUi.clearStatus();
+                }
 
-                if (chunk.reasoningOpenClose === 'open') activeUi.appendReasoning('');
+                if (chunk.reasoningOpenClose === 'open') await activeUi.appendReasoning('');
                 else if (chunk.reasoningOpenClose === 'close') activeUi.closeReasoningIfOpen();
 
-                if (chunk.reasoning) await activeUi.appendContent(chunk.reasoning);
+                if (chunk.reasoning) await activeUi.appendReasoning(chunk.reasoning);
                 if (chunk.content) await activeUi.appendContent(chunk.content, Boolean(chunk.done));
             }
         } catch (error) {
