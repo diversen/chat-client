@@ -42,6 +42,74 @@ class TestChatEndpoints(BaseTestCase):
         assert m2["api_key"] == "key"
         assert m3 == {}
 
+    def test_list_local_tools_uses_explicit_local_definitions(self):
+        from chat_client.endpoints.chat_endpoints import _list_local_tools
+
+        def get_locale_date_time(locale: str):
+            return locale
+
+        local_definitions = [
+            {
+                "name": "get_locale_date_time",
+                "description": "Get local time by locale",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "locale": {"type": "string"},
+                    },
+                    "required": ["locale"],
+                    "additionalProperties": False,
+                },
+            }
+        ]
+
+        with (
+            patch("chat_client.endpoints.chat_endpoints.TOOL_REGISTRY", {"get_locale_date_time": get_locale_date_time}),
+            patch("chat_client.endpoints.chat_endpoints.LOCAL_TOOL_DEFINITIONS", local_definitions),
+        ):
+            tools = _list_local_tools()
+
+        assert len(tools) == 1
+        assert tools[0]["function"]["name"] == "get_locale_date_time"
+        assert tools[0]["function"]["description"] == "Get local time by locale"
+        assert tools[0]["function"]["parameters"]["required"] == ["locale"]
+
+    def test_list_tools_merges_local_and_mcp_tools(self):
+        from chat_client.endpoints.chat_endpoints import _list_tools
+
+        local_tools = [{"type": "function", "function": {"name": "local_tool", "parameters": {"type": "object"}}}]
+        mcp_tools = [{"type": "function", "function": {"name": "mcp_tool", "parameters": {"type": "object"}}}]
+
+        with (
+            patch("chat_client.endpoints.chat_endpoints.TOOL_REGISTRY", {"local_tool": lambda: "ok"}),
+            patch("chat_client.endpoints.chat_endpoints.MCP_SERVER_URL", "http://127.0.0.1:5000/mcp"),
+            patch("chat_client.endpoints.chat_endpoints._list_local_tools", return_value=local_tools),
+            patch("chat_client.endpoints.chat_endpoints._list_mcp_tools", return_value=mcp_tools),
+        ):
+            tools = _list_tools()
+
+        assert len(tools) == 2
+        assert tools[0]["function"]["name"] == "local_tool"
+        assert tools[1]["function"]["name"] == "mcp_tool"
+
+    def test_execute_tool_prefers_local_registry_then_falls_back_to_mcp(self):
+        from chat_client.endpoints.chat_endpoints import _execute_tool
+
+        local_tool_call = {"function": {"name": "local_tool", "arguments": "{}"}}
+        mcp_tool_call = {"function": {"name": "mcp_tool", "arguments": "{}"}}
+
+        with (
+            patch("chat_client.endpoints.chat_endpoints.TOOL_REGISTRY", {"local_tool": lambda: "local-result"}),
+            patch("chat_client.endpoints.chat_endpoints.MCP_SERVER_URL", "http://127.0.0.1:5000/mcp"),
+            patch("chat_client.endpoints.chat_endpoints.mcp_client.call_tool", return_value="mcp-result") as mock_mcp_call,
+        ):
+            local_result = _execute_tool(local_tool_call)
+            mcp_result = _execute_tool(mcp_tool_call)
+
+        assert local_result == "local-result"
+        assert mcp_result == "mcp-result"
+        assert mock_mcp_call.call_count == 1
+
     @patch("chat_client.core.user_session.is_logged_in")
     def test_chat_page_not_authenticated(self, mock_logged_in):
         """Test GET / when not authenticated"""
@@ -84,7 +152,7 @@ class TestChatEndpoints(BaseTestCase):
         data = response.json()
         assert "default_model" in data
         assert "use_katex" in data
-        assert "show_mcp_tool_calls" in data
+        assert "show_tool_calls" in data
         assert "system_message_models" in data
         assert "vision_models" in data
 

@@ -1,14 +1,16 @@
+import time
+import json
+import logging
+from typing import Any
+
+import data.config as config
+from openai import OpenAI
 from starlette.requests import Request
 from starlette.responses import StreamingResponse, JSONResponse, RedirectResponse
 
-from openai import OpenAI
 from chat_client.core import base_context
 from chat_client.core import chat_service
 from chat_client.core import mcp_client
-import data.config as config
-import logging
-import time
-import json
 from chat_client.core.templates import get_templates
 from chat_client.repositories import chat_repository, user_repository, prompt_repository
 from chat_client.core import exceptions_validation
@@ -33,14 +35,16 @@ templates = get_templates()
 MODELS = getattr(config, "MODELS", {})
 PROVIDERS = getattr(config, "PROVIDERS", {})
 
-MCP_MODELS = getattr(config, "MCP_MODELS", [])
 MCP_SERVER_URL = getattr(config, "MCP_SERVER_URL", "")
 MCP_AUTH_TOKEN = getattr(config, "MCP_AUTH_TOKEN", "")
 MCP_TIMEOUT_SECONDS = float(getattr(config, "MCP_TIMEOUT_SECONDS", 20.0))
 MCP_TOOLS_CACHE_SECONDS = float(getattr(config, "MCP_TOOLS_CACHE_SECONDS", 60.0))
-SHOW_MCP_TOOL_CALLS = bool(getattr(config, "SHOW_MCP_TOOL_CALLS", False))
+SHOW_TOOL_CALLS = bool(getattr(config, "SHOW_TOOL_CALLS", False))
 SYSTEM_MESSAGE_MODELS = getattr(config, "SYSTEM_MESSAGE_MODELS", [])
 VISION_MODELS = getattr(config, "VISION_MODELS", [])
+TOOL_REGISTRY = getattr(config, "TOOL_REGISTRY", {})
+LOCAL_TOOL_DEFINITIONS = getattr(config, "LOCAL_TOOL_DEFINITIONS", [])
+TOOL_MODELS = getattr(config, "TOOL_MODELS", [])
 
 _mcp_tools_cache: list[dict] = []
 _mcp_tools_cache_at: float = 0.0
@@ -48,6 +52,82 @@ _mcp_tools_cache_at: float = 0.0
 
 def _resolve_provider_info(model: str) -> dict:
     return chat_service.resolve_provider_info(model, MODELS, PROVIDERS)
+
+
+def _has_local_tool_registry() -> bool:
+    return isinstance(TOOL_REGISTRY, dict) and bool(TOOL_REGISTRY)
+
+
+def _has_mcp_config() -> bool:
+    return bool(MCP_SERVER_URL.strip())
+
+
+def _normalize_local_tool_definition(tool_definition: dict[str, Any]) -> dict[str, Any] | None:
+    if not isinstance(tool_definition, dict):
+        return None
+
+    name = tool_definition.get("name")
+    if not isinstance(name, str) or not name.strip():
+        return None
+    if name not in TOOL_REGISTRY:
+        return None
+
+    description = tool_definition.get("description", "")
+    input_schema = tool_definition.get("input_schema", {"type": "object", "properties": {}})
+    if not isinstance(input_schema, dict):
+        input_schema = {"type": "object", "properties": {}}
+
+    return {
+        "type": "function",
+        "function": {
+            "name": name,
+            "description": description if isinstance(description, str) else "",
+            "parameters": input_schema,
+        },
+    }
+
+
+def _list_local_tools() -> list[dict[str, Any]]:
+    definitions: list[dict[str, Any]] = []
+    tools: list[dict[str, Any]] = []
+    if not _has_local_tool_registry():
+        return tools
+
+    if isinstance(LOCAL_TOOL_DEFINITIONS, list):
+        definitions = [tool for tool in LOCAL_TOOL_DEFINITIONS if isinstance(tool, dict)]
+    if definitions:
+        for definition in definitions:
+            normalized = _normalize_local_tool_definition(definition)
+            if normalized:
+                tools.append(normalized)
+        return tools
+
+    for name, function in TOOL_REGISTRY.items():
+        if not isinstance(name, str) or not name.strip():
+            continue
+        if not callable(function):
+            continue
+
+        description = getattr(function, "__doc__", "") or ""
+        tools.append(
+            {
+                "type": "function",
+                "function": {
+                    "name": name,
+                    "description": str(description).strip(),
+                    "parameters": {"type": "object", "properties": {}},
+                },
+            }
+        )
+    return tools
+
+
+def _resolve_tool_models() -> list[str]:
+    if isinstance(TOOL_MODELS, list) and TOOL_MODELS:
+        return TOOL_MODELS
+    if _has_local_tool_registry() or _has_mcp_config():
+        return list(MODELS.keys())
+    return []
 
 
 async def chat_page(request: Request):
@@ -97,20 +177,31 @@ def _list_mcp_tools() -> list[dict]:
     return tools
 
 
+def _list_tools() -> list[dict]:
+    tools: list[dict] = []
+    if _has_local_tool_registry():
+        tools.extend(_list_local_tools())
+    if _has_mcp_config():
+        tools.extend(_list_mcp_tools())
+    return tools
+
+
 def _execute_tool(tool_call):
-    """
-    Execute a tool call via MCP.
-    """
-    func_name = tool_call["function"]["name"]
-    args = chat_service.parse_tool_arguments(tool_call, logger)
-    logger.info(f"Executing MCP tool: {func_name}({args})")
-    return mcp_client.call_tool(
-        server_url=MCP_SERVER_URL,
-        auth_token=MCP_AUTH_TOKEN,
-        timeout_seconds=MCP_TIMEOUT_SECONDS,
-        name=func_name,
-        arguments=args,
-    )
+    func_name = tool_call.get("function", {}).get("name", "")
+    if _has_local_tool_registry() and isinstance(func_name, str) and func_name in TOOL_REGISTRY:
+        return chat_service.execute_tool(tool_call, TOOL_REGISTRY, logger)
+    if _has_mcp_config():
+        func_name = tool_call["function"]["name"]
+        args = chat_service.parse_tool_arguments(tool_call, logger)
+        logger.info(f"Executing MCP tool: {func_name}({args})")
+        return mcp_client.call_tool(
+            server_url=MCP_SERVER_URL,
+            auth_token=MCP_AUTH_TOKEN,
+            timeout_seconds=MCP_TIMEOUT_SECONDS,
+            name=func_name,
+            arguments=args,
+        )
+    return "No tool backend configured"
 
 
 def _serialize_tool_content(result) -> str:
@@ -173,8 +264,8 @@ async def _chat_response_stream(request: Request, messages, model, logged_in, di
         model,
         openai_client_cls=OpenAI,
         provider_info_resolver=_resolve_provider_info,
-        tool_models=MCP_MODELS,
-        tools_loader=_list_mcp_tools,
+        tool_models=_resolve_tool_models(),
+        tools_loader=_list_tools,
         tool_executor=_tool_executor_with_persist,
         logger=logger,
     ):
@@ -207,7 +298,7 @@ async def config_(request: Request):
     config_values = {
         "default_model": getattr(config, "DEFAULT_MODEL", ""),
         "use_katex": getattr(config, "USE_KATEX", False),
-        "show_mcp_tool_calls": SHOW_MCP_TOOL_CALLS,
+        "show_tool_calls": SHOW_TOOL_CALLS,
         "system_message_models": SYSTEM_MESSAGE_MODELS,
         "vision_models": VISION_MODELS,
     }
@@ -308,7 +399,7 @@ async def get_messages(request: Request):
         if not dialog_id:
             raise exceptions_validation.UserValidate("Dialog id is required")
         messages = await chat_repository.get_messages(user_id, dialog_id)
-        if not SHOW_MCP_TOOL_CALLS:
+        if not SHOW_TOOL_CALLS:
             messages = [message for message in messages if message.get("role") != "tool"]
         return JSONResponse(messages)
     except exceptions_validation.UserValidate as e:

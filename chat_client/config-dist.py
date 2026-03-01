@@ -93,20 +93,42 @@ VISION_MODELS = []
 # Not all models supports this, so we need to specify which models that should receive system instructions.
 SYSTEM_MESSAGE_MODELS: list = []
 
-# Models that should receive MCP tool definitions.
-# MCP_MODELS = ["gpt-40-mini"]
+# Optional local tool registry (preferred over MCP when configured).
+# Functions must be callables that accept keyword arguments.
+# TOOL_REGISTRY = {
+#     "ping": lambda: "pong",
+# }
+#
+# Optional explicit local tool definitions in MCP-style schema.
+# `name` must exist in TOOL_REGISTRY.
+# LOCAL_TOOL_DEFINITIONS = [
+#     {
+#         "name": "ping",
+#         "description": "Simple ping tool",
+#         "input_schema": {
+#             "type": "object",
+#             "properties": {},
+#             "additionalProperties": False,
+#         },
+#     }
+# ]
 
-# MCP is disabled when MCP_MODELS is empty.
-MCP_MODELS: list = []
-SHOW_MCP_TOOL_CALLS = True
+# Models that should receive tool definitions (local + MCP).
+# TOOL_MODELS = ["gpt-40-mini"]
+#
+# If empty and either
+# TOOL_REGISTRY or MCP is configured, all configured MODELS are allowed.
+TOOL_MODELS: list = []
+
+SHOW_TOOL_CALLS = True
 # MCP server integration (remote JSON-RPC over HTTP)
 # Tools are loaded from MCP `tools/list` and executed via MCP `tools/call`.
 MCP_SERVER_URL = "http://127.0.0.1:5000/mcp"
 MCP_AUTH_TOKEN = "your-very-secret-token"  # Set bearer token / OAuth access token when required.
 MCP_TIMEOUT_SECONDS = 20.0
 MCP_TOOLS_CACHE_SECONDS = 60.0
-# Show persisted MCP tool calls in dialog history.
-SHOW_MCP_TOOL_CALLS = False
+# Show persisted tool calls in dialog history.
+
 
 # Optional hosted MCP example:
 # MCP_SERVER_URL = "https://mcp.context7.com/mcp"

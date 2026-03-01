@@ -449,7 +449,7 @@ class ConversationController {
 
                 if (chunk.reasoning) await ui.appendContent(chunk.reasoning);
                 if (chunk.content) await ui.appendContent(chunk.content, Boolean(chunk.done));
-                if (this.config.show_mcp_tool_calls && chunk.toolCall) {
+                if (this.config.show_tool_calls && chunk.toolCall) {
                     this.view.renderStaticToolMessage(chunk.toolCall, ui.container);
                 }
             }
@@ -502,7 +502,7 @@ class ConversationController {
                     msg.images || [],
                     displayRole,
                 );
-            } else if (msg.role === 'tool' && this.config.show_mcp_tool_calls) {
+            } else if (msg.role === 'tool' && this.config.show_tool_calls) {
                 this.view.renderStaticToolMessage(msg);
             } else {
                 await this.view.renderStaticAssistantMessage(msg.content, msg.message_id);
