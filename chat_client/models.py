@@ -108,6 +108,7 @@ class Message(Base):
     __table_args__ = (
         Index("message_dialog_id", "dialog_id"),
         Index("message_user_id", "user_id"),
+        Index("message_dialog_sequence_index", "dialog_id", "sequence_index"),
         {"sqlite_autoincrement": True},
     )
 
@@ -116,6 +117,7 @@ class Message(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     role: Mapped[str] = mapped_column(Text, nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    sequence_index: Mapped[int] = mapped_column(nullable=False, default=0)
     active: Mapped[int] = mapped_column(default=1)
     created: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False, init=False
@@ -155,6 +157,7 @@ class ToolCallEvent(Base):
         Index("tool_call_event_dialog_id", "dialog_id"),
         Index("tool_call_event_user_id", "user_id"),
         Index("tool_call_event_tool_call_id", "tool_call_id"),
+        Index("tool_call_event_dialog_sequence_index", "dialog_id", "sequence_index"),
         {"sqlite_autoincrement": True},
     )
 
@@ -163,6 +166,7 @@ class ToolCallEvent(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     tool_call_id: Mapped[str] = mapped_column(Text, nullable=False)
     tool_name: Mapped[str] = mapped_column(Text, nullable=False)
+    sequence_index: Mapped[int] = mapped_column(nullable=False, default=0)
     arguments_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
     result_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
     error_text: Mapped[str] = mapped_column(Text, nullable=False, default="")

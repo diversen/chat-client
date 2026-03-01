@@ -12,6 +12,23 @@ logger: logging.Logger = logging.getLogger(__name__)
 DIALOGS_PER_PAGE = 20
 
 
+async def _next_dialog_sequence_index(session, user_id: int, dialog_id: str) -> int:
+    message_max_stmt = select(func.max(Message.sequence_index)).where(
+        Message.dialog_id == dialog_id,
+        Message.user_id == user_id,
+    )
+    tool_max_stmt = select(func.max(ToolCallEvent.sequence_index)).where(
+        ToolCallEvent.dialog_id == dialog_id,
+        ToolCallEvent.user_id == user_id,
+    )
+    message_max_result = await session.execute(message_max_stmt)
+    tool_max_result = await session.execute(tool_max_stmt)
+    message_max = message_max_result.scalar_one_or_none()
+    tool_max = tool_max_result.scalar_one_or_none()
+    max_sequence = max(int(message_max or 0), int(tool_max or 0))
+    return max_sequence + 1
+
+
 async def create_dialog(user_id: int, title: str):
 
     async with async_session() as session:
@@ -36,11 +53,13 @@ async def create_message(
 ):
 
     async with async_session() as session:
+        sequence_index = await _next_dialog_sequence_index(session, user_id, dialog_id)
         new_message = Message(
             role=role,
             content=content,
             dialog_id=dialog_id,
             user_id=user_id,
+            sequence_index=sequence_index,
         )
         session.add(new_message)
         await session.flush()
@@ -97,7 +116,7 @@ async def get_messages(user_id: int, dialog_id: str):
         stmt = (
             select(Message)
             .where(Message.dialog_id == dialog_id, Message.user_id == user_id, Message.active == 1)
-            .order_by(Message.created.asc())
+            .order_by(Message.sequence_index.asc(), Message.message_id.asc())
             .limit(1000)
         )
         result = await session.execute(stmt)
@@ -122,9 +141,11 @@ async def get_messages(user_id: int, dialog_id: str):
             message_id = m.message_id
             if message_id is None:
                 continue
+            if m.role == "assistant" and not str(m.content or "").strip():
+                continue
             combined_rows.append(
                 (
-                    m.created,
+                    int(m.sequence_index),
                     {
                         "message_id": str(message_id),
                         "role": m.role,
@@ -138,7 +159,7 @@ async def get_messages(user_id: int, dialog_id: str):
         tool_stmt = (
             select(ToolCallEvent)
             .where(ToolCallEvent.dialog_id == dialog_id, ToolCallEvent.user_id == user_id)
-            .order_by(ToolCallEvent.created.asc())
+            .order_by(ToolCallEvent.sequence_index.asc(), ToolCallEvent.tool_call_event_id.asc())
         )
         tool_result = await session.execute(tool_stmt)
         tool_events = tool_result.scalars().all()
@@ -146,7 +167,7 @@ async def get_messages(user_id: int, dialog_id: str):
             assert event.created is not None
             combined_rows.append(
                 (
-                    event.created,
+                    int(event.sequence_index),
                     {
                         "message_id": None,
                         "role": "tool",
@@ -175,11 +196,13 @@ async def create_tool_call_event(
     error_text: str = "",
 ):
     async with async_session() as session:
+        sequence_index = await _next_dialog_sequence_index(session, user_id, dialog_id)
         event = ToolCallEvent(
             user_id=user_id,
             dialog_id=dialog_id,
             tool_call_id=tool_call_id,
             tool_name=tool_name,
+            sequence_index=sequence_index,
             arguments_json=json.dumps(arguments),
             result_text=result_text,
             error_text=error_text,
@@ -295,7 +318,11 @@ async def update_message(user_id: int, message_id: int, new_content: str):
         # Deactivate all messages in the same dialog that were created after this message
         deactivate_stmt = (
             update(Message)
-            .where(Message.dialog_id == message.dialog_id, Message.created > message.created, Message.user_id == user_id)
+            .where(
+                Message.dialog_id == message.dialog_id,
+                Message.sequence_index > message.sequence_index,
+                Message.user_id == user_id,
+            )
             .values(active=0)
         )
         await session.execute(deactivate_stmt)
@@ -304,7 +331,7 @@ async def update_message(user_id: int, message_id: int, new_content: str):
         delete_tool_events_stmt = delete(ToolCallEvent).where(
             ToolCallEvent.dialog_id == message.dialog_id,
             ToolCallEvent.user_id == user_id,
-            ToolCallEvent.created > message.created,
+            ToolCallEvent.sequence_index > message.sequence_index,
         )
         await session.execute(delete_tool_events_stmt)
 

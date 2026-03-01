@@ -452,12 +452,14 @@ class ConversationController {
             await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
 
             const finalText = await ui.finalize();
-            await addCopyButtons(ui.contentElement, this.config);
-            this.view.attachCopy(ui.container, finalText);
 
             if (finalText.trim()) {
+                await addCopyButtons(ui.contentElement, this.config);
+                this.view.attachCopy(ui.container, finalText);
                 const assistantMessage = { role: 'assistant', content: finalText };
                 assistantSegments.push({ message: assistantMessage, container: ui.container });
+            } else {
+                ui.container.remove();
             }
 
             ui = null;
