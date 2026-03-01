@@ -429,12 +429,39 @@ class ConversationController {
     }
 
     async renderAssistantMessage() {
-        const ui = this.view.createAssistantContainer();
         this.view.disableNew();
         this.view.enableAbort();
         this.isStreaming = true;
         this.setEditFormSubmissionEnabled(false);
         this.updateSendButtonState();
+
+        const assistantSegments = [];
+        let ui = null;
+
+        const ensureAssistantContainer = () => {
+            if (!ui) {
+                ui = this.view.createAssistantContainer();
+            }
+            return ui;
+        };
+
+        const finalizeAssistantContainer = async () => {
+            if (!ui) return;
+
+            ui.loader.classList.add('hidden');
+            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+
+            const finalText = await ui.finalize();
+            await addCopyButtons(ui.contentElement, this.config);
+            this.view.attachCopy(ui.container, finalText);
+
+            if (finalText.trim()) {
+                const assistantMessage = { role: 'assistant', content: finalText };
+                assistantSegments.push({ message: assistantMessage, container: ui.container });
+            }
+
+            ui = null;
+        };
 
         try {
             for await (const chunk of this.chat.stream({
@@ -442,19 +469,23 @@ class ConversationController {
                 dialog_id: this.dialogId || '',
                 messages: this.messages,
             }, this.abortController.signal)) {
-                ui.loader.classList.add('hidden');
-
-                if (chunk.reasoningOpenClose === 'open') ui.appendReasoning('');
-                else if (chunk.reasoningOpenClose === 'close') ui.closeReasoningIfOpen();
-
-                if (chunk.reasoning) await ui.appendContent(chunk.reasoning);
-                if (chunk.content) await ui.appendContent(chunk.content, Boolean(chunk.done));
                 if (this.config.show_tool_calls && chunk.toolCall) {
-                    this.view.renderStaticToolMessage(chunk.toolCall, ui.container);
+                    await finalizeAssistantContainer();
+                    this.view.renderStaticToolMessage(chunk.toolCall);
+                    continue;
                 }
+
+                const activeUi = ensureAssistantContainer();
+                activeUi.loader.classList.add('hidden');
+
+                if (chunk.reasoningOpenClose === 'open') activeUi.appendReasoning('');
+                else if (chunk.reasoningOpenClose === 'close') activeUi.closeReasoningIfOpen();
+
+                if (chunk.reasoning) await activeUi.appendContent(chunk.reasoning);
+                if (chunk.content) await activeUi.appendContent(chunk.content, Boolean(chunk.done));
             }
         } catch (error) {
-            ui.loader.classList.add('hidden');
+            if (ui) ui.loader.classList.add('hidden');
             if (error.name === 'AbortError') {
                 Flash.setMessage('Request was aborted', 'notice');
             } else {
@@ -470,18 +501,13 @@ class ConversationController {
             this.view.enableNew();
             this.updateSendButtonState();
 
-            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+            await finalizeAssistantContainer();
 
-            const finalText = await ui.finalize();
-            await addCopyButtons(ui.contentElement, this.config);
-
-            const assistantMessage = { role: 'assistant', content: finalText };
-            const assistantMessageId = await this.storage.createMessage(this.dialogId, assistantMessage);
-
-            ui.container.setAttribute('data-message-id', assistantMessageId);
-            this.view.attachCopy(ui.container, finalText);
-
-            this.messages.push({ ...assistantMessage, message_id: assistantMessageId });
+            for (const segment of assistantSegments) {
+                const assistantMessageId = await this.storage.createMessage(this.dialogId, segment.message);
+                segment.container.setAttribute('data-message-id', assistantMessageId);
+                this.messages.push({ ...segment.message, message_id: assistantMessageId });
+            }
             this.abortController = new AbortController();
         }
     }

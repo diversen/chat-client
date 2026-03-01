@@ -11,6 +11,7 @@ from starlette.requests import Request
 GENERIC_OPENAI_ERROR_MESSAGE = "An error occurred. Please try again later."
 IMAGE_MODALITY_ERROR_MESSAGE = "The selected model does not support image inputs. Remove attached images or choose a vision model."
 TOOL_ROUTER_MAX_TOKENS = 64
+MAX_TOOL_LOOP_ROUNDS = 8
 
 
 def _close_stream(stream: Any, logger: logging.Logger) -> None:
@@ -207,6 +208,111 @@ def _normalize_tool_calls(raw_tool_calls: Any) -> list[dict[str, Any]]:
     return normalized
 
 
+def _append_stream_tool_call_deltas(raw_tool_calls: Any, state: dict[str, Any]) -> None:
+    """
+    Merge streamed tool_call deltas into a stable list keyed by tool_call id.
+    """
+    if not isinstance(raw_tool_calls, list):
+        return
+
+    tool_calls_by_key: dict[str, dict[str, Any]] = state["tool_calls_by_key"]
+    tool_call_order: list[str] = state["tool_call_order"]
+    index_active_key: dict[int, str] = state["index_active_key"]
+
+    for raw_call in raw_tool_calls:
+        index = getattr(raw_call, "index", None)
+        if not isinstance(index, int):
+            index = -1
+
+        call_id = getattr(raw_call, "id", None)
+        if isinstance(call_id, str) and call_id.strip():
+            key = call_id
+            previous_key = index_active_key.get(index)
+            if (
+                previous_key
+                and previous_key.startswith("tmp:")
+                and previous_key in tool_calls_by_key
+                and key not in tool_calls_by_key
+            ):
+                migrated = tool_calls_by_key.pop(previous_key)
+                for i, candidate_key in enumerate(tool_call_order):
+                    if candidate_key == previous_key:
+                        tool_call_order[i] = key
+                        break
+                migrated["id"] = key
+                tool_calls_by_key[key] = migrated
+            index_active_key[index] = key
+        else:
+            key = index_active_key.get(index, "")
+            if not key or key not in tool_calls_by_key:
+                state["tmp_counter"] += 1
+                key = f"tmp:{index}:{state['tmp_counter']}"
+                index_active_key[index] = key
+
+        if key not in tool_calls_by_key:
+            tool_calls_by_key[key] = {
+                "id": call_id if isinstance(call_id, str) and call_id.strip() else key,
+                "type": "function",
+                "function": {"name": "", "arguments": ""},
+            }
+            tool_call_order.append(key)
+
+        entry = tool_calls_by_key[key]
+        if isinstance(call_id, str) and call_id.strip():
+            entry["id"] = call_id
+
+        call_type = getattr(raw_call, "type", None)
+        if isinstance(call_type, str) and call_type.strip():
+            entry["type"] = call_type
+
+        function = getattr(raw_call, "function", None)
+        if function is None:
+            continue
+
+        name = getattr(function, "name", None)
+        if isinstance(name, str) and name.strip():
+            entry["function"]["name"] = name
+
+        arguments = getattr(function, "arguments", None)
+        if isinstance(arguments, str) and arguments:
+            entry["function"]["arguments"] += arguments
+
+
+def _collect_streamed_tool_calls(state: dict[str, Any]) -> list[dict[str, Any]]:
+    tool_calls_by_key: dict[str, dict[str, Any]] = state["tool_calls_by_key"]
+    tool_call_order: list[str] = state["tool_call_order"]
+    collected: list[dict[str, Any]] = []
+
+    for key in tool_call_order:
+        call = tool_calls_by_key.get(key)
+        if not isinstance(call, dict):
+            continue
+        function = call.get("function", {})
+        name = function.get("name", "") if isinstance(function, dict) else ""
+        if not isinstance(name, str) or not name.strip():
+            continue
+        call_id = call.get("id", key)
+        if not isinstance(call_id, str) or not call_id.strip():
+            call_id = key
+        arguments = function.get("arguments", "{}")
+        if not isinstance(arguments, str):
+            arguments = "{}"
+        call_type = call.get("type", "function")
+        if not isinstance(call_type, str) or not call_type.strip():
+            call_type = "function"
+        collected.append(
+            {
+                "id": call_id,
+                "type": call_type,
+                "function": {
+                    "name": name.strip(),
+                    "arguments": arguments,
+                },
+            }
+        )
+    return collected
+
+
 def _summarize_assistant_message_for_log(assistant_message: Any, finish_reason: Any) -> dict[str, Any]:
     content = str(getattr(assistant_message, "content", "") or "")
     summary: dict[str, Any] = {
@@ -240,13 +346,34 @@ async def chat_response_stream(
         )
 
         tools_enabled = model in tool_models
-        if not tools_enabled:
-            stream_response = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                stream=True,
-            )
+        tool_definitions = tools_loader() if tools_enabled else []
+
+        rounds = 0
+        while True:
+            rounds += 1
+            if rounds > MAX_TOOL_LOOP_ROUNDS:
+                yield f"data: {json.dumps({'error': 'Tool loop exceeded maximum rounds'})}\n\n"
+                return
+
+            create_kwargs: dict[str, Any] = {
+                "model": model,
+                "messages": messages,
+                "stream": True,
+            }
+            if tools_enabled:
+                create_kwargs["tools"] = tool_definitions
+
+            stream_response = client.chat.completions.create(**create_kwargs)
             disconnected = False
+            assistant_content_parts: list[str] = []
+            finish_reason: Any = None
+            tool_call_state: dict[str, Any] = {
+                "tool_calls_by_key": {},
+                "tool_call_order": [],
+                "index_active_key": {},
+                "tmp_counter": 0,
+            }
+
             try:
                 for chunk in stream_response:
                     if await request.is_disconnected():
@@ -256,33 +383,41 @@ async def chat_response_stream(
                     model_dict = chunk.model_dump()
                     json_chunk = json.dumps(model_dict)
                     yield f"data: {json_chunk}\n\n"
+
+                    choices = getattr(chunk, "choices", None)
+                    if not isinstance(choices, list) or not choices:
+                        continue
+                    first_choice = choices[0]
+                    delta = getattr(first_choice, "delta", None)
+                    if delta is not None:
+                        content_piece = getattr(delta, "content", None)
+                        if isinstance(content_piece, str) and content_piece:
+                            assistant_content_parts.append(content_piece)
+                        _append_stream_tool_call_deltas(getattr(delta, "tool_calls", None), tool_call_state)
+                    if getattr(first_choice, "finish_reason", None) is not None:
+                        finish_reason = getattr(first_choice, "finish_reason", None)
             finally:
                 _close_stream(stream_response, logger)
 
             if disconnected:
                 return
-            return
 
-        tool_decision_response = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            tools=tools_loader(),
-            max_tokens=TOOL_ROUTER_MAX_TOKENS,
-            stream=False,
-        )
-        choices = getattr(tool_decision_response, "choices", None)
-        if not isinstance(choices, list) or not choices:
-            return
+            tool_calls = _collect_streamed_tool_calls(tool_call_state)
+            assistant_content = "".join(assistant_content_parts)
+            logger.info(
+                "Streamed assistant message: %s",
+                {
+                    "finish_reason": str(finish_reason or ""),
+                    "content": assistant_content,
+                    "tool_calls": tool_calls,
+                },
+            )
 
-        first_choice = choices[0]
-        assistant_message = getattr(first_choice, "message", None)
-        logger.info(
-            "First non-streaming assistant message: %s",
-            _summarize_assistant_message_for_log(assistant_message, getattr(first_choice, "finish_reason", None)),
-        )
-        tool_calls = _normalize_tool_calls(getattr(assistant_message, "tool_calls", None))
+            if not tool_calls:
+                return
 
-        if tool_calls:
+            messages.append({"role": "assistant", "content": assistant_content, "tool_calls": tool_calls})
+
             tool_results: list[tuple[dict[str, Any], Any]] = []
             for tool_call in tool_calls:
                 result = tool_executor(tool_call)
@@ -305,7 +440,6 @@ async def chat_response_stream(
                     + "\n\n"
                 )
 
-            messages.append({"role": "assistant", "tool_calls": tool_calls})
             for tool_call, result in tool_results:
                 messages.append(
                     {
@@ -314,38 +448,6 @@ async def chat_response_stream(
                         "content": result,
                     }
                 )
-
-            final_response = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                stream=True,
-            )
-            try:
-                for chunk in final_response:
-                    if await request.is_disconnected():
-                        return
-                    model_dict = chunk.model_dump()
-                    json_chunk = json.dumps(model_dict)
-                    yield f"data: {json_chunk}\n\n"
-            finally:
-                _close_stream(final_response, logger)
-            return
-
-        final_response = client.chat.completions.create(
-            model=model,
-            messages=messages,
-            stream=True,
-        )
-        try:
-            for chunk in final_response:
-                if await request.is_disconnected():
-                    return
-                model_dict = chunk.model_dump()
-                json_chunk = json.dumps(model_dict)
-                yield f"data: {json_chunk}\n\n"
-        finally:
-            _close_stream(final_response, logger)
-        return
 
     except OpenAIError as error:
         logger.exception("OpenAI error")

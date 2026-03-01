@@ -220,6 +220,40 @@ def _normalize_chat_messages(messages: list) -> list:
     return chat_service.normalize_chat_messages(messages)
 
 
+def _build_model_messages_from_dialog_history(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """
+    Build provider-compatible messages from persisted dialog history.
+    Includes tool messages so prior tool outputs stay in context.
+    """
+    normalized: list[dict[str, Any]] = []
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+        role = str(message.get("role", "")).strip()
+        content = str(message.get("content", ""))
+
+        if role in {"user", "assistant", "system"}:
+            item: dict[str, Any] = {"role": role, "content": content}
+            if role == "user":
+                images = message.get("images", [])
+                item["images"] = images if isinstance(images, list) else []
+            normalized.append(item)
+            continue
+
+        if role == "tool":
+            tool_call_id = str(message.get("tool_call_id", "")).strip()
+            if not tool_call_id:
+                continue
+            normalized.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tool_call_id,
+                    "content": content,
+                }
+            )
+    return normalized
+
+
 def _strip_images_from_messages(messages: list[dict]) -> list[dict]:
     """
     Remove image attachments from messages before sending to non-vision models.
@@ -276,13 +310,16 @@ async def chat_response_stream(request: Request):
     try:
         logged_in = await require_user_id_json(request, message="You must be logged in to use the chat")
         payload = await parse_json_payload(request, ChatStreamRequest)
-        raw_messages = [message.model_dump() for message in payload.messages]
-        if payload.model not in VISION_MODELS:
-            raw_messages = _strip_images_from_messages(raw_messages)
-        messages = _normalize_chat_messages(raw_messages)
+        payload_messages = [message.model_dump() for message in payload.messages]
+        raw_messages = payload_messages
         dialog_id = str(payload.dialog_id).strip()
         if dialog_id:
             await chat_repository.get_dialog(logged_in, dialog_id)
+            persisted_messages = await chat_repository.get_messages(logged_in, dialog_id)
+            raw_messages = _build_model_messages_from_dialog_history(persisted_messages)
+        if payload.model not in VISION_MODELS:
+            raw_messages = _strip_images_from_messages(raw_messages)
+        messages = _normalize_chat_messages(raw_messages)
         return StreamingResponse(
             _chat_response_stream(request, messages, payload.model, logged_in, dialog_id),
             media_type="text/event-stream",
