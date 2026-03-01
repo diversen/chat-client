@@ -268,6 +268,7 @@ function appendLabeledMarkdownCode(container, label, language, code) {
             hljs.highlightElement(element);
         });
     }
+    addCopyButtons(block);
     container.appendChild(block);
 }
 

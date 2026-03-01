@@ -3,19 +3,21 @@ async function addCopyButtons(contentElem, _config) {
     const codeBlocks = contentElem.querySelectorAll('pre code');
 
     codeBlocks.forEach(code => {
-
-        // Wrap button in a div and insert before code block
-        const codeButtonContainer = document.createElement('div');
-        codeButtonContainer.classList.add('code-button-container');
+        if (code.querySelector('.copy-button')) {
+            return;
+        }
+        const codeText = code.textContent;
+        code.classList.add('copyable-code');
 
         /**
          * Copy-paste code button
          */
         const button = document.createElement("button");
         button.classList.add('copy-button');
+        button.type = 'button';
         button.textContent = "Copy code";
         button.onclick = function () {
-            navigator.clipboard.writeText(code.textContent).then(() => {
+            navigator.clipboard.writeText(codeText).then(() => {
                 button.textContent = "Copied!";
 
                 setTimeout(() => {
@@ -26,11 +28,7 @@ async function addCopyButtons(contentElem, _config) {
                 console.log('Failed to copy: ', err);
             });
         };
-
-        codeButtonContainer.appendChild(button);
-
-        const parent = code.parentNode;
-        parent.insertBefore(codeButtonContainer, code);
+        code.appendChild(button);
     });
 }
 

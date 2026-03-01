@@ -304,10 +304,19 @@ nav svg {
     font-size: 12px;
 }
 
-.code-button-container {
-    display: flex;
-    justify-content: flex-end;
-    gap: 5px;
+pre code.copyable-code {
+    position: relative;
+    display: block;
+    padding-top: 2rem;
+}
+
+pre code.copyable-code .copy-button {
+    position: absolute;
+    top: 0.4rem;
+    right: 0.4rem;
+    z-index: 2;
+    padding: 2px 8px;
+    font-size: 11px;
 }
 
 .loading-spinner {
