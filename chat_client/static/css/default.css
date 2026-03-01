@@ -565,6 +565,10 @@ a.is-disabled-link {
     color: dimgray;
 }
 
+.role_tool {
+    color: dimgray;
+}
+
 .role_tool.tool-toggle {
     cursor: pointer;
     user-select: none;
@@ -581,6 +585,30 @@ a.is-disabled-link {
 }
 
 .tool-call-body {
+    margin-top: 4px;
+}
+
+.thinking-block {
+    margin: 4px 0;
+}
+
+.thinking-toggle {
+    cursor: pointer;
+    user-select: none;
+    margin-bottom: 0;
+}
+
+.thinking-toggle::after {
+    content: " ▸";
+    font-size: 0.9em;
+    opacity: 0.7;
+}
+
+.thinking-toggle[aria-expanded="true"]::after {
+    content: " ▾";
+}
+
+.thinking-body {
     margin-top: 4px;
 }
 

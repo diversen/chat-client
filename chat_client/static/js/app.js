@@ -55,6 +55,83 @@ function renderKatex(contentElem) {
     }
 }
 
+function splitThinkingSegments(rawText) {
+    const text = String(rawText || '');
+    const tagRegex = /<\/?(?:think|thinking|thought)>/gi;
+    const segments = [];
+    let isThinking = false;
+    let lastIndex = 0;
+    let match;
+
+    const pushSegment = (type, value) => {
+        if (!value) return;
+        const prev = segments[segments.length - 1];
+        if (prev && prev.type === type) {
+            prev.text += value;
+            return;
+        }
+        segments.push({ type, text: value });
+    };
+
+    while ((match = tagRegex.exec(text)) !== null) {
+        const before = text.slice(lastIndex, match.index);
+        pushSegment(isThinking ? 'thinking' : 'normal', before);
+
+        const tag = String(match[0] || '').toLowerCase();
+        if (tag.startsWith('</')) {
+            isThinking = false;
+        } else {
+            isThinking = true;
+        }
+        lastIndex = tagRegex.lastIndex;
+    }
+
+    pushSegment(isThinking ? 'thinking' : 'normal', text.slice(lastIndex));
+    return segments;
+}
+
+function appendRenderedMarkdown(target, markdownText) {
+    const container = document.createElement('div');
+    container.innerHTML = mdNoHTML.render(markdownText);
+    while (container.firstChild) {
+        target.appendChild(container.firstChild);
+    }
+}
+
+function createThinkingBlock(markdownText) {
+    const block = document.createElement('section');
+    block.className = 'thinking-block';
+
+    const toggle = document.createElement('h4');
+    toggle.className = 'role role_tool thinking-toggle';
+    toggle.textContent = 'Thinking';
+    toggle.setAttribute('role', 'button');
+    toggle.setAttribute('tabindex', '0');
+    toggle.setAttribute('aria-expanded', 'false');
+
+    const body = document.createElement('div');
+    body.className = 'thinking-body hidden';
+    appendRenderedMarkdown(body, markdownText);
+
+    const toggleBody = () => {
+        const isOpen = !body.classList.contains('hidden');
+        body.classList.toggle('hidden', isOpen);
+        toggle.setAttribute('aria-expanded', String(!isOpen));
+    };
+
+    toggle.addEventListener('click', toggleBody);
+    toggle.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            toggleBody();
+        }
+    });
+
+    block.appendChild(toggle);
+    block.appendChild(body);
+    return block;
+}
+
 /**
  * Render streamed response text into the content element (static render)
  * Note: renamed from renderSteamedResponseText
@@ -62,8 +139,18 @@ function renderKatex(contentElem) {
 async function renderStreamedResponseText(contentElement, streamedResponseText) {
     const startTime = performance.now();
 
-    streamedResponseText = modifyStreamedText(streamedResponseText);
-    contentElement.innerHTML = mdNoHTML.render(streamedResponseText);
+    const segments = splitThinkingSegments(streamedResponseText);
+    contentElement.innerHTML = '';
+
+    for (const segment of segments) {
+        const normalizedText = modifyStreamedText(segment.text);
+        if (segment.type === 'thinking') {
+            const thinkingBlock = createThinkingBlock(normalizedText);
+            contentElement.appendChild(thinkingBlock);
+            continue;
+        }
+        appendRenderedMarkdown(contentElement, normalizedText);
+    }
 
     // Optimize highlight and KaTeX: run after markdown render
     highlightCodeInElement(contentElement);
