@@ -6,7 +6,7 @@ import {
 import { initAppEvents } from './app-events.js';
 import { dd } from './diff-dom.js';
 import { modifyStreamedText } from './utils.js';
-import { createStorageService, createAuthService, createChatService } from './chat-services.js';
+import { storageService, authService, chatService } from './chat-services.js';
 import { ConversationController } from './chat-controller.js';
 import { createChatView } from './chat-view.js';
 
@@ -238,10 +238,6 @@ const view = createChatView({
     renderStreamedResponseText,
     updateContentDiff,
 });
-
-const storageService = createStorageService();
-const authService = createAuthService();
-const chatService = createChatService();
 
 /**
  * Bootstrap: instantiate controller and perform initial URL-based loading

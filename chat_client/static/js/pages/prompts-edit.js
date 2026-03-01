@@ -1,5 +1,6 @@
 import { Flash } from '/static/js/flash.js';
 import { Requests } from '/static/js/requests.js';
+import { getTrimmedValueById, validateRequiredFields } from '/static/js/pages/page-utils.js';
 
 function initPromptsEditPage() {
     const saveButton = document.getElementById('save-btn');
@@ -17,16 +18,17 @@ function initPromptsEditPage() {
             return;
         }
 
-        const title = document.getElementById('title').value.trim();
-        const prompt = document.getElementById('custom-prompt').value.trim();
+        const title = getTrimmedValueById('title');
+        const prompt = getTrimmedValueById('custom-prompt');
 
-        if (!title) {
-            Flash.setMessage('Please enter a title.', 'error');
-            return;
-        }
-
-        if (!prompt) {
-            Flash.setMessage('Please enter a prompt.', 'error');
+        const isValid = validateRequiredFields(
+            [
+                { value: title, message: 'Please enter a title.' },
+                { value: prompt, message: 'Please enter a prompt.' },
+            ],
+            (message) => Flash.setMessage(message, 'error'),
+        );
+        if (!isValid) {
             return;
         }
 

@@ -11,6 +11,7 @@ import {
 import { addCopyButtons } from './app-copy-buttons.js';
 import { copyIcon, checkIcon, editIcon } from './app-icons.js';
 import { mdNoHTML } from './markdown.js';
+import { openImagePreviewModal } from './image-preview-modal.js';
 
 const ANCHOR_SPACER_CLASS = 'responses-anchor-spacer';
 const MIN_ANCHOR_SPACER_HEIGHT_PX = 20;
@@ -203,13 +204,6 @@ function showEditForm(container, originalMessage, onEdit) {
     });
 }
 
-function openImagePreviewModal(dataUrl, name) {
-    if (!imagePreviewModalElem || !imagePreviewModalImageElem) return;
-    imagePreviewModalImageElem.src = dataUrl;
-    imagePreviewModalImageElem.alt = name || 'Selected image preview';
-    imagePreviewModalElem.classList.remove('hidden');
-}
-
 function createMessageImages(images = []) {
     if (!Array.isArray(images) || images.length === 0) return null;
 
@@ -228,7 +222,7 @@ function createMessageImages(images = []) {
         thumbnail.alt = `Message image ${index + 1}`;
         thumbnail.src = dataUrl;
         thumbnail.addEventListener('click', () => {
-            openImagePreviewModal(dataUrl, thumbnail.alt);
+            openImagePreviewModal(imagePreviewModalElem, imagePreviewModalImageElem, dataUrl, thumbnail.alt);
         });
 
         item.appendChild(thumbnail);

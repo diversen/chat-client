@@ -2,6 +2,7 @@ import { Flash } from './flash.js';
 import { logError } from './error-log.js';
 import { addCopyButtons } from './app-copy-buttons.js';
 import { Requests } from './requests.js';
+import { openImagePreviewModal, closeImagePreviewModal } from './image-preview-modal.js';
 import {
     responsesElem,
     messageElem,
@@ -123,16 +124,11 @@ class ConversationController {
     }
 
     openImagePreviewModal(dataUrl, name) {
-        if (!imagePreviewModalElem || !imagePreviewModalImageElem) return;
-        imagePreviewModalImageElem.src = dataUrl;
-        imagePreviewModalImageElem.alt = name || 'Selected image preview';
-        imagePreviewModalElem.classList.remove('hidden');
+        openImagePreviewModal(imagePreviewModalElem, imagePreviewModalImageElem, dataUrl, name);
     }
 
     closeImagePreviewModal() {
-        if (!imagePreviewModalElem || !imagePreviewModalImageElem) return;
-        imagePreviewModalElem.classList.add('hidden');
-        imagePreviewModalImageElem.src = '';
+        closeImagePreviewModal(imagePreviewModalElem, imagePreviewModalImageElem);
     }
 
     clearPendingImages() {
@@ -200,7 +196,7 @@ class ConversationController {
                 const container = editForm.closest('[data-message-id]');
                 if (container) this.view.hideEditForm(container);
             });
-            this.checkScroll(false);
+            this.checkScroll();
         });
 
         attachImageButtonElem.addEventListener('click', () => {
@@ -261,42 +257,37 @@ class ConversationController {
             await this.sendUserMessage();
         });
 
-        let userInteracting = false;
         let interactionTimeout;
-
-        window.addEventListener('wheel', () => {
-            userInteracting = true;
+        const checkScrollAfterInteraction = () => {
             clearTimeout(interactionTimeout);
             interactionTimeout = setTimeout(() => {
-                userInteracting = false;
-                this.checkScroll(userInteracting);
+                this.checkScroll();
             }, 1000);
+        };
+
+        window.addEventListener('wheel', () => {
+            checkScrollAfterInteraction();
         });
 
         window.addEventListener('touchstart', (event) => {
             if (scrollToBottom && event.target instanceof Element && event.target.closest('#scroll-to-bottom')) {
                 return;
             }
-            userInteracting = true;
             clearTimeout(interactionTimeout);
         });
 
         window.addEventListener('touchend', () => {
-            clearTimeout(interactionTimeout);
-            interactionTimeout = setTimeout(() => {
-                userInteracting = false;
-                this.checkScroll(userInteracting);
-            }, 1000);
+            checkScrollAfterInteraction();
         });
 
-        window.addEventListener('scroll', () => this.checkScroll(userInteracting), { passive: true });
+        window.addEventListener('scroll', () => this.checkScroll(), { passive: true });
         new MutationObserver(() => {
-            this.checkScroll(userInteracting);
+            this.checkScroll();
             if (this.isStreaming) this.setEditFormSubmissionEnabled(false);
         }).observe(responsesElem, { childList: true, subtree: true });
     }
 
-    checkScroll(_userInteracting) {
+    checkScroll() {
         if (!scrollToBottom) return;
         const isEditingMessage = Boolean(responsesElem.querySelector('.edit-form'));
 

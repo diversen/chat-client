@@ -177,6 +177,9 @@ nav svg {
 
 .image-preview-remove {
     all: unset;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     position: absolute;
     top: 1px;
     right: 1px;
@@ -184,8 +187,8 @@ nav svg {
     color: #fff;
     width: 22px;
     height: 22px;
-    line-height: 22px;
-    text-align: center;
+    padding: 0;
+    line-height: 1;
     border-radius: 999px;
     cursor: pointer;
     border: 1px solid rgba(255, 255, 255, 0.45);
@@ -233,6 +236,9 @@ nav svg {
 
 .image-preview-modal-close {
     all: unset;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     position: absolute;
     top: 18px;
     right: 18px;
@@ -242,8 +248,8 @@ nav svg {
     border: 1px solid rgba(255, 255, 255, 0.35);
     width: 32px;
     height: 32px;
-    line-height: 32px;
-    text-align: center;
+    padding: 0;
+    line-height: 1;
     border-radius: 16px;
     font-size: 16px;
 }
