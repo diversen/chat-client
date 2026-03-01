@@ -565,23 +565,26 @@ a.is-disabled-link {
     color: dimgray;
 }
 
-.role_tool {
-    color: var(--links);
-}
-
-.tool-call-details {
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 8px;
-    background: rgba(0, 0, 0, 0.02);
-}
-
-.tool-call-details summary {
+.role_tool.tool-toggle {
     cursor: pointer;
-    font-weight: 600;
+    user-select: none;
 }
 
-.tool-call-meta pre {
+.role_tool.tool-toggle::after {
+    content: " ▸";
+    font-size: 0.9em;
+    opacity: 0.7;
+}
+
+.role_tool.tool-toggle[aria-expanded="true"]::after {
+    content: " ▾";
+}
+
+.tool-call-body {
+    margin-top: 4px;
+}
+
+.tool-message pre {
     background: rgba(0, 0, 0, 0.03);
     border: 1px solid var(--border);
     border-radius: 4px;

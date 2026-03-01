@@ -340,38 +340,43 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
         renderStaticToolMessage(toolMessage, beforeElement = null) {
             const { container, contentElement } = createMessageElement('Tool');
             const toolName = String(toolMessage?.tool_name || 'unknown_tool');
-            const toolCallId = String(toolMessage?.tool_call_id || '');
             const argumentsJson = String(toolMessage?.arguments_json || '{}');
             const resultContent = String(toolMessage?.content || '');
             const errorText = String(toolMessage?.error_text || '');
+            const roleElement = container.querySelector('.role_tool');
+            const toolBody = document.createElement('div');
+            toolBody.className = 'tool-call-body hidden';
+            contentElement.appendChild(toolBody);
 
-            const details = document.createElement('details');
-            details.className = 'tool-call-details';
-            details.open = false;
+            if (roleElement) {
+                roleElement.classList.add('tool-toggle');
+                roleElement.setAttribute('role', 'button');
+                roleElement.setAttribute('tabindex', '0');
+                roleElement.setAttribute('aria-expanded', 'false');
+                roleElement.title = `Show/hide ${toolName} details`;
 
-            const summary = document.createElement('summary');
-            summary.textContent = `Tool: ${toolName}`;
-            details.appendChild(summary);
+                const toggle = () => {
+                    const isOpen = !toolBody.classList.contains('hidden');
+                    toolBody.classList.toggle('hidden', isOpen);
+                    roleElement.setAttribute('aria-expanded', String(!isOpen));
+                };
 
-            const metadata = document.createElement('div');
-            metadata.className = 'tool-call-meta';
-
-            const callId = document.createElement('p');
-            callId.innerHTML = '<strong>Call ID:</strong> ';
-            callId.append(toolCallId);
-            metadata.appendChild(callId);
+                roleElement.addEventListener('click', toggle);
+                roleElement.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        toggle();
+                    }
+                });
+            }
 
             const renderer = TOOL_META_RENDERERS[toolName] || TOOL_META_RENDERERS.default;
-            renderer(metadata, {
+            renderer(toolBody, {
                 toolName,
-                toolCallId,
                 argumentsJson,
                 resultContent,
                 errorText,
             });
-
-            details.appendChild(metadata);
-            contentElement.appendChild(details);
 
             if (beforeElement && beforeElement.parentNode === responsesElem) {
                 responsesElem.insertBefore(container, beforeElement);
