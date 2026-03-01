@@ -19,6 +19,28 @@ Simple python tool utilizing a sqlite3 backend and a minimal HTML / JavaScript f
 * Custom system prompts
 * Tool calling using MCP (Model Context Protocol) protocol. 
 
+## Python Tool Sandbox
+
+The built-in `python` tool runs code in a hardened Docker container and requires Docker to be installed.
+
+Build the default image:
+
+```bash
+sandbox/build_secure_python.sh base
+```
+
+Build a science image with `numpy`, `sympy`, and `pandas` (pinned):
+
+```bash
+sandbox/build_secure_python.sh science
+```
+
+Set which image the tool should use in `data/config.py`:
+
+```python
+PYTHON_TOOL_DOCKER_IMAGE = "secure-python-science"
+```
+
 ## Demo
 
 Try the demo at: https://chat.10kilobyte.com

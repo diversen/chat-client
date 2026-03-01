@@ -47,6 +47,10 @@ REQUEST_MAX_SIZE = 10 * 1024 * 1024
 # Use mathjax for rendering math
 USE_KATEX = True
 
+# Docker image used by the built-in python tool sandbox.
+# Use "secure-python" for base or "secure-python-science" for numpy/sympy/pandas.
+PYTHON_TOOL_DOCKER_IMAGE = "secure-python"
+
 PROVIDERS = {
     # "openai": {
     #     "base_url": "https://api.openai.com/v1",
