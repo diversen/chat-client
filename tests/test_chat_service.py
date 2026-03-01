@@ -68,15 +68,34 @@ class DummyStream:
         self.closed = True
 
 
-def _chunk(content: str, finish_reason=None):
+def _chunk(content: str | None = "", finish_reason=None, tool_calls=None):
+    delta_payload = {}
+    if content is not None:
+        delta_payload["content"] = content
+    if tool_calls is not None:
+        serialized_tool_calls = []
+        for tool_call in tool_calls:
+            function = getattr(tool_call, "function", None)
+            serialized_tool_calls.append(
+                {
+                    "index": getattr(tool_call, "index", None),
+                    "id": getattr(tool_call, "id", None),
+                    "type": getattr(tool_call, "type", None),
+                    "function": {
+                        "name": getattr(function, "name", None),
+                        "arguments": getattr(function, "arguments", None),
+                    },
+                }
+            )
+        delta_payload["tool_calls"] = serialized_tool_calls
     return SimpleNamespace(
         choices=[
             SimpleNamespace(
-                delta=SimpleNamespace(content=content, tool_calls=None),
+                delta=SimpleNamespace(content=content, tool_calls=tool_calls),
                 finish_reason=finish_reason,
             )
         ],
-        model_dump=lambda: {"choices": [{"delta": {"content": content}}]},
+        model_dump=lambda: {"choices": [{"delta": delta_payload}]},
     )
 
 
@@ -133,30 +152,30 @@ def test_chat_response_stream_closes_provider_stream_after_normal_completion():
     assert stream.closed is True
 
 
-def test_chat_response_stream_uses_two_phase_loop_for_tools():
-    tool_choice = SimpleNamespace(
-        choices=[
-            SimpleNamespace(
-                message=SimpleNamespace(
-                    content="",
-                    tool_calls=[
-                        SimpleNamespace(
-                            id="call_utc",
-                            type="function",
-                            function=SimpleNamespace(name="get_locale_date_time", arguments='{"timezone":"UTC"}'),
+def test_chat_response_stream_uses_streaming_tool_loop():
+    first_stream = DummyStream(
+        [
+            _chunk(
+                None,
+                tool_calls=[
+                    SimpleNamespace(
+                        index=0,
+                        id="call_utc",
+                        type="function",
+                        function=SimpleNamespace(name="get_locale_date_time", arguments='{"timezone":"UTC"}'),
+                    ),
+                    SimpleNamespace(
+                        index=1,
+                        id="call_ny",
+                        type="function",
+                        function=SimpleNamespace(
+                            name="get_locale_date_time",
+                            arguments='{"timezone":"America/New_York"}',
                         ),
-                        SimpleNamespace(
-                            id="call_ny",
-                            type="function",
-                            function=SimpleNamespace(
-                                name="get_locale_date_time",
-                                arguments='{"timezone":"America/New_York"}',
-                            ),
-                        ),
-                    ],
-                ),
-                finish_reason="tool_calls",
-            )
+                    ),
+                ],
+            ),
+            _chunk("", finish_reason="tool_calls"),
         ]
     )
     final_stream = DummyStream([_chunk("comparison", finish_reason="stop")])
@@ -164,9 +183,7 @@ def test_chat_response_stream_uses_two_phase_loop_for_tools():
 
     def _create(**kwargs):
         create_calls.append(kwargs)
-        if kwargs.get("stream") is False:
-            return tool_choice
-        return final_stream
+        return first_stream if len(create_calls) == 1 else final_stream
 
     client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=_create)))
     request = DummyRequest(disconnected_after_calls=999)
@@ -196,10 +213,10 @@ def test_chat_response_stream_uses_two_phase_loop_for_tools():
     chunks = asyncio.run(_run())
 
     assert len(create_calls) == 2
-    assert create_calls[0]["stream"] is False
+    assert create_calls[0]["stream"] is True
     assert "tools" in create_calls[0]
     assert create_calls[1]["stream"] is True
-    assert "tools" not in create_calls[1]
+    assert "tools" in create_calls[1]
     assert len(executed_calls) == 2
     assert chat_service.parse_tool_arguments(executed_calls[0], logging.getLogger("test")) == {"timezone": "UTC"}
     assert chat_service.parse_tool_arguments(executed_calls[1], logging.getLogger("test")) == {"timezone": "America/New_York"}
@@ -208,29 +225,18 @@ def test_chat_response_stream_uses_two_phase_loop_for_tools():
     assert len(second_call_messages[1]["tool_calls"]) == 2
     assert second_call_messages[2]["tool_call_id"] == "call_utc"
     assert second_call_messages[3]["tool_call_id"] == "call_ny"
-    assert len(chunks) == 3
-    assert '"tool_call"' in chunks[0]
-    assert '"tool_call"' in chunks[1]
-    assert "comparison" in chunks[2]
+    assert any('"tool_call"' in chunk for chunk in chunks)
+    assert any("comparison" in chunk for chunk in chunks)
+    assert first_stream.closed is True
     assert final_stream.closed is True
 
 
-def test_chat_response_stream_tools_model_without_tool_calls_streams_on_second_call():
-    no_tool_choice = SimpleNamespace(
-        choices=[
-            SimpleNamespace(
-                message=SimpleNamespace(content="no tool needed", tool_calls=None),
-                finish_reason="stop",
-            )
-        ]
-    )
+def test_chat_response_stream_tools_model_without_tool_calls_streams_on_first_call():
     final_stream = DummyStream([_chunk("streamed final", finish_reason="stop")])
     create_calls = []
 
     def _create(**kwargs):
         create_calls.append(kwargs)
-        if kwargs.get("stream") is False:
-            return no_tool_choice
         return final_stream
 
     client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=_create)))
@@ -254,10 +260,9 @@ def test_chat_response_stream_tools_model_without_tool_calls_streams_on_second_c
 
     chunks = asyncio.run(_run())
 
-    assert len(create_calls) == 2
-    assert create_calls[0]["stream"] is False
-    assert create_calls[0]["max_tokens"] == chat_service.TOOL_ROUTER_MAX_TOKENS
-    assert create_calls[1]["stream"] is True
+    assert len(create_calls) == 1
+    assert create_calls[0]["stream"] is True
+    assert "tools" in create_calls[0]
     assert len(chunks) == 1
     assert "streamed final" in chunks[0]
     assert final_stream.closed is True

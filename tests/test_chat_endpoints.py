@@ -273,6 +273,112 @@ class TestChatEndpoints(BaseTestCase):
         assert called_messages[0]["role"] == "user"
         assert called_messages[0]["content"] == "Describe this"
 
+    @patch("chat_client.repositories.chat_repository.get_messages")
+    @patch("chat_client.repositories.chat_repository.get_dialog")
+    @patch("chat_client.endpoints.chat_endpoints.OpenAI")
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_chat_response_stream_uses_persisted_tool_history_for_dialog(
+        self,
+        mock_logged_in,
+        mock_openai_class,
+        mock_get_dialog,
+        mock_get_messages,
+    ):
+        mock_logged_in.return_value = 1
+        mock_get_dialog.return_value = {"dialog_id": "dlg1", "title": "x", "created": "2026-01-01T00:00:00"}
+        mock_get_messages.return_value = [
+            {"role": "user", "content": "Find article", "images": []},
+            {"role": "assistant", "content": "", "images": []},
+            {
+                "role": "tool",
+                "content": "Article JSON",
+                "tool_call_id": "call_1",
+                "tool_name": "get_wikipedia_pages_json",
+                "arguments_json": '{"title":"X"}',
+                "images": [],
+            },
+            {"role": "assistant", "content": "I found it", "images": []},
+            {"role": "user", "content": "Summarize it", "images": []},
+        ]
+
+        mock_client = mock_openai_client()
+        mock_openai_class.return_value = mock_client
+
+        response = self.client.post(
+            "/chat",
+            json={
+                "dialog_id": "dlg1",
+                "messages": [{"role": "user", "content": "client payload should not override db"}],
+                "model": "test-model",
+            },
+        )
+
+        assert response.status_code == 200
+        _ = response.content
+        called_messages = mock_client.chat.completions.create.call_args.kwargs["messages"]
+        assert called_messages[0]["content"] == "Find article"
+        assert any(msg.get("role") == "tool" and msg.get("tool_call_id") == "call_1" for msg in called_messages)
+
+    @patch("chat_client.repositories.chat_repository.get_messages")
+    @patch("chat_client.repositories.chat_repository.get_dialog")
+    @patch("chat_client.endpoints.chat_endpoints.OpenAI")
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_chat_response_stream_passes_all_user_assistant_tool_messages_to_model(
+        self,
+        mock_logged_in,
+        mock_openai_class,
+        mock_get_dialog,
+        mock_get_messages,
+    ):
+        mock_logged_in.return_value = 1
+        mock_get_dialog.return_value = {"dialog_id": "dlg2", "title": "x", "created": "2026-01-01T00:00:00"}
+        mock_get_messages.return_value = [
+            {"role": "user", "content": "U1", "images": []},
+            {"role": "assistant", "content": "A1", "images": []},
+            {
+                "role": "tool",
+                "content": "T1",
+                "tool_call_id": "call_1",
+                "tool_name": "tool_one",
+                "arguments_json": "{}",
+                "images": [],
+            },
+            {"role": "assistant", "content": "A2", "images": []},
+            {"role": "user", "content": "U2", "images": []},
+            {
+                "role": "tool",
+                "content": "T2",
+                "tool_call_id": "call_2",
+                "tool_name": "tool_two",
+                "arguments_json": "{}",
+                "images": [],
+            },
+        ]
+
+        mock_client = mock_openai_client()
+        mock_openai_class.return_value = mock_client
+
+        response = self.client.post(
+            "/chat",
+            json={
+                "dialog_id": "dlg2",
+                "messages": [{"role": "user", "content": "payload ignored for persisted dialog history"}],
+                "model": "test-model",
+            },
+        )
+
+        assert response.status_code == 200
+        _ = response.content
+        called_messages = mock_client.chat.completions.create.call_args.kwargs["messages"]
+        assert called_messages == [
+            {"role": "user", "content": "U1"},
+            {"role": "assistant", "content": "A1"},
+            {"role": "tool", "tool_call_id": "call_1", "content": "T1"},
+            {"role": "assistant", "content": "A2"},
+            {"role": "user", "content": "U2"},
+            {"role": "tool", "tool_call_id": "call_2", "content": "T2"},
+        ]
+
     @patch("chat_client.core.user_session.is_logged_in")
     def test_create_dialog_not_authenticated(self, mock_logged_in):
         """Test POST /chat/create-dialog when not authenticated"""
