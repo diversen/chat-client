@@ -10,6 +10,7 @@ import {
 } from './app-elements.js';
 import { addCopyButtons } from './app-copy-buttons.js';
 import { copyIcon, checkIcon, editIcon } from './app-icons.js';
+import { mdNoHTML } from './markdown.js';
 
 const ANCHOR_SPACER_CLASS = 'responses-anchor-spacer';
 const MIN_ANCHOR_SPACER_HEIGHT_PX = 20;
@@ -238,6 +239,78 @@ function createMessageImages(images = []) {
     return preview;
 }
 
+function tryParseJson(value) {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    try {
+        return JSON.parse(trimmed);
+    } catch (_) {
+        return null;
+    }
+}
+
+function appendLabeledPre(container, label, value) {
+    const labelElement = document.createElement('p');
+    labelElement.innerHTML = `<strong>${label}:</strong>`;
+    container.appendChild(labelElement);
+
+    const pre = document.createElement('pre');
+    pre.textContent = value;
+    container.appendChild(pre);
+}
+
+function appendLabeledMarkdownCode(container, label, language, code) {
+    const labelElement = document.createElement('p');
+    labelElement.innerHTML = `<strong>${label}:</strong>`;
+    container.appendChild(labelElement);
+
+    const block = document.createElement('div');
+    block.innerHTML = mdNoHTML.render(`\`\`\`${language}\n${code}\n\`\`\``);
+
+    if (typeof hljs !== 'undefined') {
+        const codeBlocks = block.querySelectorAll('pre code');
+        codeBlocks.forEach((element) => {
+            hljs.highlightElement(element);
+        });
+    }
+    container.appendChild(block);
+}
+
+function renderDefaultToolCallMeta(metadata, payload) {
+    appendLabeledPre(metadata, 'Arguments', payload.argumentsJson);
+    appendLabeledPre(metadata, payload.errorText ? 'Error' : 'Result', payload.errorText || payload.resultContent);
+}
+
+function renderPythonToolCallMeta(metadata, payload) {
+    const parsedArgs = tryParseJson(payload.argumentsJson);
+    const pythonCode = typeof parsedArgs?.code === 'string' ? parsedArgs.code : '';
+
+    if (pythonCode) {
+        appendLabeledMarkdownCode(metadata, 'Python Code', 'python', pythonCode);
+    } else {
+        appendLabeledPre(metadata, 'Arguments', payload.argumentsJson);
+    }
+
+    if (payload.errorText) {
+        appendLabeledPre(metadata, 'Error', payload.errorText);
+        return;
+    }
+
+    const parsedResult = tryParseJson(payload.resultContent);
+    if (parsedResult !== null) {
+        appendLabeledMarkdownCode(metadata, 'Result (JSON)', 'json', JSON.stringify(parsedResult, null, 2));
+        return;
+    }
+
+    appendLabeledPre(metadata, 'Result', payload.resultContent);
+}
+
+const TOOL_META_RENDERERS = {
+    python: renderPythonToolCallMeta,
+    default: renderDefaultToolCallMeta,
+};
+
 function createChatView({ config, renderStreamedResponseText, updateContentDiff }) {
     return {
         renderStaticUserMessage(message, messageId = null, onEdit, images = [], displayRole = 'User') {
@@ -277,7 +350,7 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
             details.open = false;
 
             const summary = document.createElement('summary');
-            summary.textContent = `MCP tool: ${toolName}`;
+            summary.textContent = `Tool: ${toolName}`;
             details.appendChild(summary);
 
             const metadata = document.createElement('div');
@@ -288,21 +361,14 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
             callId.append(toolCallId);
             metadata.appendChild(callId);
 
-            const argsLabel = document.createElement('p');
-            argsLabel.innerHTML = '<strong>Arguments:</strong>';
-            metadata.appendChild(argsLabel);
-
-            const argsPre = document.createElement('pre');
-            argsPre.textContent = argumentsJson;
-            metadata.appendChild(argsPre);
-
-            const resultLabel = document.createElement('p');
-            resultLabel.innerHTML = `<strong>${errorText ? 'Error' : 'Result'}:</strong>`;
-            metadata.appendChild(resultLabel);
-
-            const resultPre = document.createElement('pre');
-            resultPre.textContent = errorText || resultContent;
-            metadata.appendChild(resultPre);
+            const renderer = TOOL_META_RENDERERS[toolName] || TOOL_META_RENDERERS.default;
+            renderer(metadata, {
+                toolName,
+                toolCallId,
+                argumentsJson,
+                resultContent,
+                errorText,
+            });
 
             details.appendChild(metadata);
             contentElement.appendChild(details);
