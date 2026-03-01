@@ -15,6 +15,7 @@ import { openImagePreviewModal } from './image-preview-modal.js';
 
 const ANCHOR_SPACER_CLASS = 'responses-anchor-spacer';
 const MIN_ANCHOR_SPACER_HEIGHT_PX = 20;
+const TOOL_CALLS_OPEN_BY_DEFAULT = true;
 
 function getOrCreateAnchorSpacer() {
     let spacer = responsesElem.querySelector(`.${ANCHOR_SPACER_CLASS}`);
@@ -272,6 +273,22 @@ function appendLabeledMarkdownCode(container, label, language, code) {
     container.appendChild(block);
 }
 
+function appendMarkdownCode(container, language, code, withCopyButton = false) {
+    const block = document.createElement('div');
+    block.innerHTML = mdNoHTML.render(`\`\`\`${language}\n${code}\n\`\`\``);
+
+    if (typeof hljs !== 'undefined') {
+        const codeBlocks = block.querySelectorAll('pre code');
+        codeBlocks.forEach((element) => {
+            hljs.highlightElement(element);
+        });
+    }
+    if (withCopyButton) {
+        addCopyButtons(block);
+    }
+    container.appendChild(block);
+}
+
 function renderDefaultToolCallMeta(metadata, payload) {
     appendLabeledPre(metadata, 'Arguments', payload.argumentsJson);
     appendLabeledPre(metadata, payload.errorText ? 'Error' : 'Result', payload.errorText || payload.resultContent);
@@ -282,7 +299,7 @@ function renderPythonToolCallMeta(metadata, payload) {
     const pythonCode = typeof parsedArgs?.code === 'string' ? parsedArgs.code : '';
 
     if (pythonCode) {
-        appendLabeledMarkdownCode(metadata, 'Python Code', 'python', pythonCode);
+        appendMarkdownCode(metadata, 'python', pythonCode, true);
     } else {
         appendLabeledPre(metadata, 'Arguments', payload.argumentsJson);
     }
@@ -294,7 +311,7 @@ function renderPythonToolCallMeta(metadata, payload) {
 
     const parsedResult = tryParseJson(payload.resultContent);
     if (parsedResult !== null) {
-        appendLabeledMarkdownCode(metadata, 'Result (JSON)', 'json', JSON.stringify(parsedResult, null, 2));
+        appendMarkdownCode(metadata, 'json', JSON.stringify(parsedResult, null, 2));
         return;
     }
 
@@ -340,14 +357,14 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
             const errorText = String(toolMessage?.error_text || '');
             const roleElement = container.querySelector('.role_tool');
             const toolBody = document.createElement('div');
-            toolBody.className = 'tool-call-body hidden';
+            toolBody.className = TOOL_CALLS_OPEN_BY_DEFAULT ? 'tool-call-body' : 'tool-call-body hidden';
             contentElement.appendChild(toolBody);
 
             if (roleElement) {
                 roleElement.classList.add('tool-toggle');
                 roleElement.setAttribute('role', 'button');
                 roleElement.setAttribute('tabindex', '0');
-                roleElement.setAttribute('aria-expanded', 'false');
+                roleElement.setAttribute('aria-expanded', String(TOOL_CALLS_OPEN_BY_DEFAULT));
                 roleElement.title = `Show/hide ${toolName} details`;
 
                 const toggle = () => {
