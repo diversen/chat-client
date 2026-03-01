@@ -2,7 +2,6 @@ import logging
 from pathlib import Path
 from chat_client.core.api_utils import get_provider_models
 from chat_client.tools.python_tool import python as python_tool
-from chat_client.tools.google_search_tool import google_search
 
 
 # SMTP
@@ -101,14 +100,11 @@ SYSTEM_MESSAGE_MODELS: list = []
 
 # Optional local tool registry (preferred over MCP when configured).
 # Functions must be callables that accept keyword arguments.
-def ping():
-    return "Is alive!"
+
 
 
 TOOL_REGISTRY = {
-    "ping": ping,
     "python": python_tool,
-    "google_search": google_search,
 }
 
 # Optional explicit local tool definitions in MCP-style schema.
