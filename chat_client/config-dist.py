@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 from chat_client.core.api_utils import get_provider_models
+from chat_client.tools.python_tool import python as python_tool
 
 
 # SMTP
@@ -95,23 +96,43 @@ SYSTEM_MESSAGE_MODELS: list = []
 
 # Optional local tool registry (preferred over MCP when configured).
 # Functions must be callables that accept keyword arguments.
-# TOOL_REGISTRY = {
-#     "ping": lambda: "pong",
-# }
-#
+def ping():
+    return "Is alive!"
+
+
+TOOL_REGISTRY = {
+    "ping": ping,
+    "python": python_tool,
+}
+
 # Optional explicit local tool definitions in MCP-style schema.
 # `name` must exist in TOOL_REGISTRY.
-# LOCAL_TOOL_DEFINITIONS = [
-#     {
-#         "name": "ping",
-#         "description": "Simple ping tool",
-#         "input_schema": {
-#             "type": "object",
-#             "properties": {},
-#             "additionalProperties": False,
-#         },
-#     }
-# ]
+LOCAL_TOOL_DEFINITIONS = [
+    {
+        "name": "ping",
+        "description": "Simple ping tool to check if the tool system is working",
+        "input_schema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "python",
+        "description": "Execute Python code and return output/result.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "description": "Python code to execute.",
+                }
+            },
+            "required": ["code"],
+            "additionalProperties": False,
+        },
+    },
+]
 
 # Models that should receive tool definitions (local + MCP).
 # TOOL_MODELS = ["gpt-40-mini"]
