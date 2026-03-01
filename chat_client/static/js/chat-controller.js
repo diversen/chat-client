@@ -437,6 +437,11 @@ class ConversationController {
 
         const assistantSegments = [];
         let ui = null;
+        const hasVisibleAssistantContent = (rawText) => {
+            const text = String(rawText || '');
+            const withoutThinkingTags = text.replace(/<\/?(?:think|thinking|thought)>/gi, '');
+            return withoutThinkingTags.trim().length > 0;
+        };
 
         const ensureAssistantContainer = () => {
             if (!ui) {
@@ -453,7 +458,7 @@ class ConversationController {
 
             const finalText = await ui.finalize();
 
-            if (finalText.trim()) {
+            if (hasVisibleAssistantContent(finalText)) {
                 await addCopyButtons(ui.contentElement, this.config);
                 this.view.attachCopy(ui.container, finalText);
                 const assistantMessage = { role: 'assistant', content: finalText };

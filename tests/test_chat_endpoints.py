@@ -110,6 +110,37 @@ class TestChatEndpoints(BaseTestCase):
         assert mcp_result == "mcp-result"
         assert mock_mcp_call.call_count == 1
 
+    def test_build_model_messages_from_dialog_history_groups_consecutive_tools(self):
+        from chat_client.endpoints.chat_endpoints import _build_model_messages_from_dialog_history
+
+        persisted = [
+            {"role": "user", "content": "Q", "images": []},
+            {
+                "role": "tool",
+                "content": "R1",
+                "tool_call_id": "call_1",
+                "tool_name": "t1",
+                "arguments_json": '{"x":1}',
+            },
+            {
+                "role": "tool",
+                "content": "R2",
+                "tool_call_id": "call_2",
+                "tool_name": "t2",
+                "arguments_json": '{"y":2}',
+            },
+            {"role": "assistant", "content": "A", "images": []},
+        ]
+
+        messages = _build_model_messages_from_dialog_history(persisted)
+        assert messages[0] == {"role": "user", "content": "Q", "images": []}
+        assert messages[1]["role"] == "assistant"
+        assert messages[1]["content"] == ""
+        assert len(messages[1]["tool_calls"]) == 2
+        assert messages[2] == {"role": "tool", "tool_call_id": "call_1", "content": "R1"}
+        assert messages[3] == {"role": "tool", "tool_call_id": "call_2", "content": "R2"}
+        assert messages[4] == {"role": "assistant", "content": "A"}
+
     @patch("chat_client.core.user_session.is_logged_in")
     def test_chat_page_not_authenticated(self, mock_logged_in):
         """Test GET / when not authenticated"""
@@ -317,6 +348,7 @@ class TestChatEndpoints(BaseTestCase):
         _ = response.content
         called_messages = mock_client.chat.completions.create.call_args.kwargs["messages"]
         assert called_messages[0]["content"] == "Find article"
+        assert any(msg.get("role") == "assistant" and msg.get("tool_calls") for msg in called_messages)
         assert any(msg.get("role") == "tool" and msg.get("tool_call_id") == "call_1" for msg in called_messages)
 
     @patch("chat_client.repositories.chat_repository.get_messages")
@@ -373,9 +405,31 @@ class TestChatEndpoints(BaseTestCase):
         assert called_messages == [
             {"role": "user", "content": "U1"},
             {"role": "assistant", "content": "A1"},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {"name": "tool_one", "arguments": "{}"},
+                    }
+                ],
+            },
             {"role": "tool", "tool_call_id": "call_1", "content": "T1"},
             {"role": "assistant", "content": "A2"},
             {"role": "user", "content": "U2"},
+            {
+                "role": "assistant",
+                "content": "",
+                "tool_calls": [
+                    {
+                        "id": "call_2",
+                        "type": "function",
+                        "function": {"name": "tool_two", "arguments": "{}"},
+                    }
+                ],
+            },
             {"role": "tool", "tool_call_id": "call_2", "content": "T2"},
         ]
 

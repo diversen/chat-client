@@ -226,8 +226,11 @@ def _build_model_messages_from_dialog_history(messages: list[dict[str, Any]]) ->
     Includes tool messages so prior tool outputs stay in context.
     """
     normalized: list[dict[str, Any]] = []
-    for message in messages:
+    i = 0
+    while i < len(messages):
+        message = messages[i]
         if not isinstance(message, dict):
+            i += 1
             continue
         role = str(message.get("role", "")).strip()
         content = str(message.get("content", ""))
@@ -238,19 +241,67 @@ def _build_model_messages_from_dialog_history(messages: list[dict[str, Any]]) ->
                 images = message.get("images", [])
                 item["images"] = images if isinstance(images, list) else []
             normalized.append(item)
+            i += 1
             continue
 
         if role == "tool":
-            tool_call_id = str(message.get("tool_call_id", "")).strip()
-            if not tool_call_id:
+            consecutive_tools: list[dict[str, Any]] = []
+            while i < len(messages):
+                candidate = messages[i]
+                if not isinstance(candidate, dict):
+                    break
+                if str(candidate.get("role", "")).strip() != "tool":
+                    break
+                tool_call_id = str(candidate.get("tool_call_id", "")).strip()
+                if tool_call_id:
+                    consecutive_tools.append(candidate)
+                i += 1
+
+            if not consecutive_tools:
                 continue
+
+            tool_calls: list[dict[str, Any]] = []
+            for tool_message in consecutive_tools:
+                tool_call_id = str(tool_message.get("tool_call_id", "")).strip()
+                tool_name = str(tool_message.get("tool_name", "")).strip() or "unknown_tool"
+                raw_arguments = tool_message.get("arguments_json", "{}")
+                arguments_json = "{}"
+                if isinstance(raw_arguments, str):
+                    try:
+                        parsed_arguments = json.loads(raw_arguments)
+                        arguments_json = json.dumps(parsed_arguments, ensure_ascii=True, separators=(",", ":"))
+                    except json.JSONDecodeError:
+                        arguments_json = "{}"
+
+                tool_calls.append(
+                    {
+                        "id": tool_call_id,
+                        "type": "function",
+                        "function": {
+                            "name": tool_name,
+                            "arguments": arguments_json,
+                        },
+                    }
+                )
+
             normalized.append(
                 {
-                    "role": "tool",
-                    "tool_call_id": tool_call_id,
-                    "content": content,
+                    "role": "assistant",
+                    "content": "",
+                    "tool_calls": tool_calls,
                 }
             )
+            for tool_message in consecutive_tools:
+                tool_call_id = str(tool_message.get("tool_call_id", "")).strip()
+                normalized.append(
+                    {
+                        "role": "tool",
+                        "tool_call_id": tool_call_id,
+                        "content": str(tool_message.get("content", "")),
+                    }
+                )
+            continue
+        i += 1
     return normalized
 
 

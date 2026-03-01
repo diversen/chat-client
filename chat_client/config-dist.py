@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 from chat_client.core.api_utils import get_provider_models
 from chat_client.tools.python_tool import python as python_tool
+from chat_client.tools.google_search_tool import google_search
 
 
 # SMTP
@@ -103,6 +104,7 @@ def ping():
 TOOL_REGISTRY = {
     "ping": ping,
     "python": python_tool,
+    "google_search": google_search,
 }
 
 # Optional explicit local tool definitions in MCP-style schema.
@@ -132,7 +134,33 @@ LOCAL_TOOL_DEFINITIONS = [
             "additionalProperties": False,
         },
     },
+    {
+        "name": "google_search",
+        "description": "Search Google and return compact JSON results.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Search query.",
+                },
+                "num_results": {
+                    "type": "integer",
+                    "description": "Number of results to return (1-10).",
+                    "minimum": 1,
+                    "maximum": 10,
+                },
+            },
+            "required": ["query"],
+            "additionalProperties": False,
+        },
+    },
 ]
+
+# Google Search tool configuration (Google Custom Search JSON API)
+# Set these environment variables before starting the app:
+# export GOOGLE_SEARCH_API_KEY="..."
+# export GOOGLE_SEARCH_CX="..."
 
 # Models that should receive tool definitions (local + MCP).
 # TOOL_MODELS = ["gpt-40-mini"]
