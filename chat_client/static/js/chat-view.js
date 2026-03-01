@@ -15,7 +15,6 @@ import { openImagePreviewModal } from './image-preview-modal.js';
 
 const ANCHOR_SPACER_CLASS = 'responses-anchor-spacer';
 const MIN_ANCHOR_SPACER_HEIGHT_PX = 20;
-const TOOL_CALLS_OPEN_BY_DEFAULT = true;
 
 function getOrCreateAnchorSpacer() {
     let spacer = responsesElem.querySelector(`.${ANCHOR_SPACER_CLASS}`);
@@ -324,6 +323,9 @@ const TOOL_META_RENDERERS = {
 };
 
 function createChatView({ config, renderStreamedResponseText, updateContentDiff }) {
+    const toolCallsCollapsedByDefault = Boolean(config?.tool_calls_collapsed_by_default ?? true);
+    const toolCallsOpenByDefault = !toolCallsCollapsedByDefault;
+
     return {
         renderStaticUserMessage(message, messageId = null, onEdit, images = [], displayRole = 'User') {
             const safeDisplayRole = String(displayRole || 'User');
@@ -357,14 +359,14 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
             const errorText = String(toolMessage?.error_text || '');
             const roleElement = container.querySelector('.role_tool');
             const toolBody = document.createElement('div');
-            toolBody.className = TOOL_CALLS_OPEN_BY_DEFAULT ? 'tool-call-body' : 'tool-call-body hidden';
+            toolBody.className = toolCallsOpenByDefault ? 'tool-call-body' : 'tool-call-body hidden';
             contentElement.appendChild(toolBody);
 
             if (roleElement) {
                 roleElement.classList.add('tool-toggle');
                 roleElement.setAttribute('role', 'button');
                 roleElement.setAttribute('tabindex', '0');
-                roleElement.setAttribute('aria-expanded', String(TOOL_CALLS_OPEN_BY_DEFAULT));
+                roleElement.setAttribute('aria-expanded', String(toolCallsOpenByDefault));
                 roleElement.title = `Show/hide ${toolName} details`;
 
                 const toggle = () => {

@@ -39,7 +39,7 @@ MCP_SERVER_URL = getattr(config, "MCP_SERVER_URL", "")
 MCP_AUTH_TOKEN = getattr(config, "MCP_AUTH_TOKEN", "")
 MCP_TIMEOUT_SECONDS = float(getattr(config, "MCP_TIMEOUT_SECONDS", 20.0))
 MCP_TOOLS_CACHE_SECONDS = float(getattr(config, "MCP_TOOLS_CACHE_SECONDS", 60.0))
-SHOW_TOOL_CALLS = bool(getattr(config, "SHOW_TOOL_CALLS", False))
+TOOL_CALLS_COLLAPSED_BY_DEFAULT = bool(getattr(config, "TOOL_CALLS_COLLAPSED_BY_DEFAULT", True))
 SYSTEM_MESSAGE_MODELS = getattr(config, "SYSTEM_MESSAGE_MODELS", [])
 VISION_MODELS = getattr(config, "VISION_MODELS", [])
 TOOL_REGISTRY = getattr(config, "TOOL_REGISTRY", {})
@@ -386,7 +386,7 @@ async def config_(request: Request):
     config_values = {
         "default_model": getattr(config, "DEFAULT_MODEL", ""),
         "use_katex": getattr(config, "USE_KATEX", False),
-        "show_tool_calls": SHOW_TOOL_CALLS,
+        "tool_calls_collapsed_by_default": TOOL_CALLS_COLLAPSED_BY_DEFAULT,
         "system_message_models": SYSTEM_MESSAGE_MODELS,
         "vision_models": VISION_MODELS,
     }
@@ -487,8 +487,6 @@ async def get_messages(request: Request):
         if not dialog_id:
             raise exceptions_validation.UserValidate("Dialog id is required")
         messages = await chat_repository.get_messages(user_id, dialog_id)
-        if not SHOW_TOOL_CALLS:
-            messages = [message for message in messages if message.get("role") != "tool"]
         return JSONResponse(messages)
     except exceptions_validation.UserValidate as e:
         return json_error(str(e), status_code=400)

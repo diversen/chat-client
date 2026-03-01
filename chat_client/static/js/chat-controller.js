@@ -479,7 +479,7 @@ class ConversationController {
                     activeUi.setStatus(`Calling tool: ${toolName}...`);
                     continue;
                 }
-                if (this.config.show_tool_calls && chunk.toolCall) {
+                if (chunk.toolCall) {
                     await finalizeAssistantContainer();
                     this.view.renderStaticToolMessage(chunk.toolCall);
                     continue;
@@ -541,7 +541,7 @@ class ConversationController {
                     msg.images || [],
                     displayRole,
                 );
-            } else if (msg.role === 'tool' && this.config.show_tool_calls) {
+            } else if (msg.role === 'tool') {
                 this.view.renderStaticToolMessage(msg);
             } else {
                 await this.view.renderStaticAssistantMessage(msg.content, msg.message_id);

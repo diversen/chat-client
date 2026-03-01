@@ -48,7 +48,7 @@ USE_KATEX = True
 
 # Docker image used by the built-in python tool sandbox.
 # Use "secure-python" for base or "secure-python-science" for numpy/sympy/pandas.
-PYTHON_TOOL_DOCKER_IMAGE = "secure-python"
+PYTHON_TOOL_DOCKER_IMAGE = "secure-python-science"
 
 PROVIDERS = {
     # "openai": {
@@ -102,7 +102,6 @@ SYSTEM_MESSAGE_MODELS: list = []
 # Functions must be callables that accept keyword arguments.
 
 
-
 TOOL_REGISTRY = {
     "python": python_tool,
 }
@@ -110,15 +109,6 @@ TOOL_REGISTRY = {
 # Optional explicit local tool definitions in MCP-style schema.
 # `name` must exist in TOOL_REGISTRY.
 LOCAL_TOOL_DEFINITIONS = [
-    {
-        "name": "ping",
-        "description": "Simple ping tool to check if the tool system is working",
-        "input_schema": {
-            "type": "object",
-            "properties": {},
-            "additionalProperties": False,
-        },
-    },
     {
         "name": "python",
         "description": "Execute Python code and return output/result.",
@@ -134,28 +124,9 @@ LOCAL_TOOL_DEFINITIONS = [
             "additionalProperties": False,
         },
     },
-    {
-        "name": "google_search",
-        "description": "Search Google and return compact JSON results.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "query": {
-                    "type": "string",
-                    "description": "Search query.",
-                },
-                "num_results": {
-                    "type": "integer",
-                    "description": "Number of results to return (1-10).",
-                    "minimum": 1,
-                    "maximum": 10,
-                },
-            },
-            "required": ["query"],
-            "additionalProperties": False,
-        },
-    },
 ]
+
+TOOL_CALLS_COLLAPSED_BY_DEFAULT = True
 
 # Google Search tool configuration (Google Custom Search JSON API)
 # Set these environment variables before starting the app:
@@ -167,16 +138,16 @@ LOCAL_TOOL_DEFINITIONS = [
 #
 # If empty and either
 # TOOL_REGISTRY or MCP is configured, all configured MODELS are allowed.
-TOOL_MODELS: list = []
+# TOOL_MODELS: list = []
 
-SHOW_TOOL_CALLS = True
-# MCP server integration (remote JSON-RPC over HTTP)
-# Tools are loaded from MCP `tools/list` and executed via MCP `tools/call`.
-MCP_SERVER_URL = "http://127.0.0.1:5000/mcp"
-MCP_AUTH_TOKEN = "your-very-secret-token"  # Set bearer token / OAuth access token when required.
-MCP_TIMEOUT_SECONDS = 20.0
-MCP_TOOLS_CACHE_SECONDS = 60.0
-# Show persisted tool calls in dialog history.
+# TOOL_CALLS_COLLAPSED_BY_DEFAULT = True
+# # MCP server integration (remote JSON-RPC over HTTP)
+# # Tools are loaded from MCP `tools/list` and executed via MCP `tools/call`.
+# MCP_SERVER_URL = "http://127.0.0.1:5000/mcp"
+# MCP_AUTH_TOKEN = "your-very-secret-token"  # Set bearer token / OAuth access token when required.
+# MCP_TIMEOUT_SECONDS = 20.0
+# MCP_TOOLS_CACHE_SECONDS = 60.0
+# # Show persisted tool calls in dialog history.
 
 
 # Optional hosted MCP example:
