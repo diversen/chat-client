@@ -1,3 +1,5 @@
+import { copyIcon, checkIcon } from './app-icons.js';
+
 async function addCopyButtons(contentElem, _config) {
 
     const codeBlocks = contentElem.querySelectorAll('pre code');
@@ -15,13 +17,15 @@ async function addCopyButtons(contentElem, _config) {
         const button = document.createElement("button");
         button.classList.add('copy-button');
         button.type = 'button';
-        button.textContent = "Copy code";
+        button.title = 'Copy code';
+        button.setAttribute('aria-label', 'Copy code');
+        button.innerHTML = copyIcon;
         button.onclick = function () {
             navigator.clipboard.writeText(codeText).then(() => {
-                button.textContent = "Copied!";
+                button.innerHTML = checkIcon;
 
                 setTimeout(() => {
-                    button.textContent = "Copy code";
+                    button.innerHTML = copyIcon;
                 }, 2000);
 
             }, err => {

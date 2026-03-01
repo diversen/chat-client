@@ -300,8 +300,13 @@ nav svg {
 
 .copy-button {
     cursor: pointer;
-    padding: 5px;
+    padding: 4px;
     font-size: 12px;
+    border: none;
+    background: transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 pre code.copyable-code {
@@ -315,8 +320,14 @@ pre code.copyable-code .copy-button {
     top: 0.4rem;
     right: 0.4rem;
     z-index: 2;
-    padding: 2px 8px;
-    font-size: 11px;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+}
+
+pre code.copyable-code .copy-button svg {
+    width: 20px;
+    height: 20px;
 }
 
 .loading-spinner {
