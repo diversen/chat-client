@@ -67,7 +67,6 @@ PROVIDERS = {
         "base_url": "http://localhost:11434/v1",
         "api_key": "ollama",
     },
-    
 }
 
 # Set a Default model
@@ -134,7 +133,8 @@ TOOL_CALLS_COLLAPSED_BY_DEFAULT = True
 # export GOOGLE_SEARCH_CX="..."
 
 # Models that should receive tool definitions (local + MCP).
-# TOOL_MODELS = ["gpt-40-mini"]
+# Use ["*"] to allow tools for any configured model.
+TOOL_MODELS = ["*"]
 #
 # If empty and either
 # TOOL_REGISTRY or MCP is configured, all configured MODELS are allowed.

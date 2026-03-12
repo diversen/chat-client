@@ -124,6 +124,8 @@ def _list_local_tools() -> list[dict[str, Any]]:
 
 def _resolve_tool_models() -> list[str]:
     if isinstance(TOOL_MODELS, list) and TOOL_MODELS:
+        if "*" in TOOL_MODELS:
+            return list(MODELS.keys())
         return TOOL_MODELS
     if _has_local_tool_registry() or _has_mcp_config():
         return list(MODELS.keys())
@@ -470,6 +472,8 @@ async def get_dialog(request: Request):
             raise exceptions_validation.UserValidate("Dialog id is required")
         dialog = await chat_repository.get_dialog(user_id, dialog_id)
         return JSONResponse(dialog)
+    except exceptions_validation.JSONError as e:
+        return json_error(str(e), status_code=e.status_code)
     except exceptions_validation.UserValidate as e:
         return json_error(str(e), status_code=400)
     except Exception:
@@ -488,6 +492,8 @@ async def get_messages(request: Request):
             raise exceptions_validation.UserValidate("Dialog id is required")
         messages = await chat_repository.get_messages(user_id, dialog_id)
         return JSONResponse(messages)
+    except exceptions_validation.JSONError as e:
+        return json_error(str(e), status_code=e.status_code)
     except exceptions_validation.UserValidate as e:
         return json_error(str(e), status_code=400)
     except Exception:
@@ -506,6 +512,8 @@ async def delete_dialog(request: Request):
             raise exceptions_validation.UserValidate("Dialog id is required")
         await chat_repository.delete_dialog(user_id, dialog_id)
         return json_success()
+    except exceptions_validation.JSONError as e:
+        return json_error(str(e), status_code=e.status_code)
     except exceptions_validation.UserValidate as e:
         return json_error(str(e), status_code=400)
     except Exception:

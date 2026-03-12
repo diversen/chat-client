@@ -1,29 +1,24 @@
 """
 Base test utilities for Starlette backend tests.
-Provides TestClient setup, database fixtures, and common test utilities.
+Provides shared helpers and pytest-compatible setup for endpoint suites.
 """
 
 import asyncio
 import tempfile
-import os
 from pathlib import Path
-from unittest.mock import patch, MagicMock
-import sys
+from unittest.mock import MagicMock
 
-# Add project root to path
-project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, project_root)
-
-from starlette.testclient import TestClient
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+import pytest
 from sqlalchemy import event
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-# Import our models
 from chat_client.models import Base
 
 
 class TestDatabase:
     """Test database setup and teardown"""
+
+    __test__ = False
 
     def __init__(self):
         self.temp_dir = tempfile.mkdtemp()
@@ -75,36 +70,9 @@ class TestDatabase:
 class BaseTestCase:
     """Base test case with common setup"""
 
-    def __init__(self):
-        self.client = None
-        self.db = None
-
-    def setup_method(self):
-        """Setup before each test method"""
-        # Create test client with mocked dependencies
-        with patch("chat_client.endpoints.chat_endpoints.config") as mock_config:
-            with patch("chat_client.endpoints.user_endpoints.config"):
-                with patch("chat_client.endpoints.prompt_endpoints.config"):
-                    # Mock configuration
-                    mock_config.DEFAULT_MODEL = "test-model"
-                    mock_config.PROVIDERS = {"test-provider": {"base_url": "http://test", "api_key": "test"}}
-                    mock_config.MODELS = {"test-model": "test-provider"}
-                    mock_config.MCP_MODELS = []
-                    mock_config.MCP_SERVER_URL = "http://127.0.0.1:5000/mcp"
-                    mock_config.MCP_AUTH_TOKEN = ""
-                    mock_config.MCP_TIMEOUT_SECONDS = 5.0
-                    mock_config.MCP_TOOLS_CACHE_SECONDS = 0.0
-                    mock_config.USE_KATEX = False
-
-                    # Import app after mocking config
-                    from chat_client.main import app
-
-                    self.client = TestClient(app)
-
-    def teardown_method(self):
-        """Teardown after each test method"""
-        if self.client:
-            self.client.__exit__(None, None, None)
+    @pytest.fixture(autouse=True)
+    def _setup_client(self, client):
+        self.client = client
 
     def create_test_user_data(self):
         """Create test user data for registration"""

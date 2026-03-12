@@ -10,7 +10,7 @@ from unittest.mock import patch
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
-from starlette.testclient import TestClient
+from tests.conftest import SyncASGITestClient
 
 
 def test_basic_routes():
@@ -20,7 +20,8 @@ def test_basic_routes():
     # Import app directly without complex mocking
     from chat_client.main import app
 
-    with TestClient(app) as client:
+    client = SyncASGITestClient(app)
+    try:
         # Test error endpoint - should work without auth
         response = client.post("/error/log", json={"error": "test"})
         assert response.status_code == 200, f"Error endpoint failed: {response.text}"
@@ -49,6 +50,8 @@ def test_basic_routes():
         assert "model_names" in data
         assert isinstance(data["model_names"], list)
         print("✓ Models list endpoint works")
+    finally:
+        client.close()
 
 
 def test_user_routes():
@@ -57,7 +60,8 @@ def test_user_routes():
 
     from chat_client.main import app
 
-    with TestClient(app) as client:
+    client = SyncASGITestClient(app)
+    try:
         # Test signup GET
         response = client.get("/user/signup")
         assert response.status_code == 200, f"Signup GET failed: {response.status_code}"
@@ -84,6 +88,8 @@ def test_user_routes():
             assert data["error"] is True  # Should be error because not logged in
             assert data["redirect"] == "/user/login"
             print("✓ Is-logged-in endpoint works when not authenticated")
+    finally:
+        client.close()
 
 
 def test_authenticated_routes():
@@ -92,7 +98,8 @@ def test_authenticated_routes():
 
     from chat_client.main import app
 
-    with TestClient(app) as client:
+    client = SyncASGITestClient(app)
+    try:
         # Test chat page when authenticated
         with patch("chat_client.core.user_session.is_logged_in", return_value=1):  # Mock logged in user
             with patch("chat_client.repositories.prompt_repository.list_prompts", return_value=[]):
@@ -113,6 +120,8 @@ def test_authenticated_routes():
                 response = client.get("/prompt")
                 assert response.status_code == 200
                 print("✓ Prompt list works when authenticated")
+    finally:
+        client.close()
 
 
 def test_json_endpoints():
@@ -121,7 +130,8 @@ def test_json_endpoints():
 
     from chat_client.main import app
 
-    with TestClient(app) as client:
+    client = SyncASGITestClient(app)
+    try:
         # Test chat endpoint without auth - should return 401
         with patch("chat_client.core.user_session.is_logged_in", return_value=False):
             response = client.post("/chat", json={"messages": [{"role": "user", "content": "test"}], "model": "test-model"})
@@ -132,6 +142,8 @@ def test_json_endpoints():
             response = client.post("/chat/create-dialog", json={"title": "Test"})
             assert response.status_code == 401
             print("✓ Create dialog endpoint requires authentication")
+    finally:
+        client.close()
 
 
 if __name__ == "__main__":

@@ -78,7 +78,7 @@ class TestPromptEndpoints(BaseTestCase):
 
         response = self.client.get("/prompt/create")
         assert response.status_code == 200
-        assert "Create Prompt" in response.text
+        assert "New Custom Prompt" in response.text
 
     @patch("chat_client.core.user_session.is_logged_in")
     def test_prompt_create_post_not_authenticated(self, mock_logged_in):

@@ -11,7 +11,7 @@ from unittest.mock import patch, MagicMock
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, project_root)
 
-from starlette.testclient import TestClient
+from tests.conftest import SyncASGITestClient
 
 
 class TestStarletteBackend:
@@ -27,7 +27,8 @@ class TestStarletteBackend:
         """Test all chat-related endpoints"""
         print("Testing chat endpoints...")
 
-        with TestClient(self.app) as client:
+        client = SyncASGITestClient(self.app)
+        try:
             # Test chat streaming endpoint authentication
             response = client.post("/chat", json={"messages": [{"role": "user", "content": "Hello"}], "model": "test-model"})
             assert response.status_code == 401
@@ -116,12 +117,15 @@ class TestStarletteBackend:
                     data = response.json()
                     assert data["error"] is False
                     print("  ✓ Delete dialog works")
+        finally:
+            client.close()
 
     def test_user_endpoints(self):
         """Test all user-related endpoints"""
         print("Testing user endpoints...")
 
-        with TestClient(self.app) as client:
+        client = SyncASGITestClient(self.app)
+        try:
             # Test user registration
             with patch("chat_client.repositories.user_repository.create_user", return_value={"user_id": 1}):
                 response = client.post(
@@ -203,12 +207,15 @@ class TestStarletteBackend:
                     assert data["error"] is False
                     assert len(data["dialogs_info"]) == 1
                     print("  ✓ List dialogs works")
+        finally:
+            client.close()
 
     def test_prompt_endpoints(self):
         """Test all prompt-related endpoints"""
         print("Testing prompt endpoints...")
 
-        with TestClient(self.app) as client:
+        client = SyncASGITestClient(self.app)
+        try:
             # Test prompt operations without authentication
             response = client.get("/prompt/json")
             assert response.status_code == 401
@@ -266,12 +273,15 @@ class TestStarletteBackend:
                         data = response.json()
                         assert data["error"] is False
                         print("  ✓ Delete prompt works")
+        finally:
+            client.close()
 
     def test_error_endpoints(self):
         """Test error logging endpoint"""
         print("Testing error endpoints...")
 
-        with TestClient(self.app) as client:
+        client = SyncASGITestClient(self.app)
+        try:
             # Test error logging
             with patch("chat_client.endpoints.error_endpoints.log") as mock_logger:
                 response = client.post("/error/log", json={"error": "JavaScript error", "url": "/chat", "line": 42})
@@ -280,12 +290,15 @@ class TestStarletteBackend:
                 assert data["status"] == "received"
                 mock_logger.error.assert_called_once()
                 print("  ✓ Error logging works")
+        finally:
+            client.close()
 
     def test_validation_and_error_cases(self):
         """Test validation errors and edge cases"""
         print("Testing validation and error cases...")
 
-        with TestClient(self.app) as client:
+        client = SyncASGITestClient(self.app)
+        try:
             # Test user registration with validation error
             with patch("chat_client.repositories.user_repository.create_user") as mock_create:
                 from chat_client.core.exceptions_validation import UserValidate
@@ -362,6 +375,8 @@ class TestStarletteBackend:
                 assert "/user/login" in location, "Main route should redirect to login"
 
             print("  ✓ Protected routes require authentication")
+        finally:
+            client.close()
 
     def run_all_tests(self):
         """Run all test methods"""

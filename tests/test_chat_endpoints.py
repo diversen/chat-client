@@ -92,6 +92,17 @@ class TestChatEndpoints(BaseTestCase):
         assert tools[0]["function"]["name"] == "local_tool"
         assert tools[1]["function"]["name"] == "mcp_tool"
 
+    def test_resolve_tool_models_supports_wildcard(self):
+        from chat_client.endpoints.chat_endpoints import _resolve_tool_models
+
+        with (
+            patch("chat_client.endpoints.chat_endpoints.MODELS", {"model-a": {}, "model-b": {}}),
+            patch("chat_client.endpoints.chat_endpoints.TOOL_MODELS", ["*"]),
+        ):
+            tool_models = _resolve_tool_models()
+
+        assert tool_models == ["model-a", "model-b"]
+
     def test_execute_tool_prefers_local_registry_then_falls_back_to_mcp(self):
         from chat_client.endpoints.chat_endpoints import _execute_tool
 
@@ -403,8 +414,8 @@ class TestChatEndpoints(BaseTestCase):
         _ = response.content
         called_messages = mock_client.chat.completions.create.call_args.kwargs["messages"]
         assert called_messages == [
-            {"role": "user", "content": "U1"},
-            {"role": "assistant", "content": "A1"},
+            {"role": "user", "content": "U1", "images": []},
+            {"role": "assistant", "content": "A1", "images": []},
             {
                 "role": "assistant",
                 "content": "",
@@ -415,10 +426,11 @@ class TestChatEndpoints(BaseTestCase):
                         "function": {"name": "tool_one", "arguments": "{}"},
                     }
                 ],
+                "images": [],
             },
-            {"role": "tool", "tool_call_id": "call_1", "content": "T1"},
-            {"role": "assistant", "content": "A2"},
-            {"role": "user", "content": "U2"},
+            {"role": "tool", "tool_call_id": "call_1", "content": "T1", "images": []},
+            {"role": "assistant", "content": "A2", "images": []},
+            {"role": "user", "content": "U2", "images": []},
             {
                 "role": "assistant",
                 "content": "",
@@ -429,8 +441,9 @@ class TestChatEndpoints(BaseTestCase):
                         "function": {"name": "tool_two", "arguments": "{}"},
                     }
                 ],
+                "images": [],
             },
-            {"role": "tool", "tool_call_id": "call_2", "content": "T2"},
+            {"role": "tool", "tool_call_id": "call_2", "content": "T2", "images": []},
         ]
 
     @patch("chat_client.core.user_session.is_logged_in")

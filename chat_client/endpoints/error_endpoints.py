@@ -18,7 +18,9 @@ async def error_log_post(request: Request):
     try:
         data = await request.json()
         log.error(data)
-        return JSONResponse({"status": "received"}, status_code=200)
     except Exception:
-        log.error("No json data in request")
-        return JSONResponse({"status": "received"}, status_code=200)
+        try:
+            log.error("No json data in request")
+        except Exception:
+            pass
+    return JSONResponse({"status": "received"}, status_code=200)

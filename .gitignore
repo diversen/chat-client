@@ -9,6 +9,7 @@ data
 chat_client.egg-info
 prompt.md
 uv.lock
+tests/.test-data/
 
 # Playwright
 /test-results/
