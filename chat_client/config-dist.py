@@ -136,8 +136,7 @@ TOOL_CALLS_COLLAPSED_BY_DEFAULT = True
 # Use ["*"] to allow tools for any configured model.
 TOOL_MODELS = ["*"]
 #
-# If empty and either
-# TOOL_REGISTRY or MCP is configured, all configured MODELS are allowed.
+# If empty, no models are allowed to use tools.
 # TOOL_MODELS: list = []
 
 # TOOL_CALLS_COLLAPSED_BY_DEFAULT = True

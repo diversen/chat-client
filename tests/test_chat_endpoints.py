@@ -103,6 +103,19 @@ class TestChatEndpoints(BaseTestCase):
 
         assert tool_models == ["model-a", "model-b"]
 
+    def test_resolve_tool_models_empty_list_disables_tools(self):
+        from chat_client.endpoints.chat_endpoints import _resolve_tool_models
+
+        with (
+            patch("chat_client.endpoints.chat_endpoints.MODELS", {"model-a": {}, "model-b": {}}),
+            patch("chat_client.endpoints.chat_endpoints.TOOL_MODELS", []),
+            patch("chat_client.endpoints.chat_endpoints.TOOL_REGISTRY", {"local_tool": lambda: "ok"}),
+            patch("chat_client.endpoints.chat_endpoints.MCP_SERVER_URL", "http://127.0.0.1:5000/mcp"),
+        ):
+            tool_models = _resolve_tool_models()
+
+        assert tool_models == []
+
     def test_execute_tool_prefers_local_registry_then_falls_back_to_mcp(self):
         from chat_client.endpoints.chat_endpoints import _execute_tool
 

@@ -123,12 +123,12 @@ def _list_local_tools() -> list[dict[str, Any]]:
 
 
 def _resolve_tool_models() -> list[str]:
-    if isinstance(TOOL_MODELS, list) and TOOL_MODELS:
-        if "*" in TOOL_MODELS:
-            return list(MODELS.keys())
-        return TOOL_MODELS
-    if _has_local_tool_registry() or _has_mcp_config():
+    if not isinstance(TOOL_MODELS, list):
+        return []
+    if "*" in TOOL_MODELS:
         return list(MODELS.keys())
+    if TOOL_MODELS:
+        return TOOL_MODELS
     return []
 
 
