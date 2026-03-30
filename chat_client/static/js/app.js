@@ -194,9 +194,15 @@ async function renderStreamedResponseText(contentElement, streamedResponseText) 
  */
 let rafScheduled = false;
 let pendingArgs = null;
+let pendingFlushResolvers = [];
 
 async function flushDiff() {
-    if (!pendingArgs) return;
+    if (!pendingArgs) {
+        const resolvers = pendingFlushResolvers;
+        pendingFlushResolvers = [];
+        resolvers.forEach((resolve) => resolve());
+        return;
+    }
     const { contentElement, hiddenContentElem, streamedResponseText } = pendingArgs;
     pendingArgs = null;
 
@@ -209,14 +215,22 @@ async function flushDiff() {
         console.log("Error in diffDOMExec:", error);
     }
     rafScheduled = false;
+    const resolvers = pendingFlushResolvers;
+    pendingFlushResolvers = [];
+    resolvers.forEach((resolve) => resolve());
 }
 
 function scheduleDiff(contentElement, hiddenContentElem, streamedResponseText) {
     pendingArgs = { contentElement, hiddenContentElem, streamedResponseText };
-    if (rafScheduled) return;
-    rafScheduled = true;
-    // Double rAF to push after current layout/paint for smoother UX
-    requestAnimationFrame(() => requestAnimationFrame(() => { flushDiff(); }));
+    const flushPromise = new Promise((resolve) => {
+        pendingFlushResolvers.push(resolve);
+    });
+    if (!rafScheduled) {
+        rafScheduled = true;
+        // Double rAF to push after current layout/paint for smoother UX
+        requestAnimationFrame(() => requestAnimationFrame(() => { flushDiff(); }));
+    }
+    return flushPromise;
 }
 
 /**
@@ -230,7 +244,7 @@ async function updateContentDiff(contentElement, hiddenContentElem, streamedResp
         await flushDiff();
         return;
     }
-    scheduleDiff(contentElement, hiddenContentElem, streamedResponseText);
+    await scheduleDiff(contentElement, hiddenContentElem, streamedResponseText);
 }
 
 const view = createChatView({

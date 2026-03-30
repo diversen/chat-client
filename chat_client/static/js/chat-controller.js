@@ -569,7 +569,13 @@ class ConversationController {
                 this.messages.push(segment.message);
             }
             if (turnUi) {
-                turnUi.removeIfEmpty();
+                const liveTurnContainer = turnUi.container;
+                if (turnEvents.length > 0) {
+                    await this.view.renderStaticAssistantTurn(turnEvents, liveTurnContainer);
+                    liveTurnContainer.remove();
+                } else {
+                    turnUi.removeIfEmpty();
+                }
                 turnUi = null;
             }
             this.abortController = new AbortController();

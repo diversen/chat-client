@@ -428,22 +428,18 @@ function createAssistantSegmentShell(messageId = null, initialKind = 'Thinking',
     const segmentKindElement = document.createElement('span');
     segmentKindElement.className = 'assistant-segment-kind';
     segmentKindElement.textContent = String(initialKind || 'Thinking');
-    segmentHeader.appendChild(segmentStep);
-    segmentHeader.appendChild(segmentKindElement);
-    container.appendChild(segmentHeader);
-
-    const metaElement = document.createElement('div');
-    metaElement.className = 'assistant-meta hidden';
     const loader = document.createElement('div');
     loader.className = 'loading-model';
     if (!showLoader) {
         loader.classList.add('hidden');
     }
-    const statusElement = document.createElement('p');
-    statusElement.className = 'assistant-status';
-    metaElement.appendChild(loader);
-    metaElement.appendChild(statusElement);
-    container.appendChild(metaElement);
+    const statusElement = document.createElement('span');
+    statusElement.className = 'assistant-status hidden';
+    segmentHeader.appendChild(segmentStep);
+    segmentHeader.appendChild(segmentKindElement);
+    segmentHeader.appendChild(loader);
+    segmentHeader.appendChild(statusElement);
+    container.appendChild(segmentHeader);
 
     const contentElement = document.createElement('div');
     contentElement.className = 'content';
@@ -463,16 +459,15 @@ function createAssistantSegmentShell(messageId = null, initialKind = 'Thinking',
         },
         setLoading(isLoading) {
             loader.classList.toggle('hidden', !isLoading);
-            metaElement.classList.toggle('hidden', loader.classList.contains('hidden') && !statusElement.textContent.trim());
         },
         setStatus(text) {
             const safeText = String(text || '').trim();
             statusElement.textContent = safeText;
-            metaElement.classList.toggle('hidden', loader.classList.contains('hidden') && !safeText);
+            statusElement.classList.toggle('hidden', !safeText);
         },
         clearStatus() {
             statusElement.textContent = '';
-            metaElement.classList.toggle('hidden', loader.classList.contains('hidden'));
+            statusElement.classList.add('hidden');
         },
         contentElement,
     };
@@ -507,10 +502,14 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
             await renderStreamedResponseText(contentElement, message);
             await addCopyButtons(contentElement, config);
         },
-        async renderStaticAssistantTurn(turnMessages = []) {
+        async renderStaticAssistantTurn(turnMessages = [], beforeElement = null) {
             const { container: turnContainer, contentElement: turnContentElement } = createMessageElement('Assistant');
             turnContainer.classList.add('assistant-turn');
-            appendBeforeAnchorSpacer(turnContainer);
+            if (beforeElement && beforeElement.parentNode === responsesElem) {
+                responsesElem.insertBefore(turnContainer, beforeElement);
+            } else {
+                appendBeforeAnchorSpacer(turnContainer);
+            }
 
             let segmentIndex = 0;
             const appendStaticTextSegment = async (kind, text, messageId = null) => {
@@ -655,6 +654,7 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                     const afterBaseScrollHeight = getBaseScrollHeight();
                     const consumedOnInsert = Math.max(0, afterBaseScrollHeight - beforeBaseScrollHeight);
                     consumeAnchorSpacerBy(consumedOnInsert, false);
+                    lastBaseScrollHeight = afterBaseScrollHeight;
                     return activeAssistantSegment;
                 },
                 getActiveAssistantSegment() {
@@ -688,6 +688,7 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                     const afterBaseScrollHeight = getBaseScrollHeight();
                     const consumedOnInsert = Math.max(0, afterBaseScrollHeight - beforeBaseScrollHeight);
                     consumeAnchorSpacerBy(consumedOnInsert, false);
+                    lastBaseScrollHeight = afterBaseScrollHeight;
                     return container;
                 },
                 removeIfEmpty() {
