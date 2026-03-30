@@ -187,6 +187,7 @@ class ConversationController {
         });
 
         messageElem.addEventListener('input', () => {
+            this.view.resizeInput();
             this.updateSendButtonState();
         });
 
@@ -251,6 +252,8 @@ class ConversationController {
                 const end = messageElem.selectionEnd;
                 messageElem.value = messageElem.value.substring(0, start) + '\n' + messageElem.value.substring(end);
                 messageElem.selectionStart = messageElem.selectionEnd = start + 1;
+                this.view.resizeInput();
+                this.updateSendButtonState();
                 return;
             }
             e.preventDefault();

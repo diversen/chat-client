@@ -15,6 +15,27 @@ import { openImagePreviewModal } from './image-preview-modal.js';
 
 const ANCHOR_SPACER_CLASS = 'responses-anchor-spacer';
 const MIN_ANCHOR_SPACER_HEIGHT_PX = 20;
+const MESSAGE_INPUT_MIN_HEIGHT_PX = 60;
+const MESSAGE_INPUT_MAX_VIEWPORT_HEIGHT_RATIO = 0.25;
+
+function resizeMessageInput() {
+    if (!messageElem) return;
+
+    const maxHeightPx = Math.max(
+        MESSAGE_INPUT_MIN_HEIGHT_PX,
+        Math.floor(window.innerHeight * MESSAGE_INPUT_MAX_VIEWPORT_HEIGHT_RATIO),
+    );
+
+    messageElem.style.height = 'auto';
+    messageElem.style.height = `${Math.min(messageElem.scrollHeight, maxHeightPx)}px`;
+    messageElem.style.overflowY = messageElem.scrollHeight > maxHeightPx ? 'auto' : 'hidden';
+}
+
+function resetMessageInputHeight() {
+    if (!messageElem) return;
+    messageElem.style.height = `${MESSAGE_INPUT_MIN_HEIGHT_PX}px`;
+    messageElem.style.overflowY = 'hidden';
+}
 
 function getOrCreateAnchorSpacer() {
     let spacer = responsesElem.querySelector(`.${ANCHOR_SPACER_CLASS}`);
@@ -477,6 +498,9 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
     const toolCallsCollapsedByDefault = Boolean(config?.tool_calls_collapsed_by_default ?? true);
     const toolCallsOpenByDefault = !toolCallsCollapsedByDefault;
 
+    resetMessageInputHeight();
+    window.addEventListener('resize', resizeMessageInput);
+
     return {
         renderStaticUserMessage(message, messageId = null, onEdit, images = [], displayRole = 'User') {
             const safeDisplayRole = String(displayRole || 'User');
@@ -698,7 +722,11 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                 },
             };
         },
-        clearInput() { messageElem.value = ''; },
+        clearInput() {
+            messageElem.value = '';
+            resetMessageInputHeight();
+        },
+        resizeInput() { resizeMessageInput(); },
         disableSend() { sendButtonElem.setAttribute('disabled', true); },
         enableSend() { sendButtonElem.removeAttribute('disabled'); },
         disableNew() {

@@ -480,15 +480,16 @@ pre code {
 }
 
 #message {
-    height: 60px;
-    overflow: auto;
+    min-height: 60px;
+    overflow-y: hidden;
     display: none;
+    resize: none;
 }
 
 /* on screens with small height make the chat textarea smaller */
 @media (max-height: 800px) {
     #message {
-        height: 60px;
+        min-height: 60px;
     }
 }
 
@@ -611,11 +612,6 @@ a.is-disabled-link {
     display: flex;
     flex-direction: column;
     gap: 14px;
-}
-
-.assistant-segment {
-    border-left: 2px solid color-mix(in srgb, var(--selection) 34%, transparent);
-    padding: 2px 0 2px 12px;
 }
 
 .assistant-segment-header {
