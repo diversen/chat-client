@@ -1,6 +1,6 @@
 from chat_client.core import exceptions_validation
 
-from chat_client.models import Dialog, Message, Image, MessageImage, ToolCallEvent
+from chat_client.models import Dialog, Message, Image, MessageImage, ToolCallEvent, AssistantTurnEvent
 from chat_client.database.db_session import async_session
 import uuid
 import logging
@@ -13,6 +13,10 @@ DIALOGS_PER_PAGE = 20
 
 
 async def _next_dialog_sequence_index(session, user_id: int, dialog_id: str) -> int:
+    return await _next_dialog_sequence_index_in_session(session, user_id, dialog_id)
+
+
+async def _next_dialog_sequence_index_in_session(session, user_id: int, dialog_id: str) -> int:
     message_max_stmt = select(func.max(Message.sequence_index)).where(
         Message.dialog_id == dialog_id,
         Message.user_id == user_id,
@@ -21,11 +25,17 @@ async def _next_dialog_sequence_index(session, user_id: int, dialog_id: str) -> 
         ToolCallEvent.dialog_id == dialog_id,
         ToolCallEvent.user_id == user_id,
     )
+    assistant_turn_max_stmt = select(func.max(AssistantTurnEvent.sequence_index)).where(
+        AssistantTurnEvent.dialog_id == dialog_id,
+        AssistantTurnEvent.user_id == user_id,
+    )
     message_max_result = await session.execute(message_max_stmt)
     tool_max_result = await session.execute(tool_max_stmt)
+    assistant_turn_max_result = await session.execute(assistant_turn_max_stmt)
     message_max = message_max_result.scalar_one_or_none()
     tool_max = tool_max_result.scalar_one_or_none()
-    max_sequence = max(int(message_max or 0), int(tool_max or 0))
+    assistant_turn_max = assistant_turn_max_result.scalar_one_or_none()
+    max_sequence = max(int(message_max or 0), int(tool_max or 0), int(assistant_turn_max or 0))
     return max_sequence + 1
 
 
@@ -141,7 +151,7 @@ async def get_messages(user_id: int, dialog_id: str):
             message_id = m.message_id
             if message_id is None:
                 continue
-            if m.role == "assistant" and not str(m.content or "").strip():
+            if m.role not in {"user", "system"}:
                 continue
             combined_rows.append(
                 (
@@ -156,34 +166,90 @@ async def get_messages(user_id: int, dialog_id: str):
                 )
             )
 
-        tool_stmt = (
-            select(ToolCallEvent)
-            .where(ToolCallEvent.dialog_id == dialog_id, ToolCallEvent.user_id == user_id)
-            .order_by(ToolCallEvent.sequence_index.asc(), ToolCallEvent.tool_call_event_id.asc())
-        )
-        tool_result = await session.execute(tool_stmt)
-        tool_events = tool_result.scalars().all()
-        for event in tool_events:
-            assert event.created is not None
-            combined_rows.append(
-                (
-                    int(event.sequence_index),
-                    {
-                        "message_id": None,
-                        "role": "tool",
-                        "content": event.result_text if event.result_text else event.error_text,
-                        "images": [],
-                        "created": event.created.isoformat(),
-                        "tool_call_id": event.tool_call_id,
-                        "tool_name": event.tool_name,
-                        "arguments_json": event.arguments_json,
-                        "error_text": event.error_text,
-                    },
-                )
+        assistant_turn_stmt = (
+            select(AssistantTurnEvent)
+            .where(AssistantTurnEvent.dialog_id == dialog_id, AssistantTurnEvent.user_id == user_id)
+            .order_by(
+                AssistantTurnEvent.sequence_index.asc(),
+                AssistantTurnEvent.assistant_turn_event_id.asc(),
             )
+        )
+        assistant_turn_result = await session.execute(assistant_turn_stmt)
+        assistant_turn_events = assistant_turn_result.scalars().all()
+
+        turns_by_id: dict[str, dict] = {}
+        ordered_turn_ids: list[str] = []
+        for event in assistant_turn_events:
+            assert event.created is not None
+            turn_id = str(event.turn_id or "").strip()
+            if not turn_id:
+                continue
+            if turn_id not in turns_by_id:
+                turns_by_id[turn_id] = {
+                    "message_id": None,
+                    "role": "assistant_turn",
+                    "turn_id": turn_id,
+                    "events": [],
+                    "created": event.created.isoformat(),
+                    "_sequence_index": int(event.sequence_index),
+                }
+                ordered_turn_ids.append(turn_id)
+            turns_by_id[turn_id]["events"].append(
+                {
+                    "event_type": event.event_type,
+                    "reasoning_text": event.reasoning_text,
+                    "content_text": event.content_text,
+                    "tool_call_id": event.tool_call_id,
+                    "tool_name": event.tool_name,
+                    "arguments_json": event.arguments_json,
+                    "result_text": event.result_text,
+                    "error_text": event.error_text,
+                }
+            )
+
+        for turn_id in ordered_turn_ids:
+            turn = turns_by_id[turn_id]
+            combined_rows.append((int(turn.pop("_sequence_index")), turn))
 
         combined_rows.sort(key=lambda row: row[0])
         return [row[1] for row in combined_rows]
+
+
+async def create_assistant_turn_events(
+    user_id: int,
+    dialog_id: str,
+    turn_id: str,
+    events: list[dict],
+):
+    normalized_turn_id = str(turn_id).strip()
+    if not normalized_turn_id:
+        raise exceptions_validation.UserValidate("turn_id is required")
+    if not events:
+        return
+
+    async with async_session() as session:
+        next_sequence_index = await _next_dialog_sequence_index_in_session(session, user_id, dialog_id)
+        for event in events:
+            event_type = str(event.get("event_type", "")).strip()
+            if event_type not in {"assistant_segment", "tool_call"}:
+                continue
+            assistant_turn_event = AssistantTurnEvent(
+                user_id=user_id,
+                dialog_id=dialog_id,
+                turn_id=normalized_turn_id,
+                sequence_index=next_sequence_index,
+                event_type=event_type,
+                reasoning_text=str(event.get("reasoning_text", "")),
+                content_text=str(event.get("content_text", "")),
+                tool_call_id=str(event.get("tool_call_id", "")),
+                tool_name=str(event.get("tool_name", "")),
+                arguments_json=str(event.get("arguments_json", "{}")),
+                result_text=str(event.get("result_text", "")),
+                error_text=str(event.get("error_text", "")),
+            )
+            session.add(assistant_turn_event)
+            next_sequence_index += 1
+        await session.commit()
 
 
 async def create_tool_call_event(
@@ -334,6 +400,13 @@ async def update_message(user_id: int, message_id: int, new_content: str):
             ToolCallEvent.sequence_index > message.sequence_index,
         )
         await session.execute(delete_tool_events_stmt)
+
+        delete_assistant_turn_events_stmt = delete(AssistantTurnEvent).where(
+            AssistantTurnEvent.dialog_id == message.dialog_id,
+            AssistantTurnEvent.user_id == user_id,
+            AssistantTurnEvent.sequence_index > message.sequence_index,
+        )
+        await session.execute(delete_assistant_turn_events_stmt)
 
         await session.commit()
 

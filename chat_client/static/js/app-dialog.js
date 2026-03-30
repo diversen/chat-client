@@ -59,6 +59,16 @@ async function createMessage(dialogID, message) {
     return data.message_id;
 }
 
+async function createAssistantTurnEvents(dialogID, payload) {
+    const data = await Requests.asyncPostJson(`/chat/create-assistant-turn-events/${dialogID}`, payload);
+
+    if (data.error) {
+        throw new Error(data.message);
+    }
+
+    return data;
+}
+
 async function isLoggedInOrRedirect() {
     
     const data = await Requests.asyncGetJson('/user/is-logged-in');
@@ -82,4 +92,4 @@ async function updateMessage(messageId, content) {
     return data;
 }
 
-export { createDialog, getMessages, createMessage, getConfig, isLoggedInOrRedirect, updateMessage };
+export { createDialog, getMessages, createMessage, createAssistantTurnEvents, getConfig, isLoggedInOrRedirect, updateMessage };

@@ -319,6 +319,13 @@ class ConversationController {
         return systemMessageModels.includes(selectedModel) ? 'system' : 'user';
     }
 
+    createTurnId() {
+        if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
+            return globalThis.crypto.randomUUID();
+        }
+        return `turn-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    }
+
     async sendUserMessage() {
         try {
             await this.auth.ensure();
@@ -427,78 +434,113 @@ class ConversationController {
         this.updateSendButtonState();
 
         const assistantSegments = [];
-        let ui = null;
-        const hasVisibleAssistantContent = (rawText) => {
-            const text = String(rawText || '');
-            const withoutThinkingTags = text.replace(/<\/?(?:think|thinking|thought)>/gi, '');
-            return withoutThinkingTags.trim().length > 0;
-        };
+        const turnEvents = [];
+        const turnId = this.createTurnId();
+        let turnUi = null;
+        const hasVisibleText = (rawText) => String(rawText || '').trim().length > 0;
 
-        const ensureAssistantContainer = () => {
-            if (!ui) {
-                ui = this.view.createAssistantContainer();
-                ui.setStatus('Thinking...');
+        const ensureAssistantContainer = async (kind = 'Thinking', options = {}) => {
+            if (!turnUi) {
+                turnUi = this.view.createAssistantTurn();
             }
-            return ui;
+            let segment = turnUi.ensureAssistantSegment(kind, options);
+            if (!segment) {
+                await finalizeAssistantContainer();
+                segment = turnUi.ensureAssistantSegment(kind, options);
+            }
+            return segment;
         };
 
         const finalizeAssistantContainer = async () => {
-            if (!ui) return;
-
-            ui.loader.classList.add('hidden');
-            ui.clearStatus();
-            await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-
-            const finalized = await ui.finalize();
+            if (!turnUi) return;
+            const finalized = await turnUi.finalizeAssistantSegment();
+            if (!finalized) return;
+            const segmentKind = String(finalized?.segmentKind || '').toLowerCase();
             const displayText = String(finalized?.displayText || '');
-            const persistedText = String(finalized?.persistedText || displayText);
 
-            if (hasVisibleAssistantContent(displayText)) {
-                await addCopyButtons(ui.contentElement, this.config);
-                this.view.attachCopy(ui.container, displayText);
-                const assistantMessage = { role: 'assistant', content: persistedText };
-                assistantSegments.push({ message: assistantMessage, container: ui.container });
-            } else {
-                ui.container.remove();
+            if (!hasVisibleText(displayText)) {
+                finalized.container.remove();
+                return;
             }
 
-            ui = null;
+            if (segmentKind === 'answer') {
+                assistantSegments.push({
+                    message: { role: 'assistant', content: displayText },
+                    container: finalized.container,
+                });
+                turnEvents.push({
+                    event_type: 'assistant_segment',
+                    reasoning_text: '',
+                    content_text: displayText,
+                });
+                return;
+            }
+
+            if (segmentKind === 'thinking') {
+                turnEvents.push({
+                    event_type: 'assistant_segment',
+                    reasoning_text: displayText,
+                    content_text: '',
+                });
+                return;
+            }
+
+            finalized.container.remove();
         };
 
         try {
-            ensureAssistantContainer();
             for await (const chunk of this.chat.stream({
                 model: this.view.getSelectedModel(),
                 dialog_id: this.dialogId || '',
                 messages: this.messages,
             }, this.abortController.signal)) {
                 if (chunk.toolStatus) {
-                    const activeUi = ensureAssistantContainer();
-                    activeUi.loader.classList.remove('hidden');
+                    const activeUi = await ensureAssistantContainer('Thinking', { showLoader: true });
+                    activeUi.setLoading(true);
                     const toolName = String(chunk.toolStatus.tool_name || 'tool');
                     activeUi.setStatus(`Calling tool: ${toolName}...`);
                     continue;
                 }
                 if (chunk.toolCall) {
                     await finalizeAssistantContainer();
-                    this.view.renderStaticToolMessage(chunk.toolCall);
+                    if (!turnUi) {
+                        turnUi = this.view.createAssistantTurn();
+                    }
+                    turnUi.appendToolCall(chunk.toolCall);
+                    turnEvents.push({
+                        event_type: 'tool_call',
+                        tool_call_id: String(chunk.toolCall.tool_call_id || ''),
+                        tool_name: String(chunk.toolCall.tool_name || ''),
+                        arguments_json: String(chunk.toolCall.arguments_json || '{}'),
+                        result_text: String(chunk.toolCall.content || ''),
+                        error_text: String(chunk.toolCall.error_text || ''),
+                    });
                     continue;
                 }
 
-                const activeUi = ensureAssistantContainer();
-                activeUi.loader.classList.add('hidden');
-                if (chunk.content || chunk.reasoning || chunk.reasoningOpenClose) {
+                if (chunk.reasoningOpenClose || chunk.reasoning) {
+                    const activeUi = await ensureAssistantContainer('Thinking');
+                    activeUi.setLoading(false);
                     activeUi.clearStatus();
+                    if (chunk.reasoning) {
+                        await activeUi.appendText(chunk.reasoning);
+                    }
                 }
 
-                if (chunk.reasoningOpenClose === 'open') await activeUi.appendReasoning('');
-                else if (chunk.reasoningOpenClose === 'close') activeUi.closeReasoningIfOpen();
-
-                if (chunk.reasoning) await activeUi.appendReasoning(chunk.reasoning);
-                if (chunk.content) await activeUi.appendContent(chunk.content, Boolean(chunk.done));
+                if (chunk.content) {
+                    const activeUi = await ensureAssistantContainer('Answer');
+                    activeUi.setLoading(false);
+                    activeUi.clearStatus();
+                    await activeUi.appendText(chunk.content, Boolean(chunk.done));
+                }
             }
         } catch (error) {
-            if (ui) ui.loader.classList.add('hidden');
+            if (turnUi) {
+                const activeUi = turnUi.getActiveAssistantSegment();
+                if (activeUi) {
+                    activeUi.setLoading(false);
+                }
+            }
             if (error.name === 'AbortError') {
                 Flash.setMessage('Request was aborted', 'notice');
             } else {
@@ -516,17 +558,40 @@ class ConversationController {
 
             await finalizeAssistantContainer();
 
+            if (this.dialogId && turnEvents.length > 0) {
+                await this.storage.createAssistantTurnEvents(this.dialogId, {
+                    turn_id: turnId,
+                    events: turnEvents,
+                });
+            }
+
             for (const segment of assistantSegments) {
-                const assistantMessageId = await this.storage.createMessage(this.dialogId, segment.message);
-                segment.container.setAttribute('data-message-id', assistantMessageId);
-                this.messages.push({ ...segment.message, message_id: assistantMessageId });
+                this.messages.push(segment.message);
+            }
+            if (turnUi) {
+                turnUi.removeIfEmpty();
+                turnUi = null;
             }
             this.abortController = new AbortController();
         }
     }
 
     async loadDialog(savedMessages) {
-        this.messages = savedMessages.filter((msg) => msg.role === 'user' || msg.role === 'system' || msg.role === 'assistant');
+        this.messages = [];
+        for (const msg of savedMessages) {
+            if (msg.role === 'user' || msg.role === 'system') {
+                this.messages.push(msg);
+                continue;
+            }
+            if (msg.role === 'assistant_turn' && Array.isArray(msg.events)) {
+                for (const event of msg.events) {
+                    if (event?.event_type !== 'assistant_segment') continue;
+                    const contentText = String(event?.content_text || '');
+                    if (!contentText.trim()) continue;
+                    this.messages.push({ role: 'assistant', content: contentText, images: [] });
+                }
+            }
+        }
         responsesElem.innerHTML = '';
 
         for (const msg of savedMessages) {
@@ -541,10 +606,21 @@ class ConversationController {
                     msg.images || [],
                     displayRole,
                 );
-            } else if (msg.role === 'tool') {
-                this.view.renderStaticToolMessage(msg);
-            } else {
+                continue;
+            }
+
+            if (msg.role === 'assistant_turn') {
+                await this.view.renderStaticAssistantTurn(msg.events || []);
+                continue;
+            }
+
+            if (msg.role === 'assistant') {
                 await this.view.renderStaticAssistantMessage(msg.content, msg.message_id);
+                continue;
+            }
+
+            if (msg.role === 'tool') {
+                this.view.renderStaticToolMessage(msg);
             }
         }
     }

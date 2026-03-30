@@ -165,6 +165,37 @@ class TestChatEndpoints(BaseTestCase):
         assert messages[3] == {"role": "tool", "tool_call_id": "call_2", "content": "R2"}
         assert messages[4] == {"role": "assistant", "content": "A"}
 
+    def test_build_model_messages_from_assistant_turn_history(self):
+        from chat_client.endpoints.chat_endpoints import _build_model_messages_from_dialog_history
+
+        persisted = [
+            {"role": "user", "content": "Q", "images": []},
+            {
+                "role": "assistant_turn",
+                "turn_id": "turn-1",
+                "events": [
+                    {"event_type": "assistant_segment", "reasoning_text": "r1", "content_text": ""},
+                    {
+                        "event_type": "tool_call",
+                        "tool_call_id": "call_1",
+                        "tool_name": "python",
+                        "arguments_json": '{"code":"1+1"}',
+                        "result_text": "2",
+                        "error_text": "",
+                    },
+                    {"event_type": "assistant_segment", "reasoning_text": "", "content_text": "A"},
+                ],
+            },
+        ]
+
+        messages = _build_model_messages_from_dialog_history(persisted)
+        assert messages[0] == {"role": "user", "content": "Q", "images": []}
+        assert messages[1]["role"] == "assistant"
+        assert messages[1]["content"] == ""
+        assert len(messages[1]["tool_calls"]) == 1
+        assert messages[2] == {"role": "tool", "tool_call_id": "call_1", "content": "2"}
+        assert messages[3] == {"role": "assistant", "content": "A"}
+
     @patch("chat_client.core.user_session.is_logged_in")
     def test_chat_page_not_authenticated(self, mock_logged_in):
         """Test GET / when not authenticated"""

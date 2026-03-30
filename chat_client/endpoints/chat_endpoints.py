@@ -23,6 +23,7 @@ from chat_client.core.http import (
 )
 from chat_client.schemas.chat import (
     ChatStreamRequest,
+    CreateAssistantTurnEventsRequest,
     CreateDialogRequest,
     CreateMessageRequest,
     UpdateMessageRequest,
@@ -236,6 +237,73 @@ def _build_model_messages_from_dialog_history(messages: list[dict[str, Any]]) ->
             continue
         role = str(message.get("role", "")).strip()
         content = str(message.get("content", ""))
+
+        if role == "assistant_turn":
+            events = message.get("events", [])
+            if not isinstance(events, list):
+                i += 1
+                continue
+            pending_tool_calls: list[dict[str, Any]] = []
+            pending_tool_messages: list[dict[str, Any]] = []
+            for raw_event in events:
+                if not isinstance(raw_event, dict):
+                    continue
+                event_type = str(raw_event.get("event_type", "")).strip()
+                if event_type == "assistant_segment":
+                    if pending_tool_calls:
+                        normalized.append(
+                            {
+                                "role": "assistant",
+                                "content": "",
+                                "tool_calls": pending_tool_calls,
+                            }
+                        )
+                        normalized.extend(pending_tool_messages)
+                        pending_tool_calls = []
+                        pending_tool_messages = []
+                    content_text = str(raw_event.get("content_text", ""))
+                    if content_text.strip():
+                        normalized.append({"role": "assistant", "content": content_text})
+                    continue
+                if event_type == "tool_call":
+                    tool_call_id = str(raw_event.get("tool_call_id", "")).strip()
+                    tool_name = str(raw_event.get("tool_name", "")).strip() or "unknown_tool"
+                    raw_arguments = raw_event.get("arguments_json", "{}")
+                    arguments_json = "{}"
+                    if isinstance(raw_arguments, str):
+                        try:
+                            parsed_arguments = json.loads(raw_arguments)
+                            arguments_json = json.dumps(parsed_arguments, ensure_ascii=True, separators=(",", ":"))
+                        except json.JSONDecodeError:
+                            arguments_json = "{}"
+                    pending_tool_calls.append(
+                        {
+                            "id": tool_call_id,
+                            "type": "function",
+                            "function": {
+                                "name": tool_name,
+                                "arguments": arguments_json,
+                            },
+                        }
+                    )
+                    pending_tool_messages.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": tool_call_id,
+                            "content": str(raw_event.get("result_text", "") or raw_event.get("error_text", "")),
+                        }
+                    )
+            if pending_tool_calls:
+                normalized.append(
+                    {
+                        "role": "assistant",
+                        "content": "",
+                        "tool_calls": pending_tool_calls,
+                    }
+                )
+                normalized.extend(pending_tool_messages)
+            i += 1
+            continue
 
         if role in {"user", "assistant", "system"}:
             item: dict[str, Any] = {"role": role, "content": content}
@@ -459,6 +527,33 @@ async def create_message(request: Request):
     except Exception:
         logger.exception("Error saving message")
         return json_error("Error saving message", status_code=500)
+
+
+async def create_assistant_turn_events(request: Request):
+    """
+    Save one completed assistant turn as ordered events.
+    """
+    try:
+        user_id = await require_user_id_json(request, message="You must be logged in in order to create assistant turn events")
+        dialog_id = str(request.path_params.get("dialog_id", "")).strip()
+        if not dialog_id:
+            raise exceptions_validation.UserValidate("Dialog id is required")
+        await chat_repository.get_dialog(user_id, dialog_id)
+        payload = await parse_json_payload(request, CreateAssistantTurnEventsRequest)
+        await chat_repository.create_assistant_turn_events(
+            user_id=user_id,
+            dialog_id=dialog_id,
+            turn_id=payload.turn_id,
+            events=[event.model_dump() for event in payload.events],
+        )
+        return json_success()
+    except exceptions_validation.JSONError as e:
+        return json_error(str(e), status_code=e.status_code)
+    except exceptions_validation.UserValidate as e:
+        return json_error(str(e), status_code=400)
+    except Exception:
+        logger.exception("Error saving assistant turn events")
+        return json_error("Error saving assistant turn events", status_code=500)
 
 
 async def get_dialog(request: Request):

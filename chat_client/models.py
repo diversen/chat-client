@@ -175,6 +175,34 @@ class ToolCallEvent(Base):
     )
 
 
+class AssistantTurnEvent(Base):
+    __tablename__ = "assistant_turn_event"
+    __table_args__ = (
+        Index("assistant_turn_event_dialog_id", "dialog_id"),
+        Index("assistant_turn_event_user_id", "user_id"),
+        Index("assistant_turn_event_dialog_sequence_index", "dialog_id", "sequence_index"),
+        Index("assistant_turn_event_dialog_turn_id", "dialog_id", "turn_id"),
+        {"sqlite_autoincrement": True},
+    )
+
+    assistant_turn_event_id: Mapped[int | None] = mapped_column(primary_key=True, autoincrement=True, nullable=False, init=False)
+    dialog_id: Mapped[str] = mapped_column(ForeignKey("dialog.dialog_id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    turn_id: Mapped[str] = mapped_column(Text, nullable=False)
+    event_type: Mapped[str] = mapped_column(Text, nullable=False)
+    sequence_index: Mapped[int] = mapped_column(nullable=False, default=0)
+    reasoning_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    content_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    tool_call_id: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    tool_name: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    arguments_json: Mapped[str] = mapped_column(Text, nullable=False, default="{}")
+    result_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    error_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    created: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False, init=False
+    )
+
+
 class Prompt(Base):
     __tablename__ = "prompt"
     __table_args__ = (

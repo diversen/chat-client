@@ -36,3 +36,21 @@ class CreateMessageRequest(BaseModel):
 class UpdateMessageRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
     content: str
+
+
+class AssistantTurnEventItemRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    event_type: str
+    reasoning_text: str = ""
+    content_text: str = ""
+    tool_call_id: str = ""
+    tool_name: str = ""
+    arguments_json: str = "{}"
+    result_text: str = ""
+    error_text: str = ""
+
+
+class CreateAssistantTurnEventsRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    turn_id: str
+    events: list[AssistantTurnEventItemRequest] = Field(default_factory=list)

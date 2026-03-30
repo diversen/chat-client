@@ -322,6 +322,162 @@ const TOOL_META_RENDERERS = {
     default: renderDefaultToolCallMeta,
 };
 
+function populateToolCallBody(container, toolMessage, toolCallsOpenByDefault, roleElement) {
+    const toolName = String(toolMessage?.tool_name || 'unknown_tool');
+    const argumentsJson = String(toolMessage?.arguments_json || '{}');
+    const resultContent = String(toolMessage?.content || '');
+    const errorText = String(toolMessage?.error_text || '');
+    const toolBody = document.createElement('div');
+    toolBody.className = toolCallsOpenByDefault ? 'tool-call-body' : 'tool-call-body hidden';
+    container.appendChild(toolBody);
+
+    if (roleElement) {
+        roleElement.classList.add('tool-toggle');
+        roleElement.setAttribute('role', 'button');
+        roleElement.setAttribute('tabindex', '0');
+        roleElement.setAttribute('aria-expanded', String(toolCallsOpenByDefault));
+        roleElement.title = `Show/hide ${toolName} details`;
+
+        const toggle = () => {
+            const isOpen = !toolBody.classList.contains('hidden');
+            toolBody.classList.toggle('hidden', isOpen);
+            roleElement.setAttribute('aria-expanded', String(!isOpen));
+        };
+
+        roleElement.addEventListener('click', toggle);
+        roleElement.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                toggle();
+            }
+        });
+    }
+
+    const renderer = TOOL_META_RENDERERS[toolName] || TOOL_META_RENDERERS.default;
+    renderer(toolBody, {
+        toolName,
+        argumentsJson,
+        resultContent,
+        errorText,
+    });
+
+    return toolBody;
+}
+
+function createToolMessageContainer(toolMessage, toolCallsOpenByDefault) {
+    const { container, contentElement } = createMessageElement('Tool');
+    const roleElement = container.querySelector('.role_tool');
+    populateToolCallBody(contentElement, toolMessage, toolCallsOpenByDefault, roleElement);
+
+    return container;
+}
+
+function createEmbeddedToolCallElement(toolMessage, toolCallsOpenByDefault) {
+    const container = document.createElement('section');
+    container.className = 'assistant-tool-call';
+
+    const roleElement = document.createElement('h4');
+    roleElement.className = 'role role_tool';
+    roleElement.textContent = 'Tool';
+    container.appendChild(roleElement);
+
+    populateToolCallBody(container, toolMessage, toolCallsOpenByDefault, roleElement);
+    return container;
+}
+
+function splitThinkingMarkup(rawText) {
+    const text = String(rawText || '');
+    const tagRegex = /<\/?(?:think|thinking|thought)>/gi;
+    const segments = [];
+    let isThinking = false;
+    let lastIndex = 0;
+    let match;
+
+    const pushSegment = (type, value) => {
+        if (!value) return;
+        const previous = segments[segments.length - 1];
+        if (previous && previous.type === type) {
+            previous.text += value;
+            return;
+        }
+        segments.push({ type, text: value });
+    };
+
+    while ((match = tagRegex.exec(text)) !== null) {
+        pushSegment(isThinking ? 'thinking' : 'normal', text.slice(lastIndex, match.index));
+        isThinking = !String(match[0] || '').startsWith('</');
+        lastIndex = tagRegex.lastIndex;
+    }
+
+    pushSegment(isThinking ? 'thinking' : 'normal', text.slice(lastIndex));
+    return segments;
+}
+
+function createAssistantSegmentShell(messageId = null, initialKind = 'Thinking', showLoader = false) {
+    const container = document.createElement('section');
+    container.className = 'assistant-segment';
+    if (messageId) {
+        container.setAttribute('data-message-id', String(messageId));
+    }
+
+    const segmentHeader = document.createElement('div');
+    segmentHeader.className = 'assistant-segment-header';
+    const segmentStep = document.createElement('span');
+    segmentStep.className = 'assistant-segment-step';
+    segmentStep.textContent = 'Step';
+    const segmentKindElement = document.createElement('span');
+    segmentKindElement.className = 'assistant-segment-kind';
+    segmentKindElement.textContent = String(initialKind || 'Thinking');
+    segmentHeader.appendChild(segmentStep);
+    segmentHeader.appendChild(segmentKindElement);
+    container.appendChild(segmentHeader);
+
+    const metaElement = document.createElement('div');
+    metaElement.className = 'assistant-meta hidden';
+    const loader = document.createElement('div');
+    loader.className = 'loading-model';
+    if (!showLoader) {
+        loader.classList.add('hidden');
+    }
+    const statusElement = document.createElement('p');
+    statusElement.className = 'assistant-status';
+    metaElement.appendChild(loader);
+    metaElement.appendChild(statusElement);
+    container.appendChild(metaElement);
+
+    const contentElement = document.createElement('div');
+    contentElement.className = 'content';
+    container.appendChild(contentElement);
+
+    return {
+        container,
+        loader,
+        statusElement,
+        setSegmentIndex(index) {
+            const safeIndex = Number(index);
+            segmentStep.textContent = Number.isFinite(safeIndex) && safeIndex > 0 ? `Step ${safeIndex}` : 'Step';
+        },
+        setSegmentKind(kind) {
+            const safeKind = String(kind || '').trim();
+            segmentKindElement.textContent = safeKind || 'Thinking';
+        },
+        setLoading(isLoading) {
+            loader.classList.toggle('hidden', !isLoading);
+            metaElement.classList.toggle('hidden', loader.classList.contains('hidden') && !statusElement.textContent.trim());
+        },
+        setStatus(text) {
+            const safeText = String(text || '').trim();
+            statusElement.textContent = safeText;
+            metaElement.classList.toggle('hidden', loader.classList.contains('hidden') && !safeText);
+        },
+        clearStatus() {
+            statusElement.textContent = '';
+            metaElement.classList.toggle('hidden', loader.classList.contains('hidden'));
+        },
+        contentElement,
+    };
+}
+
 function createChatView({ config, renderStreamedResponseText, updateContentDiff }) {
     const toolCallsCollapsedByDefault = Boolean(config?.tool_calls_collapsed_by_default ?? true);
     const toolCallsOpenByDefault = !toolCallsCollapsedByDefault;
@@ -351,46 +507,84 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
             await renderStreamedResponseText(contentElement, message);
             await addCopyButtons(contentElement, config);
         },
-        renderStaticToolMessage(toolMessage, beforeElement = null) {
-            const { container, contentElement } = createMessageElement('Tool');
-            const toolName = String(toolMessage?.tool_name || 'unknown_tool');
-            const argumentsJson = String(toolMessage?.arguments_json || '{}');
-            const resultContent = String(toolMessage?.content || '');
-            const errorText = String(toolMessage?.error_text || '');
-            const roleElement = container.querySelector('.role_tool');
-            const toolBody = document.createElement('div');
-            toolBody.className = toolCallsOpenByDefault ? 'tool-call-body' : 'tool-call-body hidden';
-            contentElement.appendChild(toolBody);
+        async renderStaticAssistantTurn(turnMessages = []) {
+            const { container: turnContainer, contentElement: turnContentElement } = createMessageElement('Assistant');
+            turnContainer.classList.add('assistant-turn');
+            appendBeforeAnchorSpacer(turnContainer);
 
-            if (roleElement) {
-                roleElement.classList.add('tool-toggle');
-                roleElement.setAttribute('role', 'button');
-                roleElement.setAttribute('tabindex', '0');
-                roleElement.setAttribute('aria-expanded', String(toolCallsOpenByDefault));
-                roleElement.title = `Show/hide ${toolName} details`;
+            let segmentIndex = 0;
+            const appendStaticTextSegment = async (kind, text, messageId = null) => {
+                const safeText = String(text || '');
+                if (!safeText.trim()) return null;
+                const segment = createAssistantSegmentShell(messageId, kind, false);
+                segmentIndex += 1;
+                segment.setSegmentIndex(segmentIndex);
+                turnContentElement.appendChild(segment.container);
+                await renderStreamedResponseText(segment.contentElement, safeText);
+                if (kind === 'Answer') {
+                    await addCopyButtons(segment.contentElement, config);
+                }
+                return segment;
+            };
 
-                const toggle = () => {
-                    const isOpen = !toolBody.classList.contains('hidden');
-                    toolBody.classList.toggle('hidden', isOpen);
-                    roleElement.setAttribute('aria-expanded', String(!isOpen));
-                };
+            const appendStaticToolSegment = (toolPayload) => {
+                const segment = createAssistantSegmentShell(null, 'Tool', false);
+                segmentIndex += 1;
+                segment.setSegmentIndex(segmentIndex);
+                turnContentElement.appendChild(segment.container);
+                const toolElement = createEmbeddedToolCallElement(toolPayload, toolCallsOpenByDefault);
+                segment.contentElement.appendChild(toolElement);
+                return segment;
+            };
 
-                roleElement.addEventListener('click', toggle);
-                roleElement.addEventListener('keydown', (event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        toggle();
+            for (const item of turnMessages) {
+                const isTool = item?.role === 'tool' || item?.event_type === 'tool_call';
+                if (isTool) {
+                    const toolPayload = item?.event_type === 'tool_call'
+                        ? {
+                            tool_call_id: String(item?.tool_call_id || ''),
+                            tool_name: String(item?.tool_name || ''),
+                            arguments_json: String(item?.arguments_json || '{}'),
+                            content: String(item?.result_text || ''),
+                            error_text: String(item?.error_text || ''),
+                        }
+                        : item;
+                    appendStaticToolSegment(toolPayload);
+                    continue;
+                }
+
+                const isAssistantSegment = item && (
+                    item.role === 'assistant' || item.event_type === 'assistant_segment'
+                );
+                if (!isAssistantSegment) {
+                    continue;
+                }
+
+                let reasoningText = '';
+                let contentText = '';
+                if (item?.event_type === 'assistant_segment') {
+                    reasoningText = String(item?.reasoning_text || '');
+                    contentText = String(item?.content_text || '');
+                } else {
+                    const parts = splitThinkingMarkup(String(item?.content || ''));
+                    for (const part of parts) {
+                        if (part.type === 'thinking') reasoningText += part.text;
+                        else contentText += part.text;
                     }
-                });
+                }
+
+                await appendStaticTextSegment('Thinking', reasoningText, item?.message_id || null);
+                await appendStaticTextSegment('Answer', contentText, item?.message_id || null);
             }
 
-            const renderer = TOOL_META_RENDERERS[toolName] || TOOL_META_RENDERERS.default;
-            renderer(toolBody, {
-                toolName,
-                argumentsJson,
-                resultContent,
-                errorText,
-            });
+            if (!turnContentElement.children.length) {
+                turnContainer.remove();
+                return null;
+            }
+            return turnContainer;
+        },
+        renderStaticToolMessage(toolMessage, beforeElement = null) {
+            const container = createToolMessageContainer(toolMessage, toolCallsOpenByDefault);
 
             if (beforeElement && beforeElement.parentNode === responsesElem) {
                 responsesElem.insertBefore(container, beforeElement);
@@ -399,115 +593,107 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
             }
             return container;
         },
-        createAssistantContainer() {
-            const { container, contentElement, loader } = createMessageElement('Assistant');
+        createAssistantTurn() {
             const beforeBaseScrollHeight = getBaseScrollHeight();
-            appendBeforeAnchorSpacer(container);
+            const { container: turnContainer, contentElement: turnContentElement } = createMessageElement('Assistant');
+            turnContainer.classList.add('assistant-turn');
+            appendBeforeAnchorSpacer(turnContainer);
             const afterBaseScrollHeight = getBaseScrollHeight();
             const consumedOnInsert = Math.max(0, afterBaseScrollHeight - beforeBaseScrollHeight);
             consumeAnchorSpacerBy(consumedOnInsert, false);
-            loader.classList.remove('hidden');
+            let lastBaseScrollHeight = getBaseScrollHeight();
+            let segmentIndex = 0;
 
-            let thinkingBlock = null;
-            let thinkingBody = null;
-            let thinkingContent = null;
+            const createTextSegment = (kind, showLoader = false) => {
+                const segment = createAssistantSegmentShell(null, kind, showLoader);
+                segmentIndex += 1;
+                segment.setSegmentIndex(segmentIndex);
 
-            const ensureThinkingBlock = () => {
-                if (thinkingBlock) return;
-                thinkingBlock = document.createElement('details');
-                thinkingBlock.className = 'thinking-block';
-                const thinkingToggle = document.createElement('summary');
-                thinkingToggle.className = 'role role_tool thinking-toggle';
-                thinkingToggle.textContent = 'Thinking';
-                thinkingBlock.open = false;
-                thinkingBody = document.createElement('div');
-                thinkingBody.className = 'thinking-body hidden';
-                thinkingContent = document.createElement('div');
-                thinkingContent.className = 'thinking-text';
-                thinkingBody.appendChild(thinkingContent);
-                thinkingBlock.appendChild(thinkingToggle);
-                thinkingBlock.appendChild(thinkingBody);
-                contentElement.insertAdjacentElement('beforebegin', thinkingBlock);
-                thinkingBlock.addEventListener('toggle', () => {
-                    if (!thinkingBody) return;
-                    thinkingBody.classList.toggle('hidden', !thinkingBlock.open);
-                });
+                const hiddenContentElem = document.createElement('div');
+                hiddenContentElem.classList.add('content');
+                let streamedResponseText = '';
+
+                return {
+                    ...segment,
+                    segmentKind: kind.toLowerCase(),
+                    async appendText(text, force = false) {
+                        streamedResponseText += text;
+                        const beforeBaseScrollHeight = lastBaseScrollHeight;
+                        await updateContentDiff(segment.contentElement, hiddenContentElem, streamedResponseText, force);
+                        const afterBaseScrollHeight = getBaseScrollHeight();
+                        const consumedHeight = Math.max(0, afterBaseScrollHeight - beforeBaseScrollHeight);
+                        consumeAnchorSpacerBy(consumedHeight, false);
+                        lastBaseScrollHeight = afterBaseScrollHeight;
+                    },
+                    async finalize() {
+                        const beforeBaseScrollHeight = lastBaseScrollHeight;
+                        await updateContentDiff(segment.contentElement, hiddenContentElem, streamedResponseText, true);
+                        const afterBaseScrollHeight = getBaseScrollHeight();
+                        const consumedHeight = Math.max(0, afterBaseScrollHeight - beforeBaseScrollHeight);
+                        consumeAnchorSpacerBy(consumedHeight, false);
+                        lastBaseScrollHeight = afterBaseScrollHeight;
+                        return {
+                            segmentKind: kind.toLowerCase(),
+                            displayText: streamedResponseText,
+                        };
+                    },
+                };
             };
 
-            const hiddenContentElem = document.createElement('div');
-            hiddenContentElem.classList.add('content');
-            const hiddenThinkingElem = document.createElement('div');
-            hiddenThinkingElem.classList.add('thinking-text');
-            contentElement.classList.add('content');
-            const statusElement = document.createElement('p');
-            statusElement.className = 'assistant-status hidden';
-            contentElement.insertAdjacentElement('beforebegin', statusElement);
-
-            let streamedResponseText = '';
-            let reasoningText = '';
-            let lastBaseScrollHeight = getBaseScrollHeight();
+            let activeAssistantSegment = null;
 
             return {
-                container,
-                loader,
-                hiddenContentElem,
-                contentElement,
-                statusElement,
-                setStatus(text) {
-                    const safeText = String(text || '').trim();
-                    if (!safeText) {
-                        statusElement.textContent = '';
-                        statusElement.classList.add('hidden');
-                        return;
+                container: turnContainer,
+                ensureAssistantSegment(kind = 'Thinking', options = {}) {
+                    if (activeAssistantSegment && activeAssistantSegment.segmentKind === String(kind || '').toLowerCase()) {
+                        return activeAssistantSegment;
                     }
-                    statusElement.textContent = safeText;
-                    statusElement.classList.remove('hidden');
-                },
-                clearStatus() {
-                    statusElement.textContent = '';
-                    statusElement.classList.add('hidden');
-                },
-                async appendReasoning(text, force = false) {
-                    ensureThinkingBlock();
-                    if (!thinkingContent) return;
-                    reasoningText += text;
-                    const beforeBaseScrollHeight = lastBaseScrollHeight;
-                    await updateContentDiff(thinkingContent, hiddenThinkingElem, reasoningText, force);
+                    if (activeAssistantSegment) return null;
+                    const beforeBaseScrollHeight = getBaseScrollHeight();
+                    activeAssistantSegment = createTextSegment(kind, Boolean(options.showLoader));
+                    turnContentElement.appendChild(activeAssistantSegment.container);
                     const afterBaseScrollHeight = getBaseScrollHeight();
-                    const consumedHeight = Math.max(0, afterBaseScrollHeight - beforeBaseScrollHeight);
-                    consumeAnchorSpacerBy(consumedHeight, false);
-                    lastBaseScrollHeight = afterBaseScrollHeight;
+                    const consumedOnInsert = Math.max(0, afterBaseScrollHeight - beforeBaseScrollHeight);
+                    consumeAnchorSpacerBy(consumedOnInsert, false);
+                    return activeAssistantSegment;
                 },
-                closeReasoningIfOpen() {
-                    // Thinking is rendered in a dedicated block outside streamed response content.
+                getActiveAssistantSegment() {
+                    return activeAssistantSegment;
                 },
-                async appendContent(text, force = false) {
-                    streamedResponseText += text;
-                    const beforeBaseScrollHeight = lastBaseScrollHeight;
-                    await updateContentDiff(contentElement, hiddenContentElem, streamedResponseText, force);
-                    const afterBaseScrollHeight = getBaseScrollHeight();
-                    const consumedHeight = Math.max(0, afterBaseScrollHeight - beforeBaseScrollHeight);
-                    consumeAnchorSpacerBy(consumedHeight, false);
-                    lastBaseScrollHeight = afterBaseScrollHeight;
-                },
-                async finalize() {
-                    if (reasoningText.trim()) {
-                        await this.appendReasoning('', true);
+                async finalizeAssistantSegment() {
+                    if (!activeAssistantSegment) return null;
+                    activeAssistantSegment.setLoading(false);
+                    activeAssistantSegment.clearStatus();
+                    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+                    const finalized = await activeAssistantSegment.finalize();
+                    const segment = activeAssistantSegment;
+                    if (segment.segmentKind === 'answer') {
+                        await addCopyButtons(segment.contentElement, config);
                     }
-                    const beforeBaseScrollHeight = lastBaseScrollHeight;
-                    await updateContentDiff(contentElement, hiddenContentElem, streamedResponseText, true);
-                    const afterBaseScrollHeight = getBaseScrollHeight();
-                    const consumedHeight = Math.max(0, afterBaseScrollHeight - beforeBaseScrollHeight);
-                    consumeAnchorSpacerBy(consumedHeight, false);
-                    lastBaseScrollHeight = afterBaseScrollHeight;
-                    let persistedText = streamedResponseText;
-                    if (reasoningText.trim()) {
-                        persistedText = `<thinking>\n${reasoningText}\n</thinking>\n\n${streamedResponseText}`;
-                    }
+                    activeAssistantSegment = null;
                     return {
-                        displayText: streamedResponseText,
-                        persistedText,
+                        ...finalized,
+                        container: segment.container,
+                        contentElement: segment.contentElement,
                     };
+                },
+                appendToolCall(toolMessage) {
+                    const beforeBaseScrollHeight = getBaseScrollHeight();
+                    const targetSegment = createAssistantSegmentShell(null, 'Tool', false);
+                    segmentIndex += 1;
+                    targetSegment.setSegmentIndex(segmentIndex);
+                    turnContentElement.appendChild(targetSegment.container);
+                    const container = createEmbeddedToolCallElement(toolMessage, toolCallsOpenByDefault);
+                    targetSegment.contentElement.appendChild(container);
+                    const afterBaseScrollHeight = getBaseScrollHeight();
+                    const consumedOnInsert = Math.max(0, afterBaseScrollHeight - beforeBaseScrollHeight);
+                    consumeAnchorSpacerBy(consumedOnInsert, false);
+                    return container;
+                },
+                removeIfEmpty() {
+                    if (!turnContentElement.children.length) {
+                        turnContainer.remove();
+                    }
                 },
             };
         },

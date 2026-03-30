@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from chat_client.models import Base, ToolCallEvent, User
+from chat_client.models import AssistantTurnEvent, Base, ToolCallEvent, User
 
 
 def _aiosqlite_available() -> bool:
@@ -128,10 +128,10 @@ def test_update_message_deletes_newer_tool_call_events():
     asyncio.run(_run())
 
 
-def test_get_messages_filters_empty_assistant_messages():
+def test_get_messages_returns_assistant_turn_items():
     async def _run():
         temp_dir = tempfile.mkdtemp()
-        db_path = Path(temp_dir) / "test_chat_repository_empty_assistant.db"
+        db_path = Path(temp_dir) / "test_chat_repository_assistant_turn.db"
         engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}", echo=False)
         session_factory = async_sessionmaker(engine, expire_on_commit=False)
 
@@ -152,7 +152,7 @@ def test_get_messages_filters_empty_assistant_messages():
 
             async with session_factory() as session:
                 user = User(
-                    email="repo-test-empty-assistant@example.com",
+                    email="repo-test-assistant-turn@example.com",
                     password_hash="x",
                     random="y",
                 )
@@ -161,26 +161,34 @@ def test_get_messages_filters_empty_assistant_messages():
                 await session.refresh(user)
                 user_id = int(user.user_id)
 
-            dialog_id = await chat_repository.create_dialog(user_id, "Filter empty assistant")
+            dialog_id = await chat_repository.create_dialog(user_id, "Assistant turn history")
             await chat_repository.create_message(user_id, dialog_id, "user", "Hello")
-            await chat_repository.create_message(user_id, dialog_id, "assistant", "   ")
-            await chat_repository.create_message(user_id, dialog_id, "assistant", "Useful answer")
-            await chat_repository.create_tool_call_event(
+            await chat_repository.create_assistant_turn_events(
                 user_id=user_id,
                 dialog_id=dialog_id,
-                tool_call_id="call_x",
-                tool_name="ping",
-                arguments={},
-                result_text="pong",
+                turn_id="turn-1",
+                events=[
+                    {"event_type": "assistant_segment", "reasoning_text": "thoughts", "content_text": ""},
+                    {
+                        "event_type": "tool_call",
+                        "tool_call_id": "call_x",
+                        "tool_name": "ping",
+                        "arguments_json": "{}",
+                        "result_text": "pong",
+                    },
+                    {"event_type": "assistant_segment", "reasoning_text": "", "content_text": "Useful answer"},
+                ],
             )
 
             messages = await chat_repository.get_messages(user_id, dialog_id)
 
-            assistant_contents = [m["content"] for m in messages if m.get("role") == "assistant"]
-            tool_count = len([m for m in messages if m.get("role") == "tool"])
+            assert messages[0]["role"] == "user"
+            assert messages[1]["role"] == "assistant_turn"
+            assert len(messages[1]["events"]) == 3
+            assert messages[1]["events"][0]["event_type"] == "assistant_segment"
+            assert messages[1]["events"][1]["event_type"] == "tool_call"
+            assert messages[1]["events"][2]["content_text"] == "Useful answer"
 
-            assert assistant_contents == ["Useful answer"]
-            assert tool_count == 1
         finally:
             chat_repository.async_session = original_session_factory
             sys.modules.pop("data.config", None)
@@ -217,7 +225,7 @@ def test_get_messages_orders_by_sequence_index():
 
             async with session_factory() as session:
                 user = User(
-                    email="repo-test-same-timestamp@example.com",
+                    email="repo-test-sequence@example.com",
                     password_hash="x",
                     random="y",
                 )
@@ -228,25 +236,31 @@ def test_get_messages_orders_by_sequence_index():
 
             dialog_id = await chat_repository.create_dialog(user_id, "Same timestamp order")
             user_msg_id = await chat_repository.create_message(user_id, dialog_id, "user", "Question")
-            await chat_repository.create_tool_call_event(
+            await chat_repository.create_assistant_turn_events(
                 user_id=user_id,
                 dialog_id=dialog_id,
-                tool_call_id="call_same",
-                tool_name="python",
-                arguments={"code": "1+1"},
-                result_text="2",
+                turn_id="turn-seq",
+                events=[
+                    {
+                        "event_type": "tool_call",
+                        "tool_call_id": "call_same",
+                        "tool_name": "python",
+                        "arguments_json": '{"code":"1+1"}',
+                        "result_text": "2",
+                    },
+                    {"event_type": "assistant_segment", "content_text": "Final answer"},
+                ],
             )
-            assistant_msg_id = await chat_repository.create_message(user_id, dialog_id, "assistant", "Final answer")
 
             # Force equal timestamps and scrambled sequence indexes; ordering must follow sequence_index.
             async with session_factory() as session:
                 same_ts = "2026-01-01 00:00:00"
                 await session.execute(
-                    text("UPDATE message SET created = :ts WHERE message_id IN (:uid, :aid)"),
-                    {"ts": same_ts, "uid": int(user_msg_id), "aid": int(assistant_msg_id)},
+                    text("UPDATE message SET created = :ts WHERE message_id = :uid"),
+                    {"ts": same_ts, "uid": int(user_msg_id)},
                 )
                 await session.execute(
-                    text("UPDATE tool_call_event SET created = :ts WHERE tool_call_id = 'call_same'"),
+                    text("UPDATE assistant_turn_event SET created = :ts WHERE turn_id = 'turn-seq'"),
                     {"ts": same_ts},
                 )
                 await session.execute(
@@ -254,17 +268,13 @@ def test_get_messages_orders_by_sequence_index():
                     {"uid": int(user_msg_id)},
                 )
                 await session.execute(
-                    text("UPDATE tool_call_event SET sequence_index = 10 WHERE tool_call_id = 'call_same'"),
-                )
-                await session.execute(
-                    text("UPDATE message SET sequence_index = 30 WHERE message_id = :aid"),
-                    {"aid": int(assistant_msg_id)},
+                    text("UPDATE assistant_turn_event SET sequence_index = 10 WHERE turn_id = 'turn-seq'"),
                 )
                 await session.commit()
 
             messages = await chat_repository.get_messages(user_id, dialog_id)
             roles = [msg["role"] for msg in messages]
-            assert roles == ["tool", "user", "assistant"]
+            assert roles == ["assistant_turn", "user"]
         finally:
             chat_repository.async_session = original_session_factory
             sys.modules.pop("data.config", None)
