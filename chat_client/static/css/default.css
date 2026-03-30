@@ -313,12 +313,17 @@ nav svg {
     justify-content: center;
 }
 
+.copyable-pre {
+    position: relative;
+}
+
 pre code.copyable-code {
     position: relative;
     display: block;
+    padding-right: 2.8rem;
 }
 
-pre code.copyable-code .copy-button {
+.copyable-pre > .copy-button {
     position: absolute;
     top: 0.4rem;
     right: 0.4rem;
@@ -328,12 +333,12 @@ pre code.copyable-code .copy-button {
     padding: 0;
 }
 
-pre code.copyable-code .copy-button svg {
+.copyable-pre > .copy-button svg {
     width: 20px;
     height: 20px;
 }
 
-pre code.copyable-code .copy-button:hover {
+.copyable-pre > .copy-button:hover {
     background: color-mix(in srgb, var(--background) 88%, transparent);
 }
 
@@ -655,6 +660,8 @@ a.is-disabled-link {
 .role_tool.tool-toggle {
     cursor: pointer;
     user-select: none;
+    font-size: 0.78rem;
+    text-transform: uppercase;
 }
 
 .role_tool.tool-toggle::after {
@@ -669,6 +676,11 @@ a.is-disabled-link {
 
 .tool-call-body {
     margin-top: 4px;
+}
+
+.tool-call-body pre {
+    max-height: 24rem;
+    overflow: auto;
 }
 
 .thinking-block {

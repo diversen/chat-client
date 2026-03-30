@@ -5,11 +5,13 @@ async function addCopyButtons(contentElem, _config) {
     const codeBlocks = contentElem.querySelectorAll('pre code');
 
     codeBlocks.forEach(code => {
-        if (code.querySelector('.copy-button')) {
+        const pre = code.parentElement;
+        if (!(pre instanceof HTMLElement) || pre.querySelector('.copy-button')) {
             return;
         }
         const codeText = code.textContent;
         code.classList.add('copyable-code');
+        pre.classList.add('copyable-pre');
 
         /**
          * Copy-paste code button
@@ -32,7 +34,7 @@ async function addCopyButtons(contentElem, _config) {
                 console.log('Failed to copy: ', err);
             });
         };
-        code.appendChild(button);
+        pre.appendChild(button);
     });
 }
 
