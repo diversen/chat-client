@@ -1,4 +1,5 @@
 import ast
+import importlib
 import os
 import subprocess
 import tempfile
@@ -85,23 +86,30 @@ def _resolve_docker_image(docker_image: str | None) -> str:
     return DEFAULT_DOCKER_IMAGE
 
 
-def python(code: str, docker_image: str | None = None) -> str:
-    """
-    Execute Python code in a hardened Docker container and return output/result.
-    """
-    if not isinstance(code, str):
-        return "[stderr]\nSecurityError: code must be a string."
-
-    if len(code) > MAX_CODE_LENGTH:
-        return f"[stderr]\nSecurityError: code exceeds max length ({MAX_CODE_LENGTH})."
-
+def _resolve_exec_timeout_seconds() -> float | None:
     try:
-        _validate_code(code)
-    except (SyntaxError, UnsafeCodeError) as exc:
-        return f"[stderr]\nSecurityError: {exc}"
+        config = importlib.import_module("data.config")
 
+        configured = getattr(config, "PYTHON_TOOL_TIMEOUT_SECONDS", EXEC_TIMEOUT_SECONDS)
+        timeout = float(configured)
+    except Exception:
+        return EXEC_TIMEOUT_SECONDS
+
+    if timeout < 0:
+        return EXEC_TIMEOUT_SECONDS
+    if timeout == 0:
+        return None
+    return timeout
+
+
+def _run_in_docker(
+    code: str,
+    docker_image: str | None,
+    docker_args: list[str],
+) -> str:
     try:
         resolved_docker_image = _resolve_docker_image(docker_image)
+        timeout_seconds = _resolve_exec_timeout_seconds()
         with tempfile.NamedTemporaryFile(mode="w", suffix=".py", encoding="utf-8", delete=False) as code_file:
             code_file.write(code)
             code_file_path = code_file.name
@@ -111,26 +119,7 @@ def python(code: str, docker_image: str | None = None) -> str:
             [
                 "docker",
                 "run",
-                "--network",
-                "none",
-                "--init",
-                "--rm",
-                "--read-only",
-                "--tmpfs",
-                "/tmp:rw,noexec,nosuid,size=64m",
-                "--cap-drop=ALL",
-                "--security-opt",
-                "no-new-privileges",
-                "--memory=256m",
-                "--memory-swap=256m",
-                "--cpus=0.5",
-                "--pids-limit=128",
-                "--ulimit",
-                "nproc=128:128",
-                "--ulimit",
-                "stack=67108864",
-                "--user",
-                "65534:65534",
+                *docker_args,
                 "-v",
                 f"{code_file_path}:/sandbox/script.py:ro",
                 resolved_docker_image,
@@ -138,13 +127,15 @@ def python(code: str, docker_image: str | None = None) -> str:
             ],
             text=True,
             capture_output=True,
-            timeout=EXEC_TIMEOUT_SECONDS,
+            timeout=timeout_seconds,
             check=False,
         )
     except FileNotFoundError:
         return "[stderr]\nDocker is not installed or not available in PATH."
     except subprocess.TimeoutExpired:
-        return f"[stderr]\nExecution timed out after {EXEC_TIMEOUT_SECONDS} seconds."
+        if timeout_seconds is None:
+            return "[stderr]\nExecution timed out."
+        return f"[stderr]\nExecution timed out after {timeout_seconds} seconds."
     finally:
         if "code_file_path" in locals():
             try:
@@ -164,3 +155,66 @@ def python(code: str, docker_image: str | None = None) -> str:
     if not output or output == "OK":
         return NO_RESULT_ERROR
     return output
+
+
+def python(code: str, docker_image: str | None = None) -> str:
+    """
+    Execute Python code in a hardened Docker container and return output/result.
+    """
+    if not isinstance(code, str):
+        return "[stderr]\nSecurityError: code must be a string."
+
+    if len(code) > MAX_CODE_LENGTH:
+        return f"[stderr]\nSecurityError: code exceeds max length ({MAX_CODE_LENGTH})."
+
+    try:
+        _validate_code(code)
+    except (SyntaxError, UnsafeCodeError) as exc:
+        return f"[stderr]\nSecurityError: {exc}"
+
+    return _run_in_docker(
+        code,
+        docker_image,
+        [
+            "--network",
+            "none",
+            "--init",
+            "--rm",
+            "--read-only",
+            "--tmpfs",
+            "/tmp:rw,noexec,nosuid,size=64m",
+            "--cap-drop=ALL",
+            "--security-opt",
+            "no-new-privileges",
+            "--memory=256m",
+            "--memory-swap=256m",
+            "--cpus=0.5",
+            "--pids-limit=128",
+            "--ulimit",
+            "nproc=128:128",
+            "--ulimit",
+            "stack=67108864",
+            "--user",
+            "65534:65534",
+        ],
+    )
+
+
+def python_insecure(code: str, docker_image: str | None = None) -> str:
+    """
+    Execute Python code in Docker with minimal restrictions for local testing.
+    """
+    if not isinstance(code, str):
+        return "[stderr]\nSecurityError: code must be a string."
+
+    if len(code) > MAX_CODE_LENGTH:
+        return f"[stderr]\nSecurityError: code exceeds max length ({MAX_CODE_LENGTH})."
+
+    return _run_in_docker(
+        code,
+        docker_image,
+        [
+            "--init",
+            "--rm",
+        ],
+    )

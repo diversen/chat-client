@@ -23,6 +23,8 @@ Simple python tool utilizing a sqlite3 backend and a minimal HTML / JavaScript f
 
 The built-in `python` tool runs code in a hardened Docker container and requires Docker to be installed.
 
+There is also a `python_insecure` tool for local testing. It still runs in Docker, but it skips AST safety checks and does not disable container network access.
+
 Build the default image:
 
 ```bash
@@ -40,6 +42,14 @@ Set which image the tool should use in `data/config.py`:
 ```python
 PYTHON_TOOL_DOCKER_IMAGE = "secure-python-science"
 ```
+
+Set the execution timeout in `data/config.py`:
+
+```python
+PYTHON_TOOL_TIMEOUT_SECONDS = 10
+```
+
+Use `0` for no timeout.
 
 ## Demo
 

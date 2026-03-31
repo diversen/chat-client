@@ -1,7 +1,8 @@
 import subprocess
+import types
 from unittest.mock import patch
 
-from chat_client.tools.python_tool import NO_RESULT_ERROR, python
+from chat_client.tools.python_tool import NO_RESULT_ERROR, python, python_insecure
 
 
 def test_python_tool_evaluates_expression():
@@ -61,3 +62,48 @@ def test_python_tool_times_out_infinite_loop():
     with patch("chat_client.tools.python_tool.subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="docker", timeout=10)):
         result = python("while True:\n    pass")
         assert "Execution timed out" in result
+
+
+def test_python_insecure_allows_open_calls():
+    with patch("chat_client.tools.python_tool.subprocess.run") as run_mock:
+        run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="ok\n", stderr="")
+        result = python_insecure("print(open('/etc/hosts').read())")
+        assert result == "ok"
+        run_mock.assert_called_once()
+
+
+def test_python_insecure_invokes_docker_without_hardening_flags():
+    with patch("chat_client.tools.python_tool.subprocess.run") as run_mock:
+        run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="OK\n", stderr="")
+        result = python_insecure("x = 42", docker_image="secure-python-science")
+
+        assert result == NO_RESULT_ERROR
+        called_args = run_mock.call_args[0][0]
+        assert called_args[0] == "docker"
+        assert "--init" in called_args
+        assert "--rm" in called_args
+        assert "--network" not in called_args
+        assert "--read-only" not in called_args
+        assert "--cap-drop=ALL" not in called_args
+        assert "--security-opt" not in called_args
+        assert "secure-python-science" in called_args
+
+
+def test_python_tool_uses_configured_timeout():
+    config_module = types.SimpleNamespace(PYTHON_TOOL_TIMEOUT_SECONDS=30)
+    with patch.dict("sys.modules", {"data.config": config_module}):
+        with patch("chat_client.tools.python_tool.subprocess.run") as run_mock:
+            run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="3\n", stderr="")
+            result = python("1 + 2")
+            assert result == "3"
+            assert run_mock.call_args.kwargs["timeout"] == 30.0
+
+
+def test_python_tool_zero_timeout_means_infinite():
+    config_module = types.SimpleNamespace(PYTHON_TOOL_TIMEOUT_SECONDS=0)
+    with patch.dict("sys.modules", {"data.config": config_module}):
+        with patch("chat_client.tools.python_tool.subprocess.run") as run_mock:
+            run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="3\n", stderr="")
+            result = python("1 + 2")
+            assert result == "3"
+            assert run_mock.call_args.kwargs["timeout"] is None

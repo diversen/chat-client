@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 from chat_client.core.api_utils import get_provider_models
 from chat_client.tools.python_tool import python as python_tool
+from chat_client.tools.python_tool import python_insecure as python_insecure_tool
 
 
 # SMTP
@@ -49,6 +50,10 @@ USE_KATEX = True
 # Docker image used by the built-in python tool sandbox.
 # Use "secure-python" for base or "secure-python-science" for numpy/sympy/pandas.
 PYTHON_TOOL_DOCKER_IMAGE = "secure-python-science"
+
+# Timeout for the built-in python tools in seconds.
+# Set to 0 for no timeout.
+PYTHON_TOOL_TIMEOUT_SECONDS = 10
 
 PROVIDERS = {
     # "openai": {
@@ -103,6 +108,7 @@ SYSTEM_MESSAGE_MODELS: list = []
 
 TOOL_REGISTRY = {
     "python": python_tool,
+    "python_insecure": python_insecure_tool,
 }
 
 # Optional explicit local tool definitions in MCP-style schema.
@@ -116,6 +122,26 @@ LOCAL_TOOL_DEFINITIONS = [
             'the code value is a single Python script string. Call the tool name exactly '
             'as "python". Do not invent related tool names such as "stateful_python" or '
             '"python_codeful". Return printed output or the final expression result.'
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "description": "Python code to execute.",
+                }
+            },
+            "required": ["code"],
+            "additionalProperties": False,
+        },
+    },
+    {
+        "name": "python_insecure",
+        "description": (
+            'Run Python code in a minimally restricted Docker container for local testing. '
+            'Use this tool only with a JSON object of the form {"code": "..."} where '
+            'the code value is a single Python script string. This variant does not '
+            'apply AST blocking and allows the container to use its normal network access.'
         ),
         "input_schema": {
             "type": "object",
