@@ -2,7 +2,7 @@
 CHECK_PATHS="chat_client tests bin"
 
 echo "Running black ..."
-black --check $CHECK_PATHS --config pyproject.toml --extend-exclude '/chat_client/migrations/'
+black --check $CHECK_PATHS --config pyproject.toml --target-version py312 --extend-exclude '/chat_client/migrations/'
 
 echo "Running mypy ..."
 mypy  --config-file pyproject.toml chat_client 
