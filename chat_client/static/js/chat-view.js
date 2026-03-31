@@ -309,6 +309,19 @@ function appendMarkdownCode(container, language, code, withCopyButton = false) {
     container.appendChild(block);
 }
 
+function appendLabeledMarkdownBlock(container, label, language, code, withCopyButton = false) {
+    const labelElement = document.createElement('p');
+    labelElement.innerHTML = `<strong>${label}:</strong>`;
+    container.appendChild(labelElement);
+    appendMarkdownCode(container, language, code, withCopyButton);
+}
+
+function isPythonLikeToolName(toolName) {
+    const normalized = String(toolName || '').trim().toLowerCase();
+    if (!normalized) return false;
+    return normalized === 'python' || normalized.includes('python');
+}
+
 function renderDefaultToolCallMeta(metadata, payload) {
     appendLabeledPre(metadata, 'Arguments', payload.argumentsJson);
     appendLabeledPre(metadata, payload.errorText ? 'Error' : 'Result', payload.errorText || payload.resultContent);
@@ -319,7 +332,7 @@ function renderPythonToolCallMeta(metadata, payload) {
     const pythonCode = typeof parsedArgs?.code === 'string' ? parsedArgs.code : '';
 
     if (pythonCode) {
-        appendMarkdownCode(metadata, 'python', pythonCode, true);
+        appendLabeledMarkdownBlock(metadata, 'Code', 'python', pythonCode, true);
     } else {
         appendLabeledPre(metadata, 'Arguments', payload.argumentsJson);
     }
@@ -374,7 +387,9 @@ function populateToolCallBody(container, toolMessage, toolCallsOpenByDefault, ro
         });
     }
 
-    const renderer = TOOL_META_RENDERERS[toolName] || TOOL_META_RENDERERS.default;
+    const renderer = isPythonLikeToolName(toolName)
+        ? renderPythonToolCallMeta
+        : (TOOL_META_RENDERERS[toolName] || TOOL_META_RENDERERS.default);
     renderer(toolBody, {
         toolName,
         argumentsJson,
