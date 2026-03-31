@@ -6,8 +6,8 @@ import tempfile
 from typing import Any
 
 MAX_CODE_LENGTH = 8_000
-EXEC_TIMEOUT_SECONDS = 10.0
-DEFAULT_DOCKER_IMAGE = "secure-python"
+DEFAULT_PYTHON_TOOL_TIMEOUT_SECONDS = 10.0
+DEFAULT_PYTHON_TOOL_DOCKER_IMAGE = "secure-python"
 NO_RESULT_ERROR = "[stderr]\nNo result produced. Please print the answer or end with an expression."
 
 
@@ -82,20 +82,20 @@ def _resolve_docker_image(docker_image: str | None) -> str:
     except Exception:
         pass
 
-    return DEFAULT_DOCKER_IMAGE
+    return DEFAULT_PYTHON_TOOL_DOCKER_IMAGE
 
 
 def _resolve_exec_timeout_seconds() -> float | None:
     try:
         config = importlib.import_module("data.config")
 
-        configured = getattr(config, "PYTHON_TOOL_TIMEOUT_SECONDS", EXEC_TIMEOUT_SECONDS)
+        configured = getattr(config, "PYTHON_TOOL_TIMEOUT_SECONDS", DEFAULT_PYTHON_TOOL_TIMEOUT_SECONDS)
         timeout = float(configured)
     except Exception:
-        return EXEC_TIMEOUT_SECONDS
+        return DEFAULT_PYTHON_TOOL_TIMEOUT_SECONDS
 
     if timeout < 0:
-        return EXEC_TIMEOUT_SECONDS
+        return DEFAULT_PYTHON_TOOL_TIMEOUT_SECONDS
     if timeout == 0:
         return None
     return timeout

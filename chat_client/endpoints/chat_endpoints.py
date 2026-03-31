@@ -34,19 +34,35 @@ from chat_client.schemas.chat import (
 logger: logging.Logger = logging.getLogger(__name__)
 templates = get_templates()
 
-MODELS = getattr(config, "MODELS", {})
-PROVIDERS = getattr(config, "PROVIDERS", {})
+CONFIGURED_MODELS = getattr(config, "MODELS", {})
+CONFIGURED_PROVIDERS = getattr(config, "PROVIDERS", {})
 
-MCP_SERVER_URL = getattr(config, "MCP_SERVER_URL", "")
-MCP_AUTH_TOKEN = getattr(config, "MCP_AUTH_TOKEN", "")
-MCP_TIMEOUT_SECONDS = float(getattr(config, "MCP_TIMEOUT_SECONDS", 20.0))
-MCP_TOOLS_CACHE_SECONDS = float(getattr(config, "MCP_TOOLS_CACHE_SECONDS", 60.0))
-TOOL_CALLS_COLLAPSED_BY_DEFAULT = bool(getattr(config, "TOOL_CALLS_COLLAPSED_BY_DEFAULT", True))
-SYSTEM_MESSAGE_MODELS = getattr(config, "SYSTEM_MESSAGE_MODELS", [])
-VISION_MODELS = getattr(config, "VISION_MODELS", [])
-TOOL_REGISTRY = getattr(config, "TOOL_REGISTRY", {})
-LOCAL_TOOL_DEFINITIONS = getattr(config, "LOCAL_TOOL_DEFINITIONS", [])
-TOOL_MODELS = getattr(config, "TOOL_MODELS", [])
+CONFIGURED_MCP_SERVER_URL = getattr(config, "MCP_SERVER_URL", "")
+CONFIGURED_MCP_AUTH_TOKEN = getattr(config, "MCP_AUTH_TOKEN", "")
+RESOLVED_MCP_TIMEOUT_SECONDS = float(getattr(config, "MCP_TIMEOUT_SECONDS", 20.0))
+RESOLVED_MCP_TOOLS_CACHE_SECONDS = float(getattr(config, "MCP_TOOLS_CACHE_SECONDS", 60.0))
+CONFIGURED_TOOL_CALLS_COLLAPSED_BY_DEFAULT = bool(getattr(config, "TOOL_CALLS_COLLAPSED_BY_DEFAULT", True))
+CONFIGURED_SYSTEM_MESSAGE_MODELS = getattr(config, "SYSTEM_MESSAGE_MODELS", [])
+CONFIGURED_VISION_MODELS = getattr(config, "VISION_MODELS", [])
+CONFIGURED_TOOL_REGISTRY = getattr(config, "TOOL_REGISTRY", {})
+CONFIGURED_LOCAL_TOOL_DEFINITIONS = getattr(config, "LOCAL_TOOL_DEFINITIONS", [])
+CONFIGURED_TOOL_MODELS = getattr(config, "TOOL_MODELS", [])
+RESOLVED_CHAT_MAX_LOOP_ROUNDS = getattr(config, "CHAT_MAX_LOOP_ROUNDS", chat_service.DEFAULT_CHAT_MAX_LOOP_ROUNDS)
+
+# Backward-compatible aliases for existing patch points in tests and local imports.
+MODELS = CONFIGURED_MODELS
+PROVIDERS = CONFIGURED_PROVIDERS
+MCP_SERVER_URL = CONFIGURED_MCP_SERVER_URL
+MCP_AUTH_TOKEN = CONFIGURED_MCP_AUTH_TOKEN
+MCP_TIMEOUT_SECONDS = RESOLVED_MCP_TIMEOUT_SECONDS
+MCP_TOOLS_CACHE_SECONDS = RESOLVED_MCP_TOOLS_CACHE_SECONDS
+TOOL_CALLS_COLLAPSED_BY_DEFAULT = CONFIGURED_TOOL_CALLS_COLLAPSED_BY_DEFAULT
+SYSTEM_MESSAGE_MODELS = CONFIGURED_SYSTEM_MESSAGE_MODELS
+VISION_MODELS = CONFIGURED_VISION_MODELS
+TOOL_REGISTRY = CONFIGURED_TOOL_REGISTRY
+LOCAL_TOOL_DEFINITIONS = CONFIGURED_LOCAL_TOOL_DEFINITIONS
+TOOL_MODELS = CONFIGURED_TOOL_MODELS
+CHAT_MAX_LOOP_ROUNDS = RESOLVED_CHAT_MAX_LOOP_ROUNDS
 
 _mcp_tools_cache: list[dict] = []
 _mcp_tools_cache_at: float = 0.0
@@ -456,6 +472,7 @@ async def _chat_response_stream(request: Request, messages, model, logged_in, di
         tool_models=_resolve_tool_models(),
         tools_loader=_list_tools,
         tool_executor=_tool_executor_with_persist,
+        max_chat_loop_rounds=CHAT_MAX_LOOP_ROUNDS,
         logger=logger,
     ):
         yield chunk

@@ -11,7 +11,7 @@ from starlette.requests import Request
 GENERIC_OPENAI_ERROR_MESSAGE = "An error occurred. Please try again later."
 IMAGE_MODALITY_ERROR_MESSAGE = "The selected model does not support image inputs. Remove attached images or choose a vision model."
 TOOL_ROUTER_MAX_TOKENS = 64
-MAX_TOOL_LOOP_ROUNDS = 8
+DEFAULT_CHAT_MAX_LOOP_ROUNDS = 8
 
 
 class ToolExecutionError(Exception):
@@ -285,6 +285,16 @@ def _is_valid_tool_argument_type(value: Any, expected_type: str) -> bool:
     return True
 
 
+def _resolve_max_chat_loop_rounds(value: Any) -> int:
+    try:
+        resolved = int(value)
+    except (TypeError, ValueError):
+        return DEFAULT_CHAT_MAX_LOOP_ROUNDS
+    if resolved < 1:
+        return DEFAULT_CHAT_MAX_LOOP_ROUNDS
+    return resolved
+
+
 def _normalize_tool_calls(raw_tool_calls: Any) -> list[dict[str, Any]]:
     normalized: list[dict[str, Any]] = []
     if not isinstance(raw_tool_calls, list):
@@ -444,10 +454,12 @@ async def chat_response_stream(
     tool_models: list[str],
     tools_loader: Callable[[], list[dict[str, Any]]],
     tool_executor: Callable[[dict[str, Any]], Any],
+    max_chat_loop_rounds: int = DEFAULT_CHAT_MAX_LOOP_ROUNDS,
     logger: logging.Logger,
 ) -> AsyncIterator[str]:
     try:
         provider_info = provider_info_resolver(model)
+        max_rounds = _resolve_max_chat_loop_rounds(max_chat_loop_rounds)
 
         client = openai_client_cls(
             api_key=provider_info.get("api_key"),
@@ -460,7 +472,7 @@ async def chat_response_stream(
         rounds = 0
         while True:
             rounds += 1
-            if rounds > MAX_TOOL_LOOP_ROUNDS:
+            if rounds > max_rounds:
                 yield f"data: {json.dumps({'error': 'Tool loop exceeded maximum rounds'})}\n\n"
                 return
 

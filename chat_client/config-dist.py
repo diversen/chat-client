@@ -55,6 +55,10 @@ PYTHON_TOOL_DOCKER_IMAGE = "secure-python-science"
 # Set to 0 for no timeout.
 PYTHON_TOOL_TIMEOUT_SECONDS = 10
 
+# Maximum number of model-response rounds used to produce a single assistant reply.
+# This includes tool-calling rounds and the final no-tool answer round.
+CHAT_MAX_LOOP_ROUNDS = 8
+
 PROVIDERS = {
     # "openai": {
     #     "base_url": "https://api.openai.com/v1",
@@ -96,11 +100,11 @@ if "ollama" in PROVIDERS:
         exit()
 
 # Enable vision models (models that can process both text and images)
-VISION_MODELS: list[str] = []
+VISION_MODELS: list[str] = ["ministral-3:14b"]
 
 # System models are models that are capable of injecting initial system instruction into the model template.
 # Not all models supports this, so we need to specify which models that should receive system instructions.
-SYSTEM_MESSAGE_MODELS: list = []
+SYSTEM_MESSAGE_MODELS: list = ["nemotron-cascade-2:latest", "ministral-3:14b", "gpt-oss:latest"]
 
 # Optional local tool registry (preferred over MCP when configured).
 # Functions must be callables that accept keyword arguments.
@@ -166,7 +170,7 @@ TOOL_CALLS_COLLAPSED_BY_DEFAULT = True
 
 # Models that should receive tool definitions (local + MCP).
 # Use ["*"] to allow tools for any configured model.
-TOOL_MODELS = ["*"]
+TOOL_MODELS = ["nemotron-cascade-2:latest", "gpt-oss:latest"]
 #
 # If empty, no models are allowed to use tools.
 # TOOL_MODELS: list = []

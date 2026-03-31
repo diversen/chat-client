@@ -318,6 +318,56 @@ def test_chat_response_stream_tools_model_without_tool_calls_streams_on_first_ca
     assert final_stream.closed is True
 
 
+def test_chat_response_stream_respects_configured_max_chat_loop_rounds():
+    first_stream = DummyStream(
+        [
+            _chunk(
+                None,
+                tool_calls=[
+                    SimpleNamespace(
+                        index=0,
+                        id="call_once",
+                        type="function",
+                        function=SimpleNamespace(name="python", arguments='{"code":"print(1)"}'),
+                    )
+                ],
+            ),
+            _chunk("", finish_reason="tool_calls"),
+        ]
+    )
+    create_calls = []
+
+    def _create(**kwargs):
+        create_calls.append(kwargs)
+        return first_stream
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=_create)))
+    request = DummyRequest(disconnected_after_calls=999)
+
+    async def _run():
+        chunks = []
+        async for chunk in chat_service.chat_response_stream(
+            request,
+            messages=[{"role": "user", "content": "use python"}],
+            model="tool-model",
+            openai_client_cls=lambda **_: client,
+            provider_info_resolver=lambda _model: {},
+            tool_models=["tool-model"],
+            tools_loader=lambda: [{"type": "function", "function": {"name": "python"}}],
+            tool_executor=lambda _tool_call: "1",
+            max_chat_loop_rounds=1,
+            logger=logging.getLogger("test"),
+        ):
+            chunks.append(chunk)
+        return chunks
+
+    chunks = asyncio.run(_run())
+
+    assert len(create_calls) == 1
+    assert any("Tool loop exceeded maximum rounds" in chunk for chunk in chunks)
+    assert first_stream.closed is True
+
+
 def test_chat_response_stream_keeps_tool_execution_errors_inside_chat():
     first_stream = DummyStream(
         [
