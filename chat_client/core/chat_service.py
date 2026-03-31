@@ -8,7 +8,6 @@ from typing import Any
 from openai import OpenAIError
 from starlette.requests import Request
 
-
 GENERIC_OPENAI_ERROR_MESSAGE = "An error occurred. Please try again later."
 IMAGE_MODALITY_ERROR_MESSAGE = "The selected model does not support image inputs. Remove attached images or choose a vision model."
 TOOL_ROUTER_MAX_TOKENS = 64

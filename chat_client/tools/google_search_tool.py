@@ -4,7 +4,6 @@ from typing import Any
 
 import httpx
 
-
 GOOGLE_SEARCH_API_URL = "https://www.googleapis.com/customsearch/v1"
 
 

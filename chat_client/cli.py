@@ -16,7 +16,6 @@ from chat_client.database.db_session import async_session
 from sqlalchemy import select
 from pathlib import Path
 
-
 setup_logging(LOG_LEVEL)
 logging.basicConfig(level=logging.DEBUG)
 logger: logging.Logger = logging.getLogger(__name__)

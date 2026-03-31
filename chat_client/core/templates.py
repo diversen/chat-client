@@ -9,7 +9,6 @@ from starlette.requests import Request
 from starlette.staticfiles import StaticFiles
 from starlette.templating import Jinja2Templates, _TemplateResponse
 
-
 logger: logging.Logger = logging.getLogger(__name__)
 
 

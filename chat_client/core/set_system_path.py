@@ -8,7 +8,6 @@ import sys
 import os
 from pathlib import Path
 
-
 # add "." to the system path
 sys.path.insert(0, ".")
 

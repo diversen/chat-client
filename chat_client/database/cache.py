@@ -8,7 +8,6 @@ from sqlalchemy import select, delete
 import logging
 from chat_client.models import Cache
 
-
 logger: logging.Logger = logging.getLogger(__name__)
 
 

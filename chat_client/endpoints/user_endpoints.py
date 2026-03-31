@@ -16,7 +16,6 @@ from chat_client.core.templates import get_templates
 from chat_client.core.base_context import get_context
 from chat_client.core.http import get_user_id_or_redirect, require_user_id_json, json_error, json_success
 
-
 logger: logging.Logger = logging.getLogger(__name__)
 templates = get_templates()
 

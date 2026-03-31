@@ -1,6 +1,5 @@
 from chat_client.tools.python_tool import python
 
-
 BUILTIN_TOOL_REGISTRY = {
     "python": python,
 }

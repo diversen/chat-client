@@ -5,7 +5,6 @@ import subprocess
 import tempfile
 from typing import Any
 
-
 MAX_CODE_LENGTH = 8_000
 EXEC_TIMEOUT_SECONDS = 10.0
 DEFAULT_DOCKER_IMAGE = "secure-python"

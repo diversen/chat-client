@@ -6,7 +6,6 @@ from chat_client.core import user_session
 from chat_client.repositories import user_repository, prompt_repository
 import data.config as config
 
-
 logger: logging.Logger = logging.getLogger(__name__)
 
 
