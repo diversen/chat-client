@@ -110,7 +110,13 @@ TOOL_REGISTRY = {
 LOCAL_TOOL_DEFINITIONS = [
     {
         "name": "python",
-        "description": "Execute Python code and return output/result.",
+        "description": (
+            'Run short Python code in a sandboxed container. '
+            'Use this tool only with a JSON object of the form {"code": "..."} where '
+            'the code value is a single Python script string. Call the tool name exactly '
+            'as "python". Do not invent related tool names such as "stateful_python" or '
+            '"python_codeful". Return printed output or the final expression result.'
+        ),
         "input_schema": {
             "type": "object",
             "properties": {

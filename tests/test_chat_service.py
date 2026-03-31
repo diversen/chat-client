@@ -231,6 +231,55 @@ def test_chat_response_stream_uses_streaming_tool_loop():
     assert final_stream.closed is True
 
 
+def test_parse_tool_arguments_raises_on_invalid_json():
+    tool_call = {"function": {"name": "python", "arguments": '{"code": "print(1)"'}}
+
+    try:
+        chat_service.parse_tool_arguments(tool_call, logging.getLogger("test"))
+        assert False, "Expected ToolArgumentsError"
+    except chat_service.ToolArgumentsError as error:
+        assert str(error) == 'Tool "python" was called with invalid JSON arguments.'
+
+
+def test_parse_tool_arguments_requires_json_object():
+    tool_call = {"function": {"name": "python", "arguments": '["print(1)"]'}}
+
+    try:
+        chat_service.parse_tool_arguments(tool_call, logging.getLogger("test"))
+        assert False, "Expected ToolArgumentsError"
+    except chat_service.ToolArgumentsError as error:
+        assert str(error) == 'Tool "python" requires JSON object arguments.'
+
+
+def test_validate_tool_arguments_checks_required_unexpected_and_type():
+    schema = {
+        "type": "object",
+        "properties": {
+            "code": {"type": "string"},
+        },
+        "required": ["code"],
+        "additionalProperties": False,
+    }
+
+    try:
+        chat_service.validate_tool_arguments({}, schema, "python")
+        assert False, "Expected required argument failure"
+    except chat_service.ToolArgumentsError as error:
+        assert str(error) == 'Tool "python" requires argument "code".'
+
+    try:
+        chat_service.validate_tool_arguments({"code": 1}, schema, "python")
+        assert False, "Expected type validation failure"
+    except chat_service.ToolArgumentsError as error:
+        assert str(error) == 'Tool "python" requires argument "code" of type string.'
+
+    try:
+        chat_service.validate_tool_arguments({"code": "print(1)", "x": 1}, schema, "python")
+        assert False, "Expected unexpected argument failure"
+    except chat_service.ToolArgumentsError as error:
+        assert str(error) == 'Tool "python" received unexpected arguments: "x".'
+
+
 def test_chat_response_stream_tools_model_without_tool_calls_streams_on_first_call():
     final_stream = DummyStream([_chunk("streamed final", finish_reason="stop")])
     create_calls = []
@@ -265,4 +314,67 @@ def test_chat_response_stream_tools_model_without_tool_calls_streams_on_first_ca
     assert "tools" in create_calls[0]
     assert len(chunks) == 1
     assert "streamed final" in chunks[0]
+    assert final_stream.closed is True
+
+
+def test_chat_response_stream_keeps_tool_execution_errors_inside_chat():
+    first_stream = DummyStream(
+        [
+            _chunk(
+                None,
+                tool_calls=[
+                    SimpleNamespace(
+                        index=0,
+                        id="call_bad_tool",
+                        type="function",
+                        function=SimpleNamespace(name="stateful_python", arguments='{"code":"print(1)"}'),
+                    )
+                ],
+            ),
+            _chunk("", finish_reason="tool_calls"),
+        ]
+    )
+    final_stream = DummyStream([_chunk("fallback answer", finish_reason="stop")])
+    create_calls = []
+
+    def _create(**kwargs):
+        create_calls.append(kwargs)
+        return first_stream if len(create_calls) == 1 else final_stream
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=_create)))
+    request = DummyRequest(disconnected_after_calls=999)
+
+    def _tool_executor(_tool_call):
+        raise chat_service.ToolNotFoundError('Tool "stateful_python" does not exist.')
+
+    async def _run():
+        chunks = []
+        async for chunk in chat_service.chat_response_stream(
+            request,
+            messages=[{"role": "user", "content": "use the tool"}],
+            model="tool-model",
+            openai_client_cls=lambda **_: client,
+            provider_info_resolver=lambda _model: {},
+            tool_models=["tool-model"],
+            tools_loader=lambda: [{"type": "function", "function": {"name": "python"}}],
+            tool_executor=_tool_executor,
+            logger=logging.getLogger("test"),
+        ):
+            chunks.append(chunk)
+        return chunks
+
+    chunks = asyncio.run(_run())
+
+    assert len(create_calls) == 2
+    assert any('"error_text": "Tool \\"stateful_python\\" does not exist."' in chunk for chunk in chunks)
+    assert any('"tool_call_id": "call_bad_tool"' in chunk for chunk in chunks)
+    assert any("fallback answer" in chunk for chunk in chunks)
+    second_call_messages = create_calls[1]["messages"]
+    assert second_call_messages[1]["role"] == "assistant"
+    assert second_call_messages[2] == {
+        "role": "tool",
+        "tool_call_id": "call_bad_tool",
+        "content": 'Tool "stateful_python" does not exist.',
+    }
+    assert first_stream.closed is True
     assert final_stream.closed is True

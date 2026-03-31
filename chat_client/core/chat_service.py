@@ -14,6 +14,36 @@ TOOL_ROUTER_MAX_TOKENS = 64
 MAX_TOOL_LOOP_ROUNDS = 8
 
 
+class ToolExecutionError(Exception):
+    """
+    Base error for tool parsing, routing, and execution failures.
+    """
+
+
+class ToolNotConfiguredError(ToolExecutionError):
+    """
+    Raised when no tool backend is configured.
+    """
+
+
+class ToolNotFoundError(ToolExecutionError):
+    """
+    Raised when a named tool cannot be found.
+    """
+
+
+class ToolArgumentsError(ToolExecutionError):
+    """
+    Raised when tool arguments are invalid or do not match the schema.
+    """
+
+
+class ToolBackendError(ToolExecutionError):
+    """
+    Raised when a backend fails while executing a tool.
+    """
+
+
 def _close_stream(stream: Any, logger: logging.Logger) -> None:
     """
     Best-effort close of an OpenAI stream-like object.
@@ -149,26 +179,96 @@ def execute_tool(tool_call: dict[str, Any], tool_registry: dict[str, Callable[..
     """
     Execute a model tool call from the configured registry.
     """
-    func_name = tool_call["function"]["name"]
+    func_name = str(tool_call.get("function", {}).get("name", "")).strip()
     args = parse_tool_arguments(tool_call, logger)
     logger.info(f"Executing tool: {func_name}({args})")
 
-    if func_name in tool_registry:
-        return tool_registry[func_name](**args)
+    if func_name not in tool_registry:
+        raise ToolNotFoundError(f'Tool "{func_name}" does not exist.')
 
-    return f"Unknown tool: {func_name}"
+    try:
+        return tool_registry[func_name](**args)
+    except TypeError as error:
+        raise ToolArgumentsError(f'Tool "{func_name}" was called with invalid arguments: {error}') from error
+    except ToolExecutionError:
+        raise
+    except Exception as error:
+        raise ToolBackendError(f'Tool "{func_name}" failed: {error}') from error
 
 
 def parse_tool_arguments(tool_call: dict[str, Any], logger: logging.Logger) -> dict[str, Any]:
+    func_name = str(tool_call.get("function", {}).get("name", "")).strip() or "unknown"
     raw_args = tool_call.get("function", {}).get("arguments", "{}")
+    if not isinstance(raw_args, str):
+        raise ToolArgumentsError(f'Tool "{func_name}" was called with invalid JSON arguments.')
     try:
         parsed = json.loads(raw_args)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as error:
         logger.exception("Invalid tool call arguments JSON")
-        return {}
+        raise ToolArgumentsError(f'Tool "{func_name}" was called with invalid JSON arguments.') from error
     if isinstance(parsed, dict):
         return parsed
-    return {}
+    raise ToolArgumentsError(f'Tool "{func_name}" requires JSON object arguments.')
+
+
+def validate_tool_arguments(args: dict[str, Any], schema: dict[str, Any] | None, tool_name: str) -> None:
+    if not schema:
+        return
+
+    schema_type = schema.get("type")
+    if schema_type and schema_type != "object":
+        raise ToolArgumentsError(f'Tool "{tool_name}" uses an unsupported argument schema.')
+
+    properties = schema.get("properties", {})
+    if not isinstance(properties, dict):
+        properties = {}
+
+    required = schema.get("required", [])
+    if not isinstance(required, list):
+        required = []
+
+    for required_name in required:
+        if isinstance(required_name, str) and required_name not in args:
+            raise ToolArgumentsError(f'Tool "{tool_name}" requires argument "{required_name}".')
+
+    additional_properties = schema.get("additionalProperties", True)
+    if additional_properties is False:
+        unexpected_names = sorted(name for name in args if name not in properties)
+        if unexpected_names:
+            formatted_names = ", ".join(f'"{name}"' for name in unexpected_names)
+            raise ToolArgumentsError(f'Tool "{tool_name}" received unexpected arguments: {formatted_names}.')
+
+    for arg_name, arg_value in args.items():
+        if arg_name not in properties:
+            continue
+        property_schema = properties.get(arg_name)
+        if not isinstance(property_schema, dict):
+            continue
+        expected_type = property_schema.get("type")
+        if not isinstance(expected_type, str):
+            continue
+        if not _is_valid_tool_argument_type(arg_value, expected_type):
+            raise ToolArgumentsError(
+                f'Tool "{tool_name}" requires argument "{arg_name}" of type {expected_type}.'
+            )
+
+
+def _is_valid_tool_argument_type(value: Any, expected_type: str) -> bool:
+    if expected_type == "string":
+        return isinstance(value, str)
+    if expected_type == "integer":
+        return isinstance(value, int) and not isinstance(value, bool)
+    if expected_type == "number":
+        return (isinstance(value, int) and not isinstance(value, bool)) or isinstance(value, float)
+    if expected_type == "boolean":
+        return isinstance(value, bool)
+    if expected_type == "object":
+        return isinstance(value, dict)
+    if expected_type == "array":
+        return isinstance(value, list)
+    if expected_type == "null":
+        return value is None
+    return True
 
 
 def _normalize_tool_calls(raw_tool_calls: Any) -> list[dict[str, Any]]:
@@ -418,7 +518,7 @@ async def chat_response_stream(
 
             messages.append({"role": "assistant", "content": assistant_content, "tool_calls": tool_calls})
 
-            tool_results: list[tuple[dict[str, Any], Any]] = []
+            tool_results: list[tuple[dict[str, Any], str, str]] = []
             for tool_call in tool_calls:
                 yield (
                     "data: "
@@ -433,10 +533,16 @@ async def chat_response_stream(
                     )
                     + "\n\n"
                 )
-                result = tool_executor(tool_call)
-                if isawaitable(result):
-                    result = await result
-                tool_results.append((tool_call, result))
+                error_text = ""
+                result_text = ""
+                try:
+                    result = tool_executor(tool_call)
+                    if isawaitable(result):
+                        result = await result
+                    result_text = str(result)
+                except ToolExecutionError as error:
+                    error_text = str(error)
+                tool_results.append((tool_call, result_text, error_text))
                 yield (
                     "data: "
                     + json.dumps(
@@ -445,20 +551,20 @@ async def chat_response_stream(
                                 "tool_call_id": tool_call["id"],
                                 "tool_name": tool_call["function"]["name"],
                                 "arguments_json": tool_call["function"]["arguments"],
-                                "content": str(result),
-                                "error_text": "",
+                                "content": result_text,
+                                "error_text": error_text,
                             }
                         }
                     )
                     + "\n\n"
                 )
 
-            for tool_call, result in tool_results:
+            for tool_call, result_text, error_text in tool_results:
                 messages.append(
                     {
                         "role": "tool",
                         "tool_call_id": tool_call["id"],
-                        "content": result,
+                        "content": error_text or result_text,
                     }
                 )
 

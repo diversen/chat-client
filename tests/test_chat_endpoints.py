@@ -2,6 +2,7 @@
 Tests for chat endpoints (chat page, streaming, models, dialogs, messages)
 """
 
+import pytest
 from unittest.mock import patch
 
 from tests.test_base import BaseTestCase, mock_openai_client
@@ -124,7 +125,29 @@ class TestChatEndpoints(BaseTestCase):
 
         with (
             patch("chat_client.endpoints.chat_endpoints.TOOL_REGISTRY", {"local_tool": lambda: "local-result"}),
+            patch(
+                "chat_client.endpoints.chat_endpoints.LOCAL_TOOL_DEFINITIONS",
+                [
+                    {
+                        "name": "local_tool",
+                        "description": "Execute local tool",
+                        "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
+                    }
+                ],
+            ),
             patch("chat_client.endpoints.chat_endpoints.MCP_SERVER_URL", "http://127.0.0.1:5000/mcp"),
+            patch(
+                "chat_client.endpoints.chat_endpoints._list_mcp_tools",
+                return_value=[
+                    {
+                        "type": "function",
+                        "function": {
+                            "name": "mcp_tool",
+                            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+                        },
+                    }
+                ],
+            ),
             patch("chat_client.endpoints.chat_endpoints.mcp_client.call_tool", return_value="mcp-result") as mock_mcp_call,
         ):
             local_result = _execute_tool(local_tool_call)
@@ -133,6 +156,112 @@ class TestChatEndpoints(BaseTestCase):
         assert local_result == "local-result"
         assert mcp_result == "mcp-result"
         assert mock_mcp_call.call_count == 1
+
+    def test_execute_tool_raises_when_no_backend_is_configured(self):
+        from chat_client.core import chat_service
+        from chat_client.endpoints.chat_endpoints import _execute_tool
+
+        tool_call = {"function": {"name": "python", "arguments": '{"code":"print(1)"}'}}
+
+        with (
+            patch("chat_client.endpoints.chat_endpoints.TOOL_REGISTRY", {}),
+            patch("chat_client.endpoints.chat_endpoints.LOCAL_TOOL_DEFINITIONS", []),
+            patch("chat_client.endpoints.chat_endpoints.MCP_SERVER_URL", ""),
+        ):
+            with pytest.raises(chat_service.ToolNotConfiguredError) as error:
+                _execute_tool(tool_call)
+
+        assert str(error.value) == 'No tool backend is configured for tool "python".'
+
+    def test_execute_tool_raises_when_tool_does_not_exist(self):
+        from chat_client.core import chat_service
+        from chat_client.endpoints.chat_endpoints import _execute_tool
+
+        tool_call = {"function": {"name": "missing_tool", "arguments": "{}"}}
+
+        with (
+            patch("chat_client.endpoints.chat_endpoints.TOOL_REGISTRY", {"python": lambda code: code}),
+            patch(
+                "chat_client.endpoints.chat_endpoints.LOCAL_TOOL_DEFINITIONS",
+                [
+                    {
+                        "name": "python",
+                        "description": "Execute Python code",
+                        "input_schema": {
+                            "type": "object",
+                            "properties": {"code": {"type": "string"}},
+                            "required": ["code"],
+                            "additionalProperties": False,
+                        },
+                    }
+                ],
+            ),
+            patch("chat_client.endpoints.chat_endpoints.MCP_SERVER_URL", ""),
+        ):
+            with pytest.raises(chat_service.ToolNotFoundError) as error:
+                _execute_tool(tool_call)
+
+        assert str(error.value) == 'Tool "missing_tool" does not exist.'
+
+    def test_execute_tool_raises_for_invalid_json_arguments(self):
+        from chat_client.core import chat_service
+        from chat_client.endpoints.chat_endpoints import _execute_tool
+
+        tool_call = {"function": {"name": "python", "arguments": '{"code":"print(1)"'}}
+
+        with (
+            patch("chat_client.endpoints.chat_endpoints.TOOL_REGISTRY", {"python": lambda code: code}),
+            patch(
+                "chat_client.endpoints.chat_endpoints.LOCAL_TOOL_DEFINITIONS",
+                [
+                    {
+                        "name": "python",
+                        "description": "Execute Python code",
+                        "input_schema": {
+                            "type": "object",
+                            "properties": {"code": {"type": "string"}},
+                            "required": ["code"],
+                            "additionalProperties": False,
+                        },
+                    }
+                ],
+            ),
+            patch("chat_client.endpoints.chat_endpoints.MCP_SERVER_URL", ""),
+        ):
+            with pytest.raises(chat_service.ToolArgumentsError) as error:
+                _execute_tool(tool_call)
+
+        assert str(error.value) == 'Tool "python" was called with invalid JSON arguments.'
+
+    def test_execute_tool_raises_for_invalid_argument_shape(self):
+        from chat_client.core import chat_service
+        from chat_client.endpoints.chat_endpoints import _execute_tool
+
+        tool_call = {"function": {"name": "python", "arguments": '{"code":1}'}}
+
+        with (
+            patch("chat_client.endpoints.chat_endpoints.TOOL_REGISTRY", {"python": lambda code: code}),
+            patch(
+                "chat_client.endpoints.chat_endpoints.LOCAL_TOOL_DEFINITIONS",
+                [
+                    {
+                        "name": "python",
+                        "description": "Execute Python code",
+                        "input_schema": {
+                            "type": "object",
+                            "properties": {"code": {"type": "string"}},
+                            "required": ["code"],
+                            "additionalProperties": False,
+                        },
+                    }
+                ],
+            ),
+            patch("chat_client.endpoints.chat_endpoints.MCP_SERVER_URL", ""),
+        ):
+            with pytest.raises(chat_service.ToolArgumentsError) as error:
+                _execute_tool(tool_call)
+
+        assert str(error.value) == 'Tool "python" requires argument "code" of type string.'
 
     def test_build_model_messages_from_dialog_history_groups_consecutive_tools(self):
         from chat_client.endpoints.chat_endpoints import _build_model_messages_from_dialog_history

@@ -189,22 +189,55 @@ def _list_tools() -> list[dict]:
     return tools
 
 
+def _find_tool_definition(name: str) -> dict[str, Any] | None:
+    if not isinstance(name, str) or not name.strip():
+        return None
+
+    for tool in _list_tools():
+        if not isinstance(tool, dict):
+            continue
+        function = tool.get("function", {})
+        if not isinstance(function, dict):
+            continue
+        if function.get("name") == name:
+            return tool
+    return None
+
+
 def _execute_tool(tool_call):
-    func_name = tool_call.get("function", {}).get("name", "")
-    if _has_local_tool_registry() and isinstance(func_name, str) and func_name in TOOL_REGISTRY:
+    func_name = str(tool_call.get("function", {}).get("name", "")).strip()
+    if not func_name:
+        raise chat_service.ToolArgumentsError('Tool call is missing function name.')
+
+    if not _has_local_tool_registry() and not _has_mcp_config():
+        raise chat_service.ToolNotConfiguredError(f'No tool backend is configured for tool "{func_name}".')
+
+    tool_definition = _find_tool_definition(func_name)
+    if tool_definition is None:
+        raise chat_service.ToolNotFoundError(f'Tool "{func_name}" does not exist.')
+
+    function = tool_definition.get("function", {})
+    parameters = function.get("parameters", {}) if isinstance(function, dict) else {}
+    args = chat_service.parse_tool_arguments(tool_call, logger)
+    if isinstance(parameters, dict):
+        chat_service.validate_tool_arguments(args, parameters, func_name)
+
+    if _has_local_tool_registry() and func_name in TOOL_REGISTRY:
         return chat_service.execute_tool(tool_call, TOOL_REGISTRY, logger)
     if _has_mcp_config():
-        func_name = tool_call["function"]["name"]
-        args = chat_service.parse_tool_arguments(tool_call, logger)
         logger.info(f"Executing MCP tool: {func_name}({args})")
-        return mcp_client.call_tool(
-            server_url=MCP_SERVER_URL,
-            auth_token=MCP_AUTH_TOKEN,
-            timeout_seconds=MCP_TIMEOUT_SECONDS,
-            name=func_name,
-            arguments=args,
-        )
-    return "No tool backend configured"
+        try:
+            return mcp_client.call_tool(
+                server_url=MCP_SERVER_URL,
+                auth_token=MCP_AUTH_TOKEN,
+                timeout_seconds=MCP_TIMEOUT_SECONDS,
+                name=func_name,
+                arguments=args,
+            )
+        except mcp_client.MCPClientError as error:
+            raise chat_service.ToolBackendError(f'MCP tool "{func_name}" failed: {error}') from error
+
+    raise chat_service.ToolNotConfiguredError(f'No tool backend is configured for tool "{func_name}".')
 
 
 def _serialize_tool_content(result) -> str:
