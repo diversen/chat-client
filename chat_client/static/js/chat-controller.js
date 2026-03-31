@@ -526,7 +526,7 @@ class ConversationController {
                     activeUi.setLoading(false);
                     activeUi.clearStatus();
                     if (chunk.reasoning) {
-                        await activeUi.appendText(chunk.reasoning);
+                        void activeUi.appendText(chunk.reasoning);
                     }
                 }
 
@@ -534,7 +534,7 @@ class ConversationController {
                     const activeUi = await ensureAssistantContainer('Answer');
                     activeUi.setLoading(false);
                     activeUi.clearStatus();
-                    await activeUi.appendText(chunk.content, Boolean(chunk.done));
+                    void activeUi.appendText(chunk.content, Boolean(chunk.done));
                 }
             }
         } catch (error) {
@@ -574,7 +574,10 @@ class ConversationController {
             if (turnUi) {
                 const liveTurnContainer = turnUi.container;
                 if (turnEvents.length > 0) {
-                    await this.view.renderStaticAssistantTurn(turnEvents, liveTurnContainer);
+                    const toolOpenStates = Array.from(
+                        liveTurnContainer.querySelectorAll('.assistant-tool-call .tool-toggle'),
+                    ).map((toggle) => String(toggle.getAttribute('aria-expanded') || '').toLowerCase() === 'true');
+                    await this.view.renderStaticAssistantTurn(turnEvents, liveTurnContainer, { toolOpenStates });
                     liveTurnContainer.remove();
                 } else {
                     turnUi.removeIfEmpty();

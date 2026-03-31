@@ -481,6 +481,15 @@ function createAssistantSegmentShell(messageId = null, initialKind = 'Thinking',
     contentElement.className = 'content';
     container.appendChild(contentElement);
 
+    const actionsElement = document.createElement('div');
+    actionsElement.className = 'message-actions hidden';
+    actionsElement.innerHTML = `
+      <a href="#" class="copy-message" title="Copy message to clipboard">
+        ${copyIcon}
+      </a>
+    `;
+    container.appendChild(actionsElement);
+
     return {
         container,
         loader,
@@ -506,6 +515,7 @@ function createAssistantSegmentShell(messageId = null, initialKind = 'Thinking',
             statusElement.classList.add('hidden');
         },
         contentElement,
+        actionsElement,
     };
 }
 
@@ -541,9 +551,11 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
             await renderStreamedResponseText(contentElement, message);
             await addCopyButtons(contentElement, config);
         },
-        async renderStaticAssistantTurn(turnMessages = [], beforeElement = null) {
+        async renderStaticAssistantTurn(turnMessages = [], beforeElement = null, options = {}) {
             const { container: turnContainer, contentElement: turnContentElement } = createMessageElement('Assistant');
             turnContainer.classList.add('assistant-turn');
+            const toolOpenStates = Array.isArray(options?.toolOpenStates) ? options.toolOpenStates : [];
+            let toolStateIndex = 0;
             if (beforeElement && beforeElement.parentNode === responsesElem) {
                 responsesElem.insertBefore(turnContainer, beforeElement);
             } else {
@@ -560,6 +572,7 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                 turnContentElement.appendChild(segment.container);
                 await renderStreamedResponseText(segment.contentElement, safeText);
                 if (kind === 'Answer') {
+                    renderCopyMessageButton(segment.container, safeText);
                     await addCopyButtons(segment.contentElement, config);
                 }
                 return segment;
@@ -570,7 +583,10 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                 segmentIndex += 1;
                 segment.setSegmentIndex(segmentIndex);
                 turnContentElement.appendChild(segment.container);
-                const toolElement = createEmbeddedToolCallElement(toolPayload, toolCallsOpenByDefault);
+                const toolIsOpen = toolOpenStates[toolStateIndex];
+                toolStateIndex += 1;
+                const openByDefault = typeof toolIsOpen === 'boolean' ? toolIsOpen : toolCallsOpenByDefault;
+                const toolElement = createEmbeddedToolCallElement(toolPayload, openByDefault);
                 segment.contentElement.appendChild(toolElement);
                 return segment;
             };
@@ -650,26 +666,58 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                 const hiddenContentElem = document.createElement('div');
                 hiddenContentElem.classList.add('content');
                 let streamedResponseText = '';
+                let pendingRender = false;
+                let pendingForceRender = false;
+                let renderInFlight = false;
+                let renderPromise = Promise.resolve();
+
+                const syncScrollAfterRender = (beforeBaseScrollHeight) => {
+                    const afterBaseScrollHeight = getBaseScrollHeight();
+                    const consumedHeight = Math.max(0, afterBaseScrollHeight - beforeBaseScrollHeight);
+                    consumeAnchorSpacerBy(consumedHeight, false);
+                    lastBaseScrollHeight = afterBaseScrollHeight;
+                };
+
+                const flushPendingRender = () => {
+                    if (renderInFlight) {
+                        return renderPromise;
+                    }
+
+                    renderInFlight = true;
+                    renderPromise = (async () => {
+                        try {
+                            while (pendingRender || pendingForceRender) {
+                                const force = pendingForceRender;
+                                pendingRender = false;
+                                pendingForceRender = false;
+                                const beforeBaseScrollHeight = lastBaseScrollHeight;
+                                await updateContentDiff(segment.contentElement, hiddenContentElem, streamedResponseText, force);
+                                syncScrollAfterRender(beforeBaseScrollHeight);
+                            }
+                        } finally {
+                            renderInFlight = false;
+                        }
+                    })();
+
+                    return renderPromise;
+                };
 
                 return {
                     ...segment,
                     segmentKind: kind.toLowerCase(),
                     async appendText(text, force = false) {
                         streamedResponseText += text;
-                        const beforeBaseScrollHeight = lastBaseScrollHeight;
-                        await updateContentDiff(segment.contentElement, hiddenContentElem, streamedResponseText, force);
-                        const afterBaseScrollHeight = getBaseScrollHeight();
-                        const consumedHeight = Math.max(0, afterBaseScrollHeight - beforeBaseScrollHeight);
-                        consumeAnchorSpacerBy(consumedHeight, false);
-                        lastBaseScrollHeight = afterBaseScrollHeight;
+                        if (force) {
+                            pendingForceRender = true;
+                            await flushPendingRender();
+                            return;
+                        }
+                        pendingRender = true;
+                        void flushPendingRender();
                     },
                     async finalize() {
-                        const beforeBaseScrollHeight = lastBaseScrollHeight;
-                        await updateContentDiff(segment.contentElement, hiddenContentElem, streamedResponseText, true);
-                        const afterBaseScrollHeight = getBaseScrollHeight();
-                        const consumedHeight = Math.max(0, afterBaseScrollHeight - beforeBaseScrollHeight);
-                        consumeAnchorSpacerBy(consumedHeight, false);
-                        lastBaseScrollHeight = afterBaseScrollHeight;
+                        pendingForceRender = true;
+                        await flushPendingRender();
                         return {
                             segmentKind: kind.toLowerCase(),
                             displayText: streamedResponseText,
@@ -707,6 +755,7 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                     const finalized = await activeAssistantSegment.finalize();
                     const segment = activeAssistantSegment;
                     if (segment.segmentKind === 'answer') {
+                        renderCopyMessageButton(segment.container, finalized.displayText);
                         await addCopyButtons(segment.contentElement, config);
                     }
                     activeAssistantSegment = null;
