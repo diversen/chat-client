@@ -1,4 +1,5 @@
 import asyncio
+import threading
 import logging
 from types import SimpleNamespace
 
@@ -376,5 +377,72 @@ def test_chat_response_stream_keeps_tool_execution_errors_inside_chat():
         "tool_call_id": "call_bad_tool",
         "content": 'Tool "stateful_python" does not exist.',
     }
+    assert first_stream.closed is True
+    assert final_stream.closed is True
+
+
+def test_chat_response_stream_yields_tool_status_before_blocking_sync_tool_completes():
+    first_stream = DummyStream(
+        [
+            _chunk(
+                None,
+                tool_calls=[
+                    SimpleNamespace(
+                        index=0,
+                        id="call_sleep",
+                        type="function",
+                        function=SimpleNamespace(name="python_insecure", arguments='{"code":"import time; time.sleep(10)"}'),
+                    )
+                ],
+            ),
+            _chunk("", finish_reason="tool_calls"),
+        ]
+    )
+    final_stream = DummyStream([_chunk("done", finish_reason="stop")])
+    create_calls = []
+    release_tool = threading.Event()
+
+    def _create(**kwargs):
+        create_calls.append(kwargs)
+        return first_stream if len(create_calls) == 1 else final_stream
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=_create)))
+    request = DummyRequest(disconnected_after_calls=999)
+
+    def _tool_executor(_tool_call):
+        release_tool.wait(timeout=1.0)
+        return "slept"
+
+    async def _run():
+        stream = chat_service.chat_response_stream(
+            request,
+            messages=[{"role": "user", "content": "sleep"}],
+            model="tool-model",
+            openai_client_cls=lambda **_: client,
+            provider_info_resolver=lambda _model: {},
+            tool_models=["tool-model"],
+            tools_loader=lambda: [{"type": "function", "function": {"name": "python_insecure"}}],
+            tool_executor=_tool_executor,
+            logger=logging.getLogger("test"),
+        )
+
+        streamed_tool_call_chunk = await asyncio.wait_for(anext(stream), timeout=0.2)
+        streamed_finish_chunk = await asyncio.wait_for(anext(stream), timeout=0.2)
+        first_chunk = await asyncio.wait_for(anext(stream), timeout=0.2)
+        release_tool.set()
+        remaining_chunks = []
+        async for chunk in stream:
+            remaining_chunks.append(chunk)
+        return streamed_tool_call_chunk, streamed_finish_chunk, first_chunk, remaining_chunks
+
+    streamed_tool_call_chunk, streamed_finish_chunk, first_chunk, remaining_chunks = asyncio.run(_run())
+
+    assert '"tool_calls"' in streamed_tool_call_chunk
+    assert '"content": ""' in streamed_finish_chunk
+    assert '"tool_status"' in first_chunk
+    assert '"phase": "start"' in first_chunk
+    assert '"tool_name": "python_insecure"' in first_chunk
+    assert any('"tool_call_id": "call_sleep"' in chunk for chunk in remaining_chunks)
+    assert any("done" in chunk for chunk in remaining_chunks)
     assert first_stream.closed is True
     assert final_stream.closed is True

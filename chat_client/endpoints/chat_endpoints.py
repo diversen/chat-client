@@ -1,3 +1,4 @@
+import asyncio
 import time
 import json
 import logging
@@ -427,7 +428,7 @@ async def _chat_response_stream(request: Request, messages, model, logged_in, di
         result_text = ""
         error_text = ""
         try:
-            result = _execute_tool(tool_call)
+            result = await asyncio.to_thread(_execute_tool, tool_call)
             result_text = _serialize_tool_content(result)
             return result
         except Exception as error:

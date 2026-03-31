@@ -1,7 +1,8 @@
+import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator, Callable
-from inspect import isawaitable
+from inspect import isawaitable, iscoroutinefunction
 from typing import Any
 
 from openai import OpenAIError
@@ -194,6 +195,22 @@ def execute_tool(tool_call: dict[str, Any], tool_registry: dict[str, Callable[..
         raise
     except Exception as error:
         raise ToolBackendError(f'Tool "{func_name}" failed: {error}') from error
+
+
+async def execute_tool_nonblocking(
+    tool_call: dict[str, Any],
+    tool_executor: Callable[[dict[str, Any]], Any],
+) -> Any:
+    """
+    Run sync tool executors off the event loop while awaiting async ones directly.
+    """
+    if iscoroutinefunction(tool_executor):
+        return await tool_executor(tool_call)
+
+    result = await asyncio.to_thread(tool_executor, tool_call)
+    if isawaitable(result):
+        return await result
+    return result
 
 
 def parse_tool_arguments(tool_call: dict[str, Any], logger: logging.Logger) -> dict[str, Any]:
@@ -533,12 +550,11 @@ async def chat_response_stream(
                     )
                     + "\n\n"
                 )
+                await asyncio.sleep(0)
                 error_text = ""
                 result_text = ""
                 try:
-                    result = tool_executor(tool_call)
-                    if isawaitable(result):
-                        result = await result
+                    result = await execute_tool_nonblocking(tool_call, tool_executor)
                     result_text = str(result)
                 except ToolExecutionError as error:
                     error_text = str(error)
