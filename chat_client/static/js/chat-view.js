@@ -15,6 +15,7 @@ import { openImagePreviewModal } from './image-preview-modal.js';
 
 const ANCHOR_SPACER_CLASS = 'responses-anchor-spacer';
 const MIN_ANCHOR_SPACER_HEIGHT_PX = 20;
+const EXTRA_STREAMING_SLACK_PX = 100;
 const MESSAGE_INPUT_MIN_HEIGHT_PX = 60;
 const MESSAGE_INPUT_MAX_VIEWPORT_HEIGHT_RATIO = 0.25;
 
@@ -65,7 +66,7 @@ function ensureScrollRoomForMessage(container, navOffset) {
     // delta tells us exactly how much spacer is needed to make top alignment possible.
     const baseScrollDelta = baseScrollHeight - window.innerHeight;
     const requiredSpacerHeight = Math.max(0, targetScrollY - baseScrollDelta);
-    setAnchorSpacerHeight(requiredSpacerHeight, false);
+    setAnchorSpacerHeight(requiredSpacerHeight + EXTRA_STREAMING_SLACK_PX, false);
     return targetScrollY;
 }
 
