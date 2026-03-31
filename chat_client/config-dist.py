@@ -96,7 +96,7 @@ if "ollama" in PROVIDERS:
         exit()
 
 # Enable vision models (models that can process both text and images)
-VISION_MODELS = []
+VISION_MODELS: list[str] = []
 
 # System models are models that are capable of injecting initial system instruction into the model template.
 # Not all models supports this, so we need to specify which models that should receive system instructions.
@@ -117,9 +117,9 @@ LOCAL_TOOL_DEFINITIONS = [
     {
         "name": "python",
         "description": (
-            'Run short Python code in a sandboxed container. '
+            "Run short Python code in a sandboxed container. "
             'Use this tool only with a JSON object of the form {"code": "..."} where '
-            'the code value is a single Python script string. Call the tool name exactly '
+            "the code value is a single Python script string. Call the tool name exactly "
             'as "python". Do not invent related tool names such as "stateful_python" or '
             '"python_codeful". Return printed output or the final expression result.'
         ),
@@ -138,10 +138,10 @@ LOCAL_TOOL_DEFINITIONS = [
     {
         "name": "python_insecure",
         "description": (
-            'Run Python code in a minimally restricted Docker container for local testing. '
+            "Run Python code in a minimally restricted Docker container for local testing. "
             'Use this tool only with a JSON object of the form {"code": "..."} where '
-            'the code value is a single Python script string. This variant does not '
-            'apply AST blocking and allows the container to use its normal network access.'
+            "the code value is a single Python script string. This variant does not "
+            "apply AST blocking and allows the container to use its normal network access."
         ),
         "input_schema": {
             "type": "object",

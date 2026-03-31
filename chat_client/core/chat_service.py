@@ -265,9 +265,7 @@ def validate_tool_arguments(args: dict[str, Any], schema: dict[str, Any] | None,
         if not isinstance(expected_type, str):
             continue
         if not _is_valid_tool_argument_type(arg_value, expected_type):
-            raise ToolArgumentsError(
-                f'Tool "{tool_name}" requires argument "{arg_name}" of type {expected_type}.'
-            )
+            raise ToolArgumentsError(f'Tool "{tool_name}" requires argument "{arg_name}" of type {expected_type}.')
 
 
 def _is_valid_tool_argument_type(value: Any, expected_type: str) -> bool:
@@ -345,12 +343,7 @@ def _append_stream_tool_call_deltas(raw_tool_calls: Any, state: dict[str, Any]) 
         if isinstance(call_id, str) and call_id.strip():
             key = call_id
             previous_key = index_active_key.get(index)
-            if (
-                previous_key
-                and previous_key.startswith("tmp:")
-                and previous_key in tool_calls_by_key
-                and key not in tool_calls_by_key
-            ):
+            if previous_key and previous_key.startswith("tmp:") and previous_key in tool_calls_by_key and key not in tool_calls_by_key:
                 migrated = tool_calls_by_key.pop(previous_key)
                 for i, candidate_key in enumerate(tool_call_order):
                     if candidate_key == previous_key:

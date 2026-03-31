@@ -13,7 +13,7 @@ from chat_client.core import base_context
 from chat_client.core import chat_service
 from chat_client.core import mcp_client
 from chat_client.core.templates import get_templates
-from chat_client.repositories import chat_repository, user_repository, prompt_repository
+from chat_client.repositories import chat_repository, prompt_repository
 from chat_client.core import exceptions_validation
 from chat_client.core.http import (
     parse_json_payload,
@@ -208,7 +208,7 @@ def _find_tool_definition(name: str) -> dict[str, Any] | None:
 def _execute_tool(tool_call):
     func_name = str(tool_call.get("function", {}).get("name", "")).strip()
     if not func_name:
-        raise chat_service.ToolArgumentsError('Tool call is missing function name.')
+        raise chat_service.ToolArgumentsError("Tool call is missing function name.")
 
     if not _has_local_tool_registry() and not _has_mcp_config():
         raise chat_service.ToolNotConfiguredError(f'No tool backend is configured for tool "{func_name}".')
