@@ -15,6 +15,12 @@ const config = await getConfig();
 
 // Math rendering
 const useKatex = config.use_katex;
+const STREAM_RENDER_CONFIG = {
+    runHighlightOnUpdate: false,
+    runHighlightOnFinalize: true,
+    runKatexOnUpdate: false,
+    runKatexOnFinalize: true,
+};
 
 /**
  * Helper function: Highlight code in a given element
@@ -53,6 +59,19 @@ function renderKatex(contentElem) {
             ],
         });
     }
+}
+
+function shouldRunHighlight(isFinal = true) {
+    return isFinal
+        ? STREAM_RENDER_CONFIG.runHighlightOnFinalize
+        : STREAM_RENDER_CONFIG.runHighlightOnUpdate;
+}
+
+function shouldRunKatex(isFinal = true) {
+    if (!useKatex) return false;
+    return isFinal
+        ? STREAM_RENDER_CONFIG.runKatexOnFinalize
+        : STREAM_RENDER_CONFIG.runKatexOnUpdate;
 }
 
 function splitThinkingSegments(rawText) {
@@ -156,7 +175,7 @@ function bindThinkingToggleEvents(contentElement) {
  * Render streamed response text into the content element (static render)
  * Note: renamed from renderSteamedResponseText
  */
-async function renderStreamedResponseText(contentElement, streamedResponseText) {
+async function renderStreamedResponseText(contentElement, streamedResponseText, isFinal = true) {
     const startTime = performance.now();
 
     const segments = splitThinkingSegments(streamedResponseText);
@@ -180,9 +199,13 @@ async function renderStreamedResponseText(contentElement, streamedResponseText) 
     }
     bindThinkingToggleEvents(contentElement);
 
-    // Optimize highlight and KaTeX: run after markdown render
-    highlightCodeInElement(contentElement);
-    renderKatex(contentElement);
+    // Expensive post-processing can be tuned independently for update/finalize.
+    if (shouldRunHighlight(isFinal)) {
+        highlightCodeInElement(contentElement);
+    }
+    if (shouldRunKatex(isFinal)) {
+        renderKatex(contentElement);
+    }
 
     const endTime = performance.now();
     console.log(`Time spent: ${endTime - startTime} milliseconds`);
@@ -203,10 +226,10 @@ async function flushDiff() {
         resolvers.forEach((resolve) => resolve());
         return;
     }
-    const { contentElement, hiddenContentElem, streamedResponseText } = pendingArgs;
+    const { contentElement, hiddenContentElem, streamedResponseText, isFinal } = pendingArgs;
     pendingArgs = null;
 
-    await renderStreamedResponseText(hiddenContentElem, streamedResponseText);
+    await renderStreamedResponseText(hiddenContentElem, streamedResponseText, isFinal);
 
     try {
         const diff = dd.diff(contentElement, hiddenContentElem);
@@ -220,8 +243,8 @@ async function flushDiff() {
     resolvers.forEach((resolve) => resolve());
 }
 
-function scheduleDiff(contentElement, hiddenContentElem, streamedResponseText) {
-    pendingArgs = { contentElement, hiddenContentElem, streamedResponseText };
+function scheduleDiff(contentElement, hiddenContentElem, streamedResponseText, isFinal = false) {
+    pendingArgs = { contentElement, hiddenContentElem, streamedResponseText, isFinal };
     const flushPromise = new Promise((resolve) => {
         pendingFlushResolvers.push(resolve);
     });
@@ -240,11 +263,11 @@ function scheduleDiff(contentElement, hiddenContentElem, streamedResponseText) {
  */
 async function updateContentDiff(contentElement, hiddenContentElem, streamedResponseText, force = false) {
     if (force) {
-        pendingArgs = { contentElement, hiddenContentElem, streamedResponseText };
+        pendingArgs = { contentElement, hiddenContentElem, streamedResponseText, isFinal: true };
         await flushDiff();
         return;
     }
-    await scheduleDiff(contentElement, hiddenContentElem, streamedResponseText);
+    await scheduleDiff(contentElement, hiddenContentElem, streamedResponseText, false);
 }
 
 const view = createChatView({
