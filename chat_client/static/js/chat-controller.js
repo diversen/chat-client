@@ -574,10 +574,10 @@ class ConversationController {
             if (turnUi) {
                 const liveTurnContainer = turnUi.container;
                 if (turnEvents.length > 0) {
-                    const toolOpenStates = Array.from(
-                        liveTurnContainer.querySelectorAll('.assistant-tool-call .tool-toggle'),
+                    const segmentOpenStates = Array.from(
+                        liveTurnContainer.querySelectorAll('.assistant-segment-header.assistant-segment-toggle'),
                     ).map((toggle) => String(toggle.getAttribute('aria-expanded') || '').toLowerCase() === 'true');
-                    await this.view.renderStaticAssistantTurn(turnEvents, liveTurnContainer, { toolOpenStates });
+                    await this.view.renderStaticAssistantTurn(turnEvents, liveTurnContainer, { segmentOpenStates });
                     liveTurnContainer.remove();
                 } else {
                     turnUi.removeIfEmpty();

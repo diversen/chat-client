@@ -357,6 +357,28 @@ const TOOL_META_RENDERERS = {
     default: renderDefaultToolCallMeta,
 };
 
+function bindToggleControl(toggleElement, bodyElement, label = '') {
+    if (!toggleElement || !bodyElement) return;
+
+    if (label) {
+        toggleElement.title = `Show/hide ${label} details`;
+    }
+
+    const toggle = () => {
+        const isOpen = !bodyElement.classList.contains('hidden');
+        bodyElement.classList.toggle('hidden', isOpen);
+        toggleElement.setAttribute('aria-expanded', String(!isOpen));
+    };
+
+    toggleElement.addEventListener('click', toggle);
+    toggleElement.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            toggle();
+        }
+    });
+}
+
 function populateToolCallBody(container, toolMessage, toolCallsOpenByDefault, roleElement) {
     const toolName = String(toolMessage?.tool_name || 'unknown_tool');
     const argumentsJson = String(toolMessage?.arguments_json || '{}');
@@ -371,21 +393,7 @@ function populateToolCallBody(container, toolMessage, toolCallsOpenByDefault, ro
         roleElement.setAttribute('role', 'button');
         roleElement.setAttribute('tabindex', '0');
         roleElement.setAttribute('aria-expanded', String(toolCallsOpenByDefault));
-        roleElement.title = `Show/hide ${toolName} details`;
-
-        const toggle = () => {
-            const isOpen = !toolBody.classList.contains('hidden');
-            toolBody.classList.toggle('hidden', isOpen);
-            roleElement.setAttribute('aria-expanded', String(!isOpen));
-        };
-
-        roleElement.addEventListener('click', toggle);
-        roleElement.addEventListener('keydown', (event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-                event.preventDefault();
-                toggle();
-            }
-        });
+        bindToggleControl(roleElement, toolBody, toolName);
     }
 
     const renderer = isPythonLikeToolName(toolName)
@@ -412,13 +420,7 @@ function createToolMessageContainer(toolMessage, toolCallsOpenByDefault) {
 function createEmbeddedToolCallElement(toolMessage, toolCallsOpenByDefault) {
     const container = document.createElement('section');
     container.className = 'assistant-tool-call';
-
-    const roleElement = document.createElement('h4');
-    roleElement.className = 'role role_tool';
-    roleElement.textContent = 'Tool';
-    container.appendChild(roleElement);
-
-    populateToolCallBody(container, toolMessage, toolCallsOpenByDefault, roleElement);
+    populateToolCallBody(container, toolMessage, toolCallsOpenByDefault, null);
     return container;
 }
 
@@ -493,6 +495,7 @@ function createAssistantSegmentShell(messageId = null, initialKind = 'Thinking',
 
     return {
         container,
+        segmentHeader,
         loader,
         statusElement,
         setSegmentIndex(index) {
@@ -515,6 +518,13 @@ function createAssistantSegmentShell(messageId = null, initialKind = 'Thinking',
             statusElement.textContent = '';
             statusElement.classList.add('hidden');
         },
+        setCollapsible(isOpen = false) {
+            segmentHeader.classList.add('assistant-segment-toggle');
+            segmentHeader.setAttribute('role', 'button');
+            segmentHeader.setAttribute('tabindex', '0');
+            segmentHeader.setAttribute('aria-expanded', String(Boolean(isOpen)));
+            segmentHeader.title = `Show/hide ${String(initialKind || 'segment').toLowerCase()} details`;
+        },
         contentElement,
         actionsElement,
     };
@@ -523,6 +533,13 @@ function createAssistantSegmentShell(messageId = null, initialKind = 'Thinking',
 function createChatView({ config, renderStreamedResponseText, updateContentDiff }) {
     const toolCallsCollapsedByDefault = Boolean(config?.tool_calls_collapsed_by_default ?? true);
     const toolCallsOpenByDefault = !toolCallsCollapsedByDefault;
+    const getSegmentDefaultOpen = (kind) => {
+        const segmentKind = String(kind || '').toLowerCase();
+        if (segmentKind === 'answer') return true;
+        if (segmentKind === 'thinking') return false;
+        if (segmentKind === 'tool') return toolCallsOpenByDefault;
+        return true;
+    };
 
     resetMessageInputHeight();
     window.addEventListener('resize', resizeMessageInput);
@@ -555,8 +572,8 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
         async renderStaticAssistantTurn(turnMessages = [], beforeElement = null, options = {}) {
             const { container: turnContainer, contentElement: turnContentElement } = createMessageElement('Assistant');
             turnContainer.classList.add('assistant-turn');
-            const toolOpenStates = Array.isArray(options?.toolOpenStates) ? options.toolOpenStates : [];
-            let toolStateIndex = 0;
+            const segmentOpenStates = Array.isArray(options?.segmentOpenStates) ? options.segmentOpenStates : [];
+            let segmentStateIndex = 0;
             if (beforeElement && beforeElement.parentNode === responsesElem) {
                 responsesElem.insertBefore(turnContainer, beforeElement);
             } else {
@@ -568,10 +585,20 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                 const safeText = String(text || '');
                 if (!safeText.trim()) return null;
                 const segment = createAssistantSegmentShell(messageId, kind, false);
+                const segmentKind = String(kind || '').toLowerCase();
                 segmentIndex += 1;
                 segment.setSegmentIndex(segmentIndex);
                 turnContentElement.appendChild(segment.container);
                 await renderStreamedResponseText(segment.contentElement, safeText);
+                if (segmentKind === 'thinking' || segmentKind === 'answer') {
+                    const isOpen = typeof segmentOpenStates[segmentStateIndex] === 'boolean'
+                        ? segmentOpenStates[segmentStateIndex]
+                        : getSegmentDefaultOpen(segmentKind);
+                    segmentStateIndex += 1;
+                    segment.setCollapsible(isOpen);
+                    segment.contentElement.classList.toggle('hidden', !isOpen);
+                    bindToggleControl(segment.segmentHeader, segment.contentElement, segmentKind);
+                }
                 if (kind === 'Answer') {
                     renderCopyMessageButton(segment.container, safeText);
                     await addCopyButtons(segment.contentElement, config);
@@ -584,10 +611,12 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                 segmentIndex += 1;
                 segment.setSegmentIndex(segmentIndex);
                 turnContentElement.appendChild(segment.container);
-                const toolIsOpen = toolOpenStates[toolStateIndex];
-                toolStateIndex += 1;
-                const openByDefault = typeof toolIsOpen === 'boolean' ? toolIsOpen : toolCallsOpenByDefault;
+                const segmentIsOpen = segmentOpenStates[segmentStateIndex];
+                segmentStateIndex += 1;
+                const openByDefault = typeof segmentIsOpen === 'boolean' ? segmentIsOpen : getSegmentDefaultOpen('tool');
                 const toolElement = createEmbeddedToolCallElement(toolPayload, openByDefault);
+                segment.setCollapsible(openByDefault);
+                bindToggleControl(segment.segmentHeader, toolElement.querySelector('.tool-call-body'), 'tool');
                 segment.contentElement.appendChild(toolElement);
                 return segment;
             };
@@ -661,8 +690,20 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
 
             const createTextSegment = (kind, showLoader = false) => {
                 const segment = createAssistantSegmentShell(null, kind, showLoader);
+                const segmentKind = String(kind || '').toLowerCase();
                 segmentIndex += 1;
                 segment.setSegmentIndex(segmentIndex);
+                const isCollapsibleTextSegment = segmentKind === 'thinking' || segmentKind === 'answer';
+                const syncSegmentVisibility = () => {
+                    if (!isCollapsibleTextSegment) return;
+                    const isExpanded = String(segment.segmentHeader.getAttribute('aria-expanded') || '').toLowerCase() === 'true';
+                    segment.contentElement.classList.toggle('hidden', !isExpanded);
+                };
+                if (isCollapsibleTextSegment) {
+                    segment.setCollapsible(getSegmentDefaultOpen(segmentKind));
+                    syncSegmentVisibility();
+                    bindToggleControl(segment.segmentHeader, segment.contentElement, segmentKind);
+                }
 
                 const hiddenContentElem = document.createElement('div');
                 hiddenContentElem.classList.add('content');
@@ -693,6 +734,7 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                                 pendingForceRender = false;
                                 const beforeBaseScrollHeight = lastBaseScrollHeight;
                                 await updateContentDiff(segment.contentElement, hiddenContentElem, streamedResponseText, force);
+                                syncSegmentVisibility();
                                 syncScrollAfterRender(beforeBaseScrollHeight);
                             }
                         } finally {

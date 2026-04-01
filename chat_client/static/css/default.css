@@ -625,6 +625,21 @@ a.is-disabled-link {
     text-transform: uppercase;
 }
 
+.assistant-segment-header.assistant-segment-toggle {
+    cursor: pointer;
+    user-select: none;
+}
+
+.assistant-segment-header.assistant-segment-toggle::after {
+    content: " ▸";
+    font-size: 0.9em;
+    opacity: 0.7;
+}
+
+.assistant-segment-header.assistant-segment-toggle[aria-expanded="true"]::after {
+    content: " ▾";
+}
+
 .assistant-segment-step {
     font-weight: 700;
     color: var(--selection);
@@ -650,7 +665,7 @@ a.is-disabled-link {
 }
 
 .assistant-tool-call {
-    margin-top: 8px;
+    margin-top: 4px;
 }
 
 .role_tool.tool-toggle {
