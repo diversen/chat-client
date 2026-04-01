@@ -1,6 +1,8 @@
 import asyncio
 import json
 import logging
+import re
+import time
 from collections.abc import AsyncIterator, Callable
 from inspect import isawaitable, iscoroutinefunction
 from typing import Any
@@ -12,6 +14,11 @@ GENERIC_OPENAI_ERROR_MESSAGE = "An error occurred. Please try again later."
 IMAGE_MODALITY_ERROR_MESSAGE = "The selected model does not support image inputs. Remove attached images or choose a vision model."
 TOOL_ROUTER_MAX_TOKENS = 64
 DEFAULT_CHAT_MAX_LOOP_ROUNDS = 8
+GENERIC_LOG_TEXT_PREVIEW_LIMIT = 256
+ASSISTANT_LOG_TEXT_PREVIEW_LIMIT = 64
+TOOL_ARGUMENTS_LOG_TEXT_PREVIEW_LIMIT = 64
+TOOL_RESULT_LOG_TEXT_PREVIEW_LIMIT = 128
+THINKING_TAG_PATTERN = re.compile(r"</?(?:think|thinking|thought)>", re.IGNORECASE)
 
 
 class ToolExecutionError(Exception):
@@ -42,6 +49,134 @@ class ToolBackendError(ToolExecutionError):
     """
     Raised when a backend fails while executing a tool.
     """
+
+
+def _truncate_for_log(value: Any, limit: int = GENERIC_LOG_TEXT_PREVIEW_LIMIT) -> str:
+    text = str(value or "")
+    if len(text) <= limit:
+        return text
+    return text[:limit] + "...[truncated]"
+
+
+def _log_event(logger: logging.Logger, level: int, event: str, **fields: Any) -> None:
+    payload = {key: value for key, value in fields.items() if value is not None}
+    logger.log(level, "%s: %s", event, payload)
+
+
+def _count_message_images(message: dict[str, Any]) -> int:
+    images = message.get("images", [])
+    if isinstance(images, list):
+        return len(images)
+
+    content = message.get("content", [])
+    if not isinstance(content, list):
+        return 0
+    return sum(1 for item in content if isinstance(item, dict) and item.get("type") == "image_url")
+
+
+def summarize_messages_for_log(messages: list[dict[str, Any]]) -> dict[str, Any]:
+    role_counts: dict[str, int] = {}
+    image_count = 0
+    tool_call_count = 0
+    text_chars = 0
+
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+        role = str(message.get("role", "")).strip() or "unknown"
+        role_counts[role] = role_counts.get(role, 0) + 1
+        image_count += _count_message_images(message)
+        tool_calls = message.get("tool_calls", [])
+        if isinstance(tool_calls, list):
+            tool_call_count += len(tool_calls)
+        content = message.get("content", "")
+        if isinstance(content, str):
+            text_chars += len(content)
+        elif isinstance(content, list):
+            for item in content:
+                if isinstance(item, dict) and item.get("type") == "text":
+                    text_chars += len(str(item.get("text", "")))
+
+    return {
+        "message_count": len(messages),
+        "role_counts": role_counts,
+        "image_count": image_count,
+        "tool_call_count": tool_call_count,
+        "text_chars": text_chars,
+    }
+
+
+def _split_thinking_and_answer_text(content: str) -> tuple[str, str]:
+    if not content:
+        return "", ""
+
+    parts = THINKING_TAG_PATTERN.split(content)
+    tags = THINKING_TAG_PATTERN.findall(content)
+    is_thinking = False
+    thinking_parts: list[str] = []
+    answer_parts: list[str] = []
+
+    for index, part in enumerate(parts):
+        if part:
+            if is_thinking:
+                thinking_parts.append(part)
+            else:
+                answer_parts.append(part)
+        if index < len(tags):
+            tag = tags[index]
+            is_thinking = not tag.startswith("</")
+
+    return "".join(thinking_parts), "".join(answer_parts)
+
+
+def summarize_assistant_text_for_log(content: str) -> dict[str, Any]:
+    thinking_text, answer_text = _split_thinking_and_answer_text(content)
+    return {
+        "content_chars": len(content),
+        "thinking_chars": len(thinking_text),
+        "answer_chars": len(answer_text),
+        "thinking_preview": _truncate_for_log(thinking_text, ASSISTANT_LOG_TEXT_PREVIEW_LIMIT),
+        "answer_preview": _truncate_for_log(answer_text, ASSISTANT_LOG_TEXT_PREVIEW_LIMIT),
+        "has_thinking": bool(thinking_text),
+    }
+
+
+def summarize_tool_call_for_log(tool_call: dict[str, Any]) -> dict[str, Any]:
+    function = tool_call.get("function", {})
+    name = str(function.get("name", "")).strip() if isinstance(function, dict) else ""
+    arguments = function.get("arguments", "{}") if isinstance(function, dict) else "{}"
+    return {
+        "tool_call_id": str(tool_call.get("id", "")).strip(),
+        "tool_name": name,
+        "arguments_preview": _truncate_for_log(arguments, TOOL_ARGUMENTS_LOG_TEXT_PREVIEW_LIMIT),
+    }
+
+
+def summarize_tool_result_for_log(tool_call: dict[str, Any], result_text: str, error_text: str) -> dict[str, Any]:
+    summary = summarize_tool_call_for_log(tool_call)
+    summary.update(
+        {
+            "status": "error" if error_text else "ok",
+            "result_preview": _truncate_for_log(result_text, TOOL_RESULT_LOG_TEXT_PREVIEW_LIMIT),
+            "error_preview": _truncate_for_log(error_text, TOOL_RESULT_LOG_TEXT_PREVIEW_LIMIT),
+            "result_chars": len(result_text),
+            "error_chars": len(error_text),
+        }
+    )
+    return summary
+
+
+def _summarize_chunk_for_log(model_dict: dict[str, Any]) -> dict[str, Any]:
+    choices = model_dict.get("choices", [])
+    first_choice = choices[0] if isinstance(choices, list) and choices and isinstance(choices[0], dict) else {}
+    delta = first_choice.get("delta", {}) if isinstance(first_choice, dict) else {}
+    delta_keys = sorted(delta.keys()) if isinstance(delta, dict) else []
+    return {
+        "top_level_keys": sorted(model_dict.keys()),
+        "choice_count": len(choices) if isinstance(choices, list) else 0,
+        "delta_keys": delta_keys,
+        "finish_reason": first_choice.get("finish_reason", "") if isinstance(first_choice, dict) else "",
+    }
 
 
 def _close_stream(stream: Any, logger: logging.Logger) -> None:
@@ -175,13 +310,29 @@ def has_image_inputs(messages: list[Any]) -> bool:
     return False
 
 
-def execute_tool(tool_call: dict[str, Any], tool_registry: dict[str, Callable[..., Any]], logger: logging.Logger) -> Any:
+def execute_tool(
+    tool_call: dict[str, Any],
+    tool_registry: dict[str, Callable[..., Any]],
+    logger: logging.Logger,
+    *,
+    log_context: dict[str, Any] | None = None,
+) -> Any:
     """
     Execute a model tool call from the configured registry.
     """
     func_name = str(tool_call.get("function", {}).get("name", "")).strip()
     args = parse_tool_arguments(tool_call, logger)
-    logger.info(f"Executing tool: {func_name}({args})")
+    _log_event(
+        logger,
+        logging.INFO,
+        "chat.tool.local.start",
+        tool_name=func_name,
+        arguments_preview=_truncate_for_log(
+            json.dumps(args, ensure_ascii=True, sort_keys=True),
+            TOOL_ARGUMENTS_LOG_TEXT_PREVIEW_LIMIT,
+        ),
+        **(log_context or {}),
+    )
 
     if func_name not in tool_registry:
         raise ToolNotFoundError(f'Tool "{func_name}" does not exist.')
@@ -456,10 +607,29 @@ async def chat_response_stream(
     tool_executor: Callable[[dict[str, Any]], Any],
     max_chat_loop_rounds: int = DEFAULT_CHAT_MAX_LOOP_ROUNDS,
     logger: logging.Logger,
+    trace_id: str = "",
+    user_id: Any = None,
+    dialog_id: str = "",
 ) -> AsyncIterator[str]:
+    base_log_context = {
+        "trace_id": trace_id,
+        "user_id": user_id,
+        "dialog_id": dialog_id,
+        "model": model,
+    }
     try:
         provider_info = provider_info_resolver(model)
         max_rounds = _resolve_max_chat_loop_rounds(max_chat_loop_rounds)
+
+        _log_event(
+            logger,
+            logging.INFO,
+            "chat.model.session.start",
+            max_rounds=max_rounds,
+            tools_enabled=model in tool_models,
+            **summarize_messages_for_log(messages),
+            **base_log_context,
+        )
 
         client = openai_client_cls(
             api_key=provider_info.get("api_key"),
@@ -473,6 +643,14 @@ async def chat_response_stream(
         while True:
             rounds += 1
             if rounds > max_rounds:
+                _log_event(
+                    logger,
+                    logging.WARNING,
+                    "chat.model.loop_limit_exceeded",
+                    round=rounds,
+                    max_rounds=max_rounds,
+                    **base_log_context,
+                )
                 yield f"data: {json.dumps({'error': 'Tool loop exceeded maximum rounds'})}\n\n"
                 return
 
@@ -484,10 +662,32 @@ async def chat_response_stream(
             if tools_enabled:
                 create_kwargs["tools"] = tool_definitions
 
+            round_started_at = time.perf_counter()
+            _log_event(
+                logger,
+                logging.INFO,
+                "chat.model.call.start",
+                round=rounds,
+                tools_enabled=tools_enabled,
+                tool_definition_count=len(tool_definitions),
+                **summarize_messages_for_log(messages),
+                **base_log_context,
+            )
+
             stream_response = client.chat.completions.create(**create_kwargs)
             disconnected = False
             assistant_content_parts: list[str] = []
             finish_reason: Any = None
+            chunk_count = 0
+            chunks_with_choices = 0
+            chunks_with_delta = 0
+            chunks_with_content = 0
+            chunks_with_tool_calls = 0
+            unknown_delta_keys: set[str] = set()
+            first_chunk_summary: dict[str, Any] | None = None
+            last_chunk_summary: dict[str, Any] | None = None
+            first_chunk_preview = ""
+            last_chunk_preview = ""
             tool_call_state: dict[str, Any] = {
                 "tool_calls_by_key": {},
                 "tool_call_order": [],
@@ -502,37 +702,138 @@ async def chat_response_stream(
                         break
 
                     model_dict = chunk.model_dump()
+                    chunk_count += 1
+                    chunk_preview = _truncate_for_log(json.dumps(model_dict, ensure_ascii=True))
+                    chunk_summary = _summarize_chunk_for_log(model_dict)
+                    if first_chunk_summary is None:
+                        first_chunk_summary = chunk_summary
+                        first_chunk_preview = chunk_preview
+                    last_chunk_summary = chunk_summary
+                    last_chunk_preview = chunk_preview
                     json_chunk = json.dumps(model_dict)
                     yield f"data: {json_chunk}\n\n"
 
                     choices = getattr(chunk, "choices", None)
                     if not isinstance(choices, list) or not choices:
                         continue
+                    chunks_with_choices += 1
                     first_choice = choices[0]
                     delta = getattr(first_choice, "delta", None)
                     if delta is not None:
+                        chunks_with_delta += 1
                         content_piece = getattr(delta, "content", None)
                         if isinstance(content_piece, str) and content_piece:
                             assistant_content_parts.append(content_piece)
+                            chunks_with_content += 1
                         _append_stream_tool_call_deltas(getattr(delta, "tool_calls", None), tool_call_state)
+                        if isinstance(getattr(delta, "tool_calls", None), list) and getattr(delta, "tool_calls", None):
+                            chunks_with_tool_calls += 1
+                        if hasattr(delta, "model_fields_set") and isinstance(delta.model_fields_set, set):
+                            unknown_delta_keys.update(
+                                str(key)
+                                for key in delta.model_fields_set
+                                if str(key) not in {"content", "tool_calls", "role", "refusal"}
+                            )
                     if getattr(first_choice, "finish_reason", None) is not None:
                         finish_reason = getattr(first_choice, "finish_reason", None)
             finally:
                 _close_stream(stream_response, logger)
 
             if disconnected:
+                _log_event(
+                    logger,
+                    logging.INFO,
+                    "chat.stream.client_disconnected",
+                    round=rounds,
+                    duration_ms=round((time.perf_counter() - round_started_at) * 1000, 2),
+                    **base_log_context,
+                )
                 return
 
             tool_calls = _collect_streamed_tool_calls(tool_call_state)
             assistant_content = "".join(assistant_content_parts)
-            logger.info(
-                "Streamed assistant message: %s",
-                {
-                    "finish_reason": str(finish_reason or ""),
-                    "content": assistant_content,
-                    "tool_calls": tool_calls,
-                },
+            assistant_summary = summarize_assistant_text_for_log(assistant_content)
+            _log_event(
+                logger,
+                logging.INFO,
+                "chat.model.call.finish",
+                round=rounds,
+                finish_reason=str(finish_reason or ""),
+                duration_ms=round((time.perf_counter() - round_started_at) * 1000, 2),
+                tool_call_count=len(tool_calls),
+                content_chars=assistant_summary["content_chars"],
+                chunk_count=chunk_count,
+                **base_log_context,
             )
+            _log_event(
+                logger,
+                logging.DEBUG,
+                "chat.model.chunk.summary",
+                round=rounds,
+                chunk_count=chunk_count,
+                chunks_with_choices=chunks_with_choices,
+                chunks_with_delta=chunks_with_delta,
+                chunks_with_content=chunks_with_content,
+                chunks_with_tool_calls=chunks_with_tool_calls,
+                finish_reason=str(finish_reason or ""),
+                first_chunk_summary=first_chunk_summary or {},
+                last_chunk_summary=last_chunk_summary or {},
+                **base_log_context,
+            )
+            if unknown_delta_keys:
+                _log_event(
+                    logger,
+                    logging.INFO,
+                    "chat.model.unknown_delta_fields",
+                    round=rounds,
+                    unknown_delta_keys=sorted(unknown_delta_keys),
+                    **base_log_context,
+                )
+            if assistant_summary["has_thinking"]:
+                _log_event(
+                    logger,
+                    logging.DEBUG,
+                    "chat.assistant.thinking",
+                    round=rounds,
+                    thinking_chars=assistant_summary["thinking_chars"],
+                    thinking_preview=assistant_summary["thinking_preview"],
+                    **base_log_context,
+                )
+            _log_event(
+                logger,
+                logging.INFO,
+                "chat.assistant.answer",
+                round=rounds,
+                finish_reason=str(finish_reason or ""),
+                answer_chars=assistant_summary["answer_chars"],
+                    answer_preview=assistant_summary["answer_preview"],
+                    **base_log_context,
+                )
+            if chunk_count > 0 and assistant_summary["content_chars"] == 0 and not tool_calls:
+                _log_event(
+                    logger,
+                    logging.WARNING,
+                    "chat.model.empty_output",
+                    round=rounds,
+                    finish_reason=str(finish_reason or ""),
+                    chunk_count=chunk_count,
+                    chunks_with_choices=chunks_with_choices,
+                    chunks_with_delta=chunks_with_delta,
+                    first_chunk_preview=first_chunk_preview,
+                    last_chunk_preview=last_chunk_preview,
+                    first_chunk_summary=first_chunk_summary or {},
+                    last_chunk_summary=last_chunk_summary or {},
+                    **base_log_context,
+                )
+            if tool_calls:
+                _log_event(
+                    logger,
+                    logging.INFO,
+                    "chat.assistant.tool_calls",
+                    round=rounds,
+                    tool_calls=[summarize_tool_call_for_log(tool_call) for tool_call in tool_calls],
+                    **base_log_context,
+                )
 
             if not tool_calls:
                 return
@@ -541,6 +842,15 @@ async def chat_response_stream(
 
             tool_results: list[tuple[dict[str, Any], str, str]] = []
             for tool_call in tool_calls:
+                tool_started_at = time.perf_counter()
+                _log_event(
+                    logger,
+                    logging.INFO,
+                    "chat.tool.start",
+                    round=rounds,
+                    **summarize_tool_call_for_log(tool_call),
+                    **base_log_context,
+                )
                 yield (
                     "data: "
                     + json.dumps(
@@ -563,6 +873,15 @@ async def chat_response_stream(
                 except ToolExecutionError as error:
                     error_text = str(error)
                 tool_results.append((tool_call, result_text, error_text))
+                _log_event(
+                    logger,
+                    logging.INFO if not error_text else logging.WARNING,
+                    "chat.tool.finish" if not error_text else "chat.tool.error",
+                    round=rounds,
+                    duration_ms=round((time.perf_counter() - tool_started_at) * 1000, 2),
+                    **summarize_tool_result_for_log(tool_call, result_text, error_text),
+                    **base_log_context,
+                )
                 yield (
                     "data: "
                     + json.dumps(
@@ -589,13 +908,22 @@ async def chat_response_stream(
                 )
 
     except OpenAIError as error:
+        _log_event(logger, logging.ERROR, "chat.stream.openai_error", error_message=str(error), **base_log_context)
         logger.exception("OpenAI error")
         yield f"data: {json.dumps({'error': map_openai_error_message(error)})}\n\n"
     except Exception as error:
+        _log_event(
+            logger,
+            logging.ERROR,
+            "chat.stream.error",
+            error_type=error.__class__.__name__,
+            error_message=str(error),
+            **base_log_context,
+        )
         logger.exception("Streaming error")
         error_message = "Streaming failed"
         if error.__class__.__name__ == "MCPClientError":
             error_message = str(error) or "MCP request failed"
         yield f"data: {json.dumps({'error': error_message})}\n\n"
     finally:
-        logger.info("Closing stream")
+        _log_event(logger, logging.INFO, "chat.stream.closed", **base_log_context)

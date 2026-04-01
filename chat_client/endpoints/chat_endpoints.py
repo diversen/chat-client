@@ -2,6 +2,7 @@ import asyncio
 import time
 import json
 import logging
+import uuid
 from typing import Any
 
 import data.config as config
@@ -221,7 +222,31 @@ def _find_tool_definition(name: str) -> dict[str, Any] | None:
     return None
 
 
-def _execute_tool(tool_call):
+def _build_chat_log_context(
+    *,
+    trace_id: str = "",
+    user_id: Any = None,
+    dialog_id: str = "",
+    model: str = "",
+) -> dict[str, Any]:
+    return {
+        "trace_id": trace_id,
+        "user_id": user_id,
+        "dialog_id": dialog_id,
+        "model": model,
+    }
+
+
+def _log_chat_event(level: int, event: str, **fields: Any) -> None:
+    payload = {key: value for key, value in fields.items() if value is not None}
+    logger.log(level, "%s: %s", event, payload)
+
+
+def _new_trace_id() -> str:
+    return uuid.uuid4().hex[:12]
+
+
+def _execute_tool(tool_call, *, log_context: dict[str, Any] | None = None):
     func_name = str(tool_call.get("function", {}).get("name", "")).strip()
     if not func_name:
         raise chat_service.ToolArgumentsError("Tool call is missing function name.")
@@ -240,9 +265,15 @@ def _execute_tool(tool_call):
         chat_service.validate_tool_arguments(args, parameters, func_name)
 
     if _has_local_tool_registry() and func_name in TOOL_REGISTRY:
-        return chat_service.execute_tool(tool_call, TOOL_REGISTRY, logger)
+        return chat_service.execute_tool(tool_call, TOOL_REGISTRY, logger, log_context=log_context)
     if _has_mcp_config():
-        logger.info(f"Executing MCP tool: {func_name}({args})")
+        _log_chat_event(
+            logging.INFO,
+            "chat.tool.mcp.start",
+            tool_name=func_name,
+            arguments_preview=chat_service.summarize_tool_call_for_log(tool_call)["arguments_preview"],
+            **(log_context or {}),
+        )
         try:
             return mcp_client.call_tool(
                 server_url=MCP_SERVER_URL,
@@ -439,12 +470,15 @@ def _strip_images_from_messages(messages: list[dict]) -> list[dict]:
     return stripped
 
 
-async def _chat_response_stream(request: Request, messages, model, logged_in, dialog_id: str):
+async def _chat_response_stream(request: Request, messages, model, logged_in, dialog_id: str, trace_id: str):
+    log_context = _build_chat_log_context(trace_id=trace_id, user_id=logged_in, dialog_id=dialog_id, model=model)
+
     async def _tool_executor_with_persist(tool_call):
         result_text = ""
         error_text = ""
+        started_at = time.perf_counter()
         try:
-            result = await asyncio.to_thread(_execute_tool, tool_call)
+            result = await asyncio.to_thread(_execute_tool, tool_call, log_context=log_context)
             result_text = _serialize_tool_content(result)
             return result
         except Exception as error:
@@ -462,6 +496,13 @@ async def _chat_response_stream(request: Request, messages, model, logged_in, di
                     result_text=result_text,
                     error_text=error_text,
                 )
+                _log_chat_event(
+                    logging.INFO if not error_text else logging.WARNING,
+                    "chat.tool.persisted" if not error_text else "chat.tool.persist_error",
+                    duration_ms=round((time.perf_counter() - started_at) * 1000, 2),
+                    **chat_service.summarize_tool_result_for_log(tool_call, result_text, error_text),
+                    **log_context,
+                )
 
     async for chunk in chat_service.chat_response_stream(
         request,
@@ -474,6 +515,9 @@ async def _chat_response_stream(request: Request, messages, model, logged_in, di
         tool_executor=_tool_executor_with_persist,
         max_chat_loop_rounds=CHAT_MAX_LOOP_ROUNDS,
         logger=logger,
+        trace_id=trace_id,
+        user_id=logged_in,
+        dialog_id=dialog_id,
     ):
         yield chunk
 
@@ -481,19 +525,47 @@ async def _chat_response_stream(request: Request, messages, model, logged_in, di
 async def chat_response_stream(request: Request):
     try:
         logged_in = await require_user_id_json(request, message="You must be logged in to use the chat")
+        trace_id = _new_trace_id()
         payload = await parse_json_payload(request, ChatStreamRequest)
         payload_messages = [message.model_dump() for message in payload.messages]
         raw_messages = payload_messages
         dialog_id = str(payload.dialog_id).strip()
+        log_context = _build_chat_log_context(trace_id=trace_id, user_id=logged_in, dialog_id=dialog_id, model=payload.model)
+        _log_chat_event(
+            logging.INFO,
+            "chat.request.start",
+            request_path=str(request.url.path),
+            **chat_service.summarize_messages_for_log(payload_messages),
+            **log_context,
+        )
         if dialog_id:
             await chat_repository.get_dialog(logged_in, dialog_id)
             persisted_messages = await chat_repository.get_messages(logged_in, dialog_id)
             raw_messages = _build_model_messages_from_dialog_history(persisted_messages)
+            _log_chat_event(
+                logging.INFO,
+                "chat.request.loaded_dialog",
+                persisted_message_count=len(persisted_messages),
+                **chat_service.summarize_messages_for_log(raw_messages),
+                **log_context,
+            )
         if payload.model not in VISION_MODELS:
             raw_messages = _strip_images_from_messages(raw_messages)
+            _log_chat_event(
+                logging.DEBUG,
+                "chat.request.images_stripped",
+                **chat_service.summarize_messages_for_log(raw_messages),
+                **log_context,
+            )
         messages = _normalize_chat_messages(raw_messages)
+        _log_chat_event(
+            logging.INFO,
+            "chat.request.normalized",
+            **chat_service.summarize_messages_for_log(messages),
+            **log_context,
+        )
         return StreamingResponse(
-            _chat_response_stream(request, messages, payload.model, logged_in, dialog_id),
+            _chat_response_stream(request, messages, payload.model, logged_in, dialog_id, trace_id),
             media_type="text/event-stream",
         )
     except exceptions_validation.JSONError as e:
