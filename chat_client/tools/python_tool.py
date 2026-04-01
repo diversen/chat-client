@@ -1,71 +1,51 @@
-import ast
 import importlib
 import os
 import subprocess
 import tempfile
-from typing import Any
+from contextlib import nullcontext
+
+from chat_client.core.attachments import resolve_tool_mount_dir
 
 MAX_CODE_LENGTH = 8_000
 DEFAULT_PYTHON_TOOL_TIMEOUT_SECONDS = 10.0
 DEFAULT_PYTHON_TOOL_DOCKER_IMAGE = "secure-python"
 NO_RESULT_ERROR = "[stderr]\nNo result produced. Please print the answer or end with an expression."
+ATTACHMENT_SOURCE_MOUNT_DIR = "/mnt/input"
+ATTACHMENT_TMPFS_SPEC = "rw,size=65m"
 
 
-BLOCKED_CALL_NAMES = {
-    "__import__",
-    "breakpoint",
-    "compile",
-    "delattr",
-    "dir",
-    "eval",
-    "exec",
-    "getattr",
-    "globals",
-    "hasattr",
-    "help",
-    "input",
-    "locals",
-    "open",
-    "quit",
-    "setattr",
-    "vars",
-    "exit",
-}
+def _build_runtime_prelude() -> str:
+    workspace_dir = resolve_tool_mount_dir()
+    return f"""
+import os as _chat_client_os
+import shutil as _chat_client_shutil
+from pathlib import Path as _chat_client_Path
 
+_CHAT_CLIENT_WORKSPACE_ROOT = _chat_client_Path({workspace_dir!r})
+_CHAT_CLIENT_SOURCE_ROOT = _chat_client_Path({ATTACHMENT_SOURCE_MOUNT_DIR!r})
 
-class UnsafeCodeError(ValueError):
-    pass
+def _chat_client_populate_workspace():
+    _CHAT_CLIENT_WORKSPACE_ROOT.mkdir(parents=True, exist_ok=True)
+    if not _CHAT_CLIENT_SOURCE_ROOT.exists():
+        return
+    for child in _CHAT_CLIENT_SOURCE_ROOT.iterdir():
+        destination = _CHAT_CLIENT_WORKSPACE_ROOT / child.name
+        if child.is_dir():
+            if destination.exists():
+                _chat_client_shutil.rmtree(destination)
+            _chat_client_shutil.copytree(child, destination)
+            _chat_client_os.chmod(destination, 0o777)
+            for nested_path in destination.rglob("*"):
+                if nested_path.is_dir():
+                    _chat_client_os.chmod(nested_path, 0o777)
+                else:
+                    _chat_client_os.chmod(nested_path, 0o666)
+        else:
+            _chat_client_shutil.copy2(child, destination)
+            _chat_client_os.chmod(destination, 0o666)
 
-
-class _SecurityValidator(ast.NodeVisitor):
-    def visit_Import(self, node: ast.Import) -> Any:
-        self.generic_visit(node)
-
-    def visit_ImportFrom(self, node: ast.ImportFrom) -> Any:
-        self.generic_visit(node)
-
-    def visit_Attribute(self, node: ast.Attribute) -> Any:
-        if node.attr.startswith("__"):
-            raise UnsafeCodeError("Dunder attribute access is not allowed.")
-        self.generic_visit(node)
-
-    def visit_Name(self, node: ast.Name) -> Any:
-        if node.id.startswith("__"):
-            raise UnsafeCodeError("Dunder names are not allowed.")
-        self.generic_visit(node)
-
-    def visit_Call(self, node: ast.Call) -> Any:
-        if isinstance(node.func, ast.Name) and node.func.id in BLOCKED_CALL_NAMES:
-            raise UnsafeCodeError(f"Call to '{node.func.id}' is not allowed.")
-        if isinstance(node.func, ast.Attribute):
-            if node.func.attr in BLOCKED_CALL_NAMES or node.func.attr.startswith("__"):
-                raise UnsafeCodeError(f"Call to '{node.func.attr}' is not allowed.")
-        self.generic_visit(node)
-
-
-def _validate_code(code: str) -> None:
-    tree = ast.parse(code, mode="exec")
-    _SecurityValidator().visit(tree)
+_chat_client_populate_workspace()
+""".strip()
 
 
 def _resolve_docker_image(docker_image: str | None) -> str:
@@ -105,25 +85,40 @@ def _run_in_docker(
     code: str,
     docker_image: str | None,
     docker_args: list[str],
+    attachment_host_dir: str | None = None,
 ) -> str:
     try:
         resolved_docker_image = _resolve_docker_image(docker_image)
         timeout_seconds = _resolve_exec_timeout_seconds()
-        with tempfile.NamedTemporaryFile(mode="w", suffix=".py", encoding="utf-8", delete=False) as code_file:
-            code_file.write(code)
-            code_file_path = code_file.name
+        temp_attachment_dir_context = tempfile.TemporaryDirectory(prefix="chat-client-python-tool-empty-")
+        attachment_dir_context = (
+            nullcontext(attachment_host_dir)
+            if attachment_host_dir
+            else temp_attachment_dir_context
+        )
+        with attachment_dir_context as resolved_attachment_host_dir:
+            if not resolved_attachment_host_dir:
+                raise ValueError("attachment_host_dir is required")
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".py", encoding="utf-8", delete=False) as code_file:
+                wrapped_code = f"{_build_runtime_prelude()}\n\n{code}"
+                code_file.write(wrapped_code)
+                code_file_path = code_file.name
         os.chmod(code_file_path, 0o644)
 
+        docker_command = [
+            "docker",
+            "run",
+            *docker_args,
+            "--tmpfs",
+            f"{resolve_tool_mount_dir()}:{ATTACHMENT_TMPFS_SPEC}",
+            "-v",
+            f"{code_file_path}:/sandbox/script.py:ro",
+            "-v",
+            f"{resolved_attachment_host_dir}:{ATTACHMENT_SOURCE_MOUNT_DIR}:ro",
+        ]
+
         completed = subprocess.run(
-            [
-                "docker",
-                "run",
-                *docker_args,
-                "-v",
-                f"{code_file_path}:/sandbox/script.py:ro",
-                resolved_docker_image,
-                "/sandbox/script.py",
-            ],
+            [*docker_command, resolved_docker_image, "/sandbox/script.py"],
             text=True,
             capture_output=True,
             timeout=timeout_seconds,
@@ -156,20 +151,26 @@ def _run_in_docker(
     return output
 
 
-def python(code: str, docker_image: str | None = None) -> str:
+def _validate_code_input(code: str) -> str | None:
+    if not isinstance(code, str):
+        return "[stderr]\nSecurityError: code must be a string."
+    if len(code) > MAX_CODE_LENGTH:
+        return f"[stderr]\nSecurityError: code exceeds max length ({MAX_CODE_LENGTH})."
+    return None
+
+
+def python(
+    code: str,
+    docker_image: str | None = None,
+    attachment_ids: list[int] | None = None,
+    attachment_host_dir: str | None = None,
+) -> str:
     """
     Execute Python code in a hardened Docker container and return output/result.
     """
-    if not isinstance(code, str):
-        return "[stderr]\nSecurityError: code must be a string."
-
-    if len(code) > MAX_CODE_LENGTH:
-        return f"[stderr]\nSecurityError: code exceeds max length ({MAX_CODE_LENGTH})."
-
-    try:
-        _validate_code(code)
-    except (SyntaxError, UnsafeCodeError) as exc:
-        return f"[stderr]\nSecurityError: {exc}"
+    validation_error = _validate_code_input(code)
+    if validation_error:
+        return validation_error
 
     return _run_in_docker(
         code,
@@ -196,18 +197,22 @@ def python(code: str, docker_image: str | None = None) -> str:
             "--user",
             "65534:65534",
         ],
+        attachment_host_dir=attachment_host_dir,
     )
 
 
-def python_insecure(code: str, docker_image: str | None = None) -> str:
+def python_insecure(
+    code: str,
+    docker_image: str | None = None,
+    attachment_ids: list[int] | None = None,
+    attachment_host_dir: str | None = None,
+) -> str:
     """
     Execute Python code in Docker with minimal restrictions for local testing.
     """
-    if not isinstance(code, str):
-        return "[stderr]\nSecurityError: code must be a string."
-
-    if len(code) > MAX_CODE_LENGTH:
-        return f"[stderr]\nSecurityError: code exceeds max length ({MAX_CODE_LENGTH})."
+    validation_error = _validate_code_input(code)
+    if validation_error:
+        return validation_error
 
     return _run_in_docker(
         code,
@@ -216,4 +221,5 @@ def python_insecure(code: str, docker_image: str | None = None) -> str:
             "--init",
             "--rm",
         ],
+        attachment_host_dir=attachment_host_dir,
     )

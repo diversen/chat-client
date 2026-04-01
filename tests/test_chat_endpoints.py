@@ -2,6 +2,7 @@
 Tests for chat endpoints (chat page, streaming, models, dialogs, messages)
 """
 
+from pathlib import Path
 import pytest
 from unittest.mock import patch
 
@@ -29,6 +30,28 @@ class TestChatEndpoints(BaseTestCase):
         assert isinstance(normalized[0]["content"], list)
         assert normalized[0]["content"][0]["type"] == "text"
         assert normalized[0]["content"][1]["type"] == "image_url"
+
+    def test_normalize_chat_messages_with_text_attachment_note(self):
+        from chat_client.endpoints.chat_endpoints import _normalize_chat_messages
+
+        messages = [
+            {
+                "role": "user",
+                "content": "Can you see any files?",
+                "images": [],
+                "attachments": [{"attachment_id": 1, "name": "0059_cipher.txt"}],
+            }
+        ]
+
+        normalized = _normalize_chat_messages(messages)
+
+        assert len(normalized) == 1
+        assert normalized[0]["role"] == "user"
+        assert normalized[0]["content"] == (
+            "Can you see any files?\n\n"
+            "Attached files available to tools:\n"
+            "- /mnt/data/0059_cipher.txt"
+        )
 
     @patch("chat_client.endpoints.chat_endpoints.PROVIDERS", {"local": {"api_key": "key", "base_url": "http://x"}})
     def test_resolve_provider_info_handles_string_dict_and_unknown_models(self):
@@ -156,6 +179,14 @@ class TestChatEndpoints(BaseTestCase):
         assert local_result == "local-result"
         assert mcp_result == "mcp-result"
         assert mock_mcp_call.call_count == 1
+
+    def test_attachment_mount_detection_supports_renamed_python_tool(self):
+        from chat_client.endpoints.chat_endpoints import _is_attachment_mount_tool
+        from chat_client.tools.python_tool import python
+
+        with patch("chat_client.endpoints.chat_endpoints.TOOL_REGISTRY", {"some_python_tool": python}):
+            assert _is_attachment_mount_tool("some_python_tool") is True
+            assert _is_attachment_mount_tool("python") is False
 
     def test_execute_tool_raises_when_no_backend_is_configured(self):
         from chat_client.core import chat_service
@@ -286,7 +317,7 @@ class TestChatEndpoints(BaseTestCase):
         ]
 
         messages = _build_model_messages_from_dialog_history(persisted)
-        assert messages[0] == {"role": "user", "content": "Q", "images": []}
+        assert messages[0] == {"role": "user", "content": "Q", "images": [], "attachments": []}
         assert messages[1]["role"] == "assistant"
         assert messages[1]["content"] == ""
         assert len(messages[1]["tool_calls"]) == 2
@@ -318,7 +349,7 @@ class TestChatEndpoints(BaseTestCase):
         ]
 
         messages = _build_model_messages_from_dialog_history(persisted)
-        assert messages[0] == {"role": "user", "content": "Q", "images": []}
+        assert messages[0] == {"role": "user", "content": "Q", "images": [], "attachments": []}
         assert messages[1]["role"] == "assistant"
         assert messages[1]["content"] == ""
         assert len(messages[1]["tool_calls"]) == 1
@@ -587,7 +618,7 @@ class TestChatEndpoints(BaseTestCase):
         _ = response.content
         called_messages = mock_client.chat.completions.create.call_args.kwargs["messages"]
         assert called_messages == [
-            {"role": "user", "content": "U1", "images": []},
+            {"role": "user", "content": "U1", "images": [], "attachments": []},
             {"role": "assistant", "content": "A1", "images": []},
             {
                 "role": "assistant",
@@ -603,7 +634,7 @@ class TestChatEndpoints(BaseTestCase):
             },
             {"role": "tool", "tool_call_id": "call_1", "content": "T1", "images": []},
             {"role": "assistant", "content": "A2", "images": []},
-            {"role": "user", "content": "U2", "images": []},
+            {"role": "user", "content": "U2", "images": [], "attachments": []},
             {
                 "role": "assistant",
                 "content": "",
@@ -673,12 +704,22 @@ class TestChatEndpoints(BaseTestCase):
         assert data["error"] is True
 
     @patch("chat_client.endpoints.chat_endpoints.VISION_MODELS", ["test-model"])
+    @patch("chat_client.repositories.chat_repository.get_attachments")
     @patch("chat_client.repositories.chat_repository.create_message")
     @patch("chat_client.core.user_session.is_logged_in")
-    def test_create_message_authenticated(self, mock_logged_in, mock_create):
+    def test_create_message_authenticated(self, mock_logged_in, mock_create, mock_get_attachments):
         """Test POST /chat/create-message/{dialog_id} when authenticated"""
         mock_logged_in.return_value = 1
         mock_create.return_value = 123  # message_id
+        mock_get_attachments.return_value = [
+            {
+                "attachment_id": 7,
+                "name": "notes.txt",
+                "content_type": "text/plain",
+                "size_bytes": 5,
+                "storage_path": "/tmp/notes.txt",
+            }
+        ]
 
         response = self.client.post(
             "/chat/create-message/test-dialog",
@@ -687,6 +728,7 @@ class TestChatEndpoints(BaseTestCase):
                 "role": "user",
                 "model": "test-model",
                 "images": [{"data_url": "data:image/png;base64,AAAA"}],
+                "attachments": [{"attachment_id": 7, "name": "notes.txt", "content_type": "text/plain", "size_bytes": 5}],
             },
         )
 
@@ -699,7 +741,87 @@ class TestChatEndpoints(BaseTestCase):
             "user",
             "Test message",
             [{"data_url": "data:image/png;base64,AAAA"}],
+            [{"attachment_id": 7, "name": "notes.txt", "content_type": "text/plain", "size_bytes": 5}],
         )
+        mock_get_attachments.assert_called_once_with(1, [7])
+
+    @patch("chat_client.repositories.chat_repository.get_attachments")
+    @patch("chat_client.repositories.chat_repository.create_message")
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_create_message_validates_attachments(self, mock_logged_in, mock_create, mock_get_attachments):
+        mock_logged_in.return_value = 1
+        mock_create.return_value = 123
+        mock_get_attachments.return_value = [
+            {
+                "attachment_id": 7,
+                "name": "notes.txt",
+                "content_type": "text/plain",
+                "size_bytes": 5,
+                "storage_path": "/tmp/notes.txt",
+            }
+        ]
+
+        response = self.client.post(
+            "/chat/create-message/test-dialog",
+            json={
+                "content": "Use attached file",
+                "role": "user",
+                "model": "test-model",
+                "attachments": [{"attachment_id": 7, "name": "notes.txt", "content_type": "text/plain", "size_bytes": 5}],
+            },
+        )
+
+        assert response.status_code == 200
+        mock_get_attachments.assert_called_once_with(1, [7])
+
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_upload_attachment_not_authenticated(self, mock_logged_in):
+        mock_logged_in.return_value = False
+
+        response = self.client.post(
+            "/chat/upload-attachment",
+            files={"file": ("notes.txt", b"hello", "text/plain")},
+        )
+
+        assert response.status_code == 401
+
+    @patch("chat_client.endpoints.chat_endpoints.attachment_service.build_attachment_storage_path")
+    @patch("chat_client.repositories.chat_repository.get_attachment")
+    @patch("chat_client.repositories.chat_repository.update_attachment_storage_path")
+    @patch("chat_client.repositories.chat_repository.create_attachment")
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_upload_attachment_authenticated(
+        self,
+        mock_logged_in,
+        mock_create_attachment,
+        mock_update_attachment_storage_path,
+        mock_get_attachment,
+        mock_build_attachment_storage_path,
+    ):
+        mock_logged_in.return_value = 1
+        mock_create_attachment.return_value = 42
+        upload_path = Path("tests/.test-data/uploaded_notes.txt")
+        mock_build_attachment_storage_path.return_value = upload_path
+        mock_get_attachment.return_value = {
+            "attachment_id": 42,
+            "name": "notes.txt",
+            "content_type": "text/plain",
+            "size_bytes": 5,
+            "storage_path": str(upload_path),
+        }
+
+        response = self.client.post(
+            "/chat/upload-attachment",
+            files={"file": ("notes.txt", b"hello", "text/plain")},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["attachment_id"] > 0
+        assert data["name"] == "notes.txt"
+        assert data["content_type"] == "text/plain"
+        assert data["size_bytes"] == 5
+        assert upload_path.read_bytes() == b"hello"
 
     @patch("chat_client.endpoints.chat_endpoints.VISION_MODELS", [])
     @patch("chat_client.core.user_session.is_logged_in")

@@ -1,7 +1,10 @@
 import subprocess
+import tempfile
 import types
+from pathlib import Path
 from unittest.mock import patch
 
+from chat_client.core.attachments import prepare_tool_attachment_mount
 from chat_client.tools.python_tool import NO_RESULT_ERROR, python, python_insecure
 
 
@@ -19,12 +22,14 @@ def test_python_tool_allows_imports():
         run_mock.assert_called_once()
 
 
-def test_python_tool_blocks_open_calls():
+def test_python_tool_allows_open_calls_with_workspace_mount():
     with patch("chat_client.tools.python_tool.subprocess.run") as run_mock:
-        result = python("open('/etc/passwd').read()")
-        assert "SecurityError" in result
-        assert "Call to 'open' is not allowed." in result
-        run_mock.assert_not_called()
+        run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="ok\n", stderr="")
+        result = python("print(open('/mnt/data/notes.txt').read())", attachment_ids=[1], attachment_host_dir="/tmp/tool-files")
+        assert result == "ok"
+        called_args = run_mock.call_args[0][0]
+        assert "/tmp/tool-files:/mnt/input:ro" in called_args
+        assert "/mnt/data:rw,size=65m" in called_args
 
 
 def test_python_tool_allows_numpy_import():
@@ -52,6 +57,51 @@ def test_python_tool_invokes_docker_with_hardening_flags():
         assert "secure-python-science" in called_args
 
 
+def test_python_tool_mounts_attachment_directory_when_present():
+    with patch("chat_client.tools.python_tool.subprocess.run") as run_mock:
+        run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="ok\n", stderr="")
+        result = python("print('ok')", attachment_ids=[9], attachment_host_dir="/tmp/tool-files")
+
+        assert result == "ok"
+        called_args = run_mock.call_args[0][0]
+        assert "/tmp/tool-files:/mnt/input:ro" in called_args
+        assert "/mnt/data:rw,size=65m" in called_args
+
+
+def test_python_tool_mounts_empty_directory_when_not_provided():
+    with patch("chat_client.tools.python_tool.subprocess.run") as run_mock:
+        run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="ok\n", stderr="")
+        result = python("print('ok')")
+
+        assert result == "ok"
+        called_args = run_mock.call_args[0][0]
+        source_mount_arg = next(arg for arg in called_args if isinstance(arg, str) and arg.endswith(":/mnt/input:ro"))
+        assert source_mount_arg.endswith(":/mnt/input:ro")
+        assert "/mnt/data:rw,size=65m" in called_args
+
+
+def test_prepare_tool_attachment_mount_makes_staged_file_world_readable():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        source_path = Path(temp_dir) / "notes.txt"
+        source_path.write_text("hello", encoding="utf-8")
+        source_path.chmod(0o600)
+
+        with prepare_tool_attachment_mount(
+            [
+                {
+                    "attachment_id": 1,
+                    "name": "notes.txt",
+                    "storage_path": str(source_path),
+                    "content_type": "text/plain",
+                    "size_bytes": 5,
+                }
+            ]
+        ) as (mount_dir, mounted_attachments):
+            staged_path = Path(str(mount_dir)) / mounted_attachments[0]["name"]
+            assert staged_path.read_text(encoding="utf-8") == "hello"
+            assert staged_path.stat().st_mode & 0o777 == 0o644
+
+
 def test_python_tool_empty_output_returns_retry_hint():
     with patch("chat_client.tools.python_tool.subprocess.run") as run_mock:
         run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
@@ -62,6 +112,13 @@ def test_python_tool_times_out_infinite_loop():
     with patch("chat_client.tools.python_tool.subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="docker", timeout=10)):
         result = python("while True:\n    pass")
         assert "Execution timed out" in result
+
+
+def test_python_tool_invalid_syntax_is_reported_by_runtime():
+    with patch("chat_client.tools.python_tool.subprocess.run") as run_mock:
+        run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=1, stdout="", stderr="SyntaxError: invalid syntax\n")
+        result = python("if True print('x')")
+        assert "SyntaxError" in result
 
 
 def test_python_insecure_allows_open_calls():

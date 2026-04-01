@@ -11,6 +11,7 @@ from starlette.requests import Request
 from starlette.responses import StreamingResponse, JSONResponse, RedirectResponse
 
 from chat_client.core import base_context
+from chat_client.core import attachments as attachment_service
 from chat_client.core import chat_service
 from chat_client.core import mcp_client
 from chat_client.core.templates import get_templates
@@ -30,6 +31,8 @@ from chat_client.schemas.chat import (
     CreateMessageRequest,
     UpdateMessageRequest,
 )
+from chat_client.tools.python_tool import python as builtin_python_tool
+from chat_client.tools.python_tool import python_insecure as builtin_python_insecure_tool
 
 # Logger
 logger: logging.Logger = logging.getLogger(__name__)
@@ -222,6 +225,13 @@ def _find_tool_definition(name: str) -> dict[str, Any] | None:
     return None
 
 
+def _is_attachment_mount_tool(name: str) -> bool:
+    if not isinstance(name, str) or not name.strip():
+        return False
+    tool = TOOL_REGISTRY.get(name)
+    return tool in {builtin_python_tool, builtin_python_insecure_tool}
+
+
 def _build_chat_log_context(
     *,
     trace_id: str = "",
@@ -246,7 +256,12 @@ def _new_trace_id() -> str:
     return uuid.uuid4().hex[:12]
 
 
-def _execute_tool(tool_call, *, log_context: dict[str, Any] | None = None):
+def _execute_tool(
+    tool_call,
+    *,
+    log_context: dict[str, Any] | None = None,
+    argument_overrides: dict[str, Any] | None = None,
+):
     func_name = str(tool_call.get("function", {}).get("name", "")).strip()
     if not func_name:
         raise chat_service.ToolArgumentsError("Tool call is missing function name.")
@@ -263,9 +278,28 @@ def _execute_tool(tool_call, *, log_context: dict[str, Any] | None = None):
     args = chat_service.parse_tool_arguments(tool_call, logger)
     if isinstance(parameters, dict):
         chat_service.validate_tool_arguments(args, parameters, func_name)
+    call_args = dict(args)
+    if isinstance(argument_overrides, dict):
+        call_args.update(argument_overrides)
 
     if _has_local_tool_registry() and func_name in TOOL_REGISTRY:
-        return chat_service.execute_tool(tool_call, TOOL_REGISTRY, logger, log_context=log_context)
+        _log_chat_event(
+            logging.INFO,
+            "chat.tool.local.start",
+            tool_name=func_name,
+            arguments_preview=chat_service.summarize_tool_call_for_log(tool_call)["arguments_preview"],
+            **(log_context or {}),
+        )
+        try:
+            return TOOL_REGISTRY[func_name](**call_args)
+        except TypeError as error:
+            raise chat_service.ToolArgumentsError(
+                f'Tool "{func_name}" was called with invalid arguments: {error}'
+            ) from error
+        except chat_service.ToolExecutionError:
+            raise
+        except Exception as error:
+            raise chat_service.ToolBackendError(f'Tool "{func_name}" failed: {error}') from error
     if _has_mcp_config():
         _log_chat_event(
             logging.INFO,
@@ -391,6 +425,8 @@ def _build_model_messages_from_dialog_history(messages: list[dict[str, Any]]) ->
             if role == "user":
                 images = message.get("images", [])
                 item["images"] = images if isinstance(images, list) else []
+                attachments = message.get("attachments", [])
+                item["attachments"] = attachments if isinstance(attachments, list) else []
             normalized.append(item)
             i += 1
             continue
@@ -470,15 +506,36 @@ def _strip_images_from_messages(messages: list[dict]) -> list[dict]:
     return stripped
 
 
-async def _chat_response_stream(request: Request, messages, model, logged_in, dialog_id: str, trace_id: str):
+async def _chat_response_stream(
+    request: Request,
+    messages,
+    model,
+    logged_in,
+    dialog_id: str,
+    trace_id: str,
+    available_attachments: list[dict[str, Any]] | None = None,
+):
     log_context = _build_chat_log_context(trace_id=trace_id, user_id=logged_in, dialog_id=dialog_id, model=model)
+    tool_attachments = list(available_attachments or [])
 
     async def _tool_executor_with_persist(tool_call):
         result_text = ""
         error_text = ""
         started_at = time.perf_counter()
         try:
-            result = await asyncio.to_thread(_execute_tool, tool_call, log_context=log_context)
+            func_name = str(tool_call.get("function", {}).get("name", "")).strip()
+            if _is_attachment_mount_tool(func_name):
+                with attachment_service.prepare_tool_attachment_mount(tool_attachments) as (attachment_host_dir, _mounted_attachments):
+                    result = await asyncio.to_thread(
+                        _execute_tool,
+                        tool_call,
+                        log_context=log_context,
+                        argument_overrides={
+                            "attachment_host_dir": attachment_host_dir,
+                        },
+                    )
+            else:
+                result = await asyncio.to_thread(_execute_tool, tool_call, log_context=log_context)
             result_text = _serialize_tool_content(result)
             return result
         except Exception as error:
@@ -530,6 +587,7 @@ async def chat_response_stream(request: Request):
         payload_messages = [message.model_dump() for message in payload.messages]
         raw_messages = payload_messages
         dialog_id = str(payload.dialog_id).strip()
+        available_attachments: list[dict[str, Any]] = []
         log_context = _build_chat_log_context(trace_id=trace_id, user_id=logged_in, dialog_id=dialog_id, model=payload.model)
         _log_chat_event(
             logging.INFO,
@@ -549,6 +607,23 @@ async def chat_response_stream(request: Request):
                 **chat_service.summarize_messages_for_log(raw_messages),
                 **log_context,
             )
+        for candidate in reversed(raw_messages):
+            if not isinstance(candidate, dict):
+                continue
+            if str(candidate.get("role", "")).strip() != "user":
+                continue
+            attachments = candidate.get("attachments", [])
+            if not isinstance(attachments, list) or not attachments:
+                break
+            available_attachments = await chat_repository.get_attachments(
+                logged_in,
+                [
+                    int(attachment.get("attachment_id"))
+                    for attachment in attachments
+                    if isinstance(attachment, dict) and attachment.get("attachment_id") is not None
+                ],
+            )
+            break
         if payload.model not in VISION_MODELS:
             raw_messages = _strip_images_from_messages(raw_messages)
             _log_chat_event(
@@ -562,14 +637,67 @@ async def chat_response_stream(request: Request):
             logging.INFO,
             "chat.request.normalized",
             **chat_service.summarize_messages_for_log(messages),
+            **chat_service.summarize_last_user_message_for_log(messages),
             **log_context,
         )
         return StreamingResponse(
-            _chat_response_stream(request, messages, payload.model, logged_in, dialog_id, trace_id),
+            _chat_response_stream(
+                request,
+                messages,
+                payload.model,
+                logged_in,
+                dialog_id,
+                trace_id,
+                available_attachments=available_attachments,
+            ),
             media_type="text/event-stream",
         )
     except exceptions_validation.JSONError as e:
         return json_error(str(e), status_code=e.status_code)
+
+
+async def upload_attachment(request: Request):
+    try:
+        user_id = await require_user_id_json(request, message="You must be logged in to upload files")
+        form = await request.form()
+        upload = form.get("file")
+        if upload is None or not hasattr(upload, "filename"):
+            raise exceptions_validation.UserValidate("A file upload is required.")
+
+        filename = str(getattr(upload, "filename", "") or "").strip()
+        content_type = str(getattr(upload, "content_type", "") or "").strip().lower()
+        file_bytes = await upload.read()
+        size_bytes = len(file_bytes)
+        safe_name, normalized_content_type = attachment_service.validate_attachment_metadata(
+            filename,
+            content_type,
+            size_bytes,
+        )
+        attachment_id = await chat_repository.create_attachment(
+            user_id=user_id,
+            name=safe_name,
+            content_type=normalized_content_type or content_type,
+            size_bytes=size_bytes,
+            storage_path="",
+        )
+        if not attachment_id:
+            raise RuntimeError("Failed to create attachment id")
+
+        storage_path = attachment_service.build_attachment_storage_path(attachment_id, safe_name)
+        storage_path.parent.mkdir(parents=True, exist_ok=True)
+        storage_path.write_bytes(file_bytes)
+        await chat_repository.update_attachment_storage_path(user_id, int(attachment_id), str(storage_path))
+        attachment = await chat_repository.get_attachment(user_id, int(attachment_id))
+        return JSONResponse(attachment_service.serialize_attachment_response(attachment))
+    except attachment_service.AttachmentValidationError as e:
+        return json_error(str(e), status_code=400)
+    except exceptions_validation.JSONError as e:
+        return json_error(str(e), status_code=e.status_code)
+    except exceptions_validation.UserValidate as e:
+        return json_error(str(e), status_code=400)
+    except Exception:
+        logger.exception("Error uploading attachment")
+        return json_error("Error uploading attachment", status_code=500)
 
 
 async def config_(request: Request):
@@ -635,12 +763,18 @@ async def create_message(request: Request):
                 raise exceptions_validation.UserValidate("Model is required when attaching images")
             if selected_model not in VISION_MODELS:
                 raise exceptions_validation.UserValidate(chat_service.IMAGE_MODALITY_ERROR_MESSAGE)
+        if payload.attachments:
+            await chat_repository.get_attachments(
+                user_id,
+                [attachment.attachment_id for attachment in payload.attachments],
+            )
         message_id = await chat_repository.create_message(
             user_id,
             dialog_id,
             payload.role,
             payload.content,
             [image.model_dump() for image in payload.images],
+            [attachment.model_dump() for attachment in payload.attachments],
         )
         return JSONResponse({"message_id": message_id})
     except exceptions_validation.JSONError as e:

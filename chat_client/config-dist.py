@@ -55,6 +55,11 @@ PYTHON_TOOL_DOCKER_IMAGE = "secure-python-science"
 # Set to 0 for no timeout.
 PYTHON_TOOL_TIMEOUT_SECONDS = 10
 
+# Uploaded files available to tools are stored privately here before being mounted into Docker.
+ATTACHMENT_STORAGE_DIR = Path(DATA_DIR) / Path("attachments")
+MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024
+PYTHON_TOOL_ATTACHMENT_MOUNT_DIR = "/mnt/data"
+
 # Maximum number of model-response rounds used to produce a single assistant reply.
 # This includes tool-calling rounds and the final no-tool answer round.
 CHAT_MAX_LOOP_ROUNDS = 8

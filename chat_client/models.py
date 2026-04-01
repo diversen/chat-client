@@ -151,6 +151,43 @@ class MessageImage(Base):
     )
 
 
+class Attachment(Base):
+    __tablename__ = "attachment"
+    __table_args__ = (
+        Index("attachment_user_id", "user_id"),
+        {"sqlite_autoincrement": True},
+    )
+
+    attachment_id: Mapped[int | None] = mapped_column(primary_key=True, autoincrement=True, init=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str] = mapped_column(Text, nullable=False)
+    storage_path: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    content_type: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    size_bytes: Mapped[int] = mapped_column(nullable=False, default=0)
+    created: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False, init=False
+    )
+
+
+class MessageAttachment(Base):
+    __tablename__ = "message_attachment"
+    __table_args__ = (
+        Index("message_attachment_message_id", "message_id"),
+        Index("message_attachment_attachment_id", "attachment_id"),
+        {"sqlite_autoincrement": True},
+    )
+
+    message_attachment_id: Mapped[int | None] = mapped_column(primary_key=True, autoincrement=True, init=False)
+    message_id: Mapped[int] = mapped_column(ForeignKey("message.message_id", ondelete="CASCADE"), nullable=False)
+    attachment_id: Mapped[int] = mapped_column(
+        ForeignKey("attachment.attachment_id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    created: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False, init=False
+    )
+
+
 class ToolCallEvent(Base):
     __tablename__ = "tool_call_event"
     __table_args__ = (

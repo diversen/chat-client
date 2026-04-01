@@ -21,13 +21,20 @@
         <form id="message-form">
             <textarea id="message" placeholder="Ask me anything"></textarea>
             <input id="image-input" type="file" accept="image/*" multiple class="hidden">
+            <input id="attachment-input" type="file" accept=".txt,.md,.markdown,.csv,.json,.py,.yaml,.yml,.log,.xml,.html,.htm,.png,.jpg,.jpeg,.gif,.webp,text/plain,text/markdown,text/csv,application/json,text/x-python,image/png,image/jpeg,image/gif,image/webp" multiple class="hidden">
         </form>
         <div id="image-preview" class="image-preview hidden"></div>
+        <div id="attachment-preview" class="attachment-preview hidden"></div>
         <div class="actions">
             <div class="actions-left">
                 <button id="attach-image" title="Attach images" type="button" class="hidden">
                     <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e8eaed">
                         <path d="M180-160q-24 0-42-18t-18-42v-520q0-24 18-42t42-18h520q24 0 42 18t18 42v120h-60v-120H180v520h520v-120h60v120q0 24-18 42t-42 18H180Zm80-120h360L510-430 400-290l-70-90-70 100Zm420-260v-80h-80v-60h80v-80h60v80h80v60h-80v80h-60Z" />
+                    </svg>
+                </button>
+                <button id="attach-file" title="Attach files" type="button">
+                    <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e8eaed">
+                        <path d="M320-240h320v-80H320v80Zm0-160h320v-80H320v80Zm-80 320q-33 0-56.5-23.5T160-160v-640q0-33 23.5-56.5T240-880h360l200 200v520q0 33-23.5 56.5T720-80H240Zm320-560v-160H240v640h480v-480H560Zm0 0H240h320Z"/>
                     </svg>
                 </button>
 

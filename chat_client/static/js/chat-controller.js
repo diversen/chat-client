@@ -12,6 +12,9 @@ import {
     imageInputElem,
     imagePreviewElem,
     attachImageButtonElem,
+    attachmentInputElem,
+    attachmentPreviewElem,
+    attachFileButtonElem,
     selectModelElem,
     imagePreviewModalElem,
     imagePreviewModalImageElem,
@@ -41,10 +44,12 @@ class ConversationController {
         this.dialogId = null;
         this.abortController = new AbortController();
         this.pendingImages = [];
+        this.pendingAttachments = [];
 
         this.wireUI();
         this.updateImageAttachmentUI();
         this.updateSendButtonState();
+        this.renderPendingAttachments();
     }
 
     setEditFormSubmissionEnabled(enabled) {
@@ -74,7 +79,8 @@ class ConversationController {
     updateSendButtonState() {
         const hasText = messageElem.value.trim().length > 0;
         const hasImages = this.isVisionModelSelected() && this.pendingImages.length > 0;
-        const canSend = !this.isStreaming && (hasText || hasImages);
+        const hasAttachments = this.pendingAttachments.length > 0;
+        const canSend = !this.isStreaming && (hasText || hasImages || hasAttachments);
 
         if (canSend) {
             this.view.enableSend();
@@ -139,6 +145,38 @@ class ConversationController {
         this.updateSendButtonState();
     }
 
+    renderPendingAttachments() {
+        if (!this.pendingAttachments.length) {
+            attachmentPreviewElem.innerHTML = '';
+            attachmentPreviewElem.classList.add('hidden');
+            return;
+        }
+
+        attachmentPreviewElem.classList.remove('hidden');
+        attachmentPreviewElem.innerHTML = '';
+        const preview = this.view.createMessageAttachments(
+            this.pendingAttachments,
+            true,
+            (attachmentId) => {
+                this.pendingAttachments = this.pendingAttachments.filter(
+                    (pending) => String(pending.attachment_id) !== String(attachmentId),
+                );
+                this.renderPendingAttachments();
+                this.updateSendButtonState();
+            },
+        );
+        if (preview) {
+            attachmentPreviewElem.appendChild(preview);
+        }
+    }
+
+    clearPendingAttachments() {
+        this.pendingAttachments = [];
+        attachmentInputElem.value = '';
+        this.renderPendingAttachments();
+        this.updateSendButtonState();
+    }
+
     async handleImageSelection(files) {
         if (!this.isVisionModelSelected()) {
             this.clearPendingImages();
@@ -181,6 +219,29 @@ class ConversationController {
         this.updateSendButtonState();
     }
 
+    async handleAttachmentSelection(files) {
+        const selectedFiles = Array.from(files || []);
+        if (!selectedFiles.length) return;
+
+        await this.auth.ensure();
+        for (const file of selectedFiles) {
+            try {
+                const uploaded = await this.storage.uploadAttachment(file);
+                this.pendingAttachments.push(uploaded);
+            } catch (error) {
+                console.error('Error uploading attachment:', error);
+                Flash.setMessage(
+                    Requests.getErrorMessage(error, `Skipped ${file.name}: could not upload file`),
+                    'notice',
+                );
+            }
+        }
+
+        attachmentInputElem.value = '';
+        this.renderPendingAttachments();
+        this.updateSendButtonState();
+    }
+
     wireUI() {
         sendButtonElem.addEventListener('click', async () => {
             await this.sendUserMessage();
@@ -208,6 +269,10 @@ class ConversationController {
             imageInputElem.click();
         });
 
+        attachFileButtonElem.addEventListener('click', () => {
+            attachmentInputElem.click();
+        });
+
         if (selectModelElem) {
             selectModelElem.addEventListener('change', () => {
                 this.updateImageAttachmentUI();
@@ -217,6 +282,10 @@ class ConversationController {
 
         imageInputElem.addEventListener('change', async (event) => {
             await this.handleImageSelection(event.target.files);
+        });
+
+        attachmentInputElem.addEventListener('change', async (event) => {
+            await this.handleAttachmentSelection(event.target.files);
         });
 
         if (imagePreviewModalCloseElem) {
@@ -313,7 +382,8 @@ class ConversationController {
 
     validateUserMessage(userMessage) {
         const hasImages = this.isVisionModelSelected() && this.pendingImages.length > 0;
-        return !!(this.isStreaming === false && (userMessage || hasImages));
+        const hasAttachments = this.pendingAttachments.length > 0;
+        return !!(this.isStreaming === false && (userMessage || hasImages || hasAttachments));
     }
 
     getInitialPromptRole() {
@@ -336,12 +406,25 @@ class ConversationController {
             const images = this.isVisionModelSelected()
                 ? this.pendingImages.map((img) => ({ data_url: img.dataUrl }))
                 : [];
+            const attachments = this.pendingAttachments.map((attachment) => ({
+                attachment_id: attachment.attachment_id,
+                name: attachment.name,
+                content_type: attachment.content_type,
+                size_bytes: attachment.size_bytes,
+            }));
             if (!this.validateUserMessage(userMessage)) return;
-            const message = { role: 'user', content: userMessage, images: images };
-            const messageTextForStorage = userMessage || `[${images.length} image${images.length > 1 ? 's' : ''} attached]`;
+            const message = { role: 'user', content: userMessage, images: images, attachments };
+            const attachmentSummary = attachments.length
+                ? `${attachments.length} file${attachments.length > 1 ? 's' : ''}`
+                : '';
+            const imageSummary = images.length
+                ? `${images.length} image${images.length > 1 ? 's' : ''}`
+                : '';
+            const summaryParts = [imageSummary, attachmentSummary].filter(Boolean);
+            const messageTextForStorage = userMessage || `[${summaryParts.join(', ')} attached]`;
 
             if (!this.dialogId) {
-                const title = userMessage || `Image message (${images.length})`;
+                const title = userMessage || (summaryParts.length ? `Attachment message (${summaryParts.join(', ')})` : 'New chat');
                 this.dialogId = await this.storage.createDialog(title);
 
                 // If this chat started from a custom prompt, persist that prompt
@@ -353,6 +436,7 @@ class ConversationController {
                             role: priorMessage.role,
                             content: priorMessage.content,
                             images: priorMessage.images || [],
+                            attachments: priorMessage.attachments || [],
                         });
                     }
                 }
@@ -363,12 +447,14 @@ class ConversationController {
                 content: messageTextForStorage,
                 model: this.view.getSelectedModel(),
                 images,
+                attachments,
             });
 
             this.messages.push({ ...message, message_id: userMessageId });
 
             this.view.clearInput();
             this.clearPendingImages();
+            this.clearPendingAttachments();
 
             const userContainer = this.view.renderStaticUserMessage(
                 messageTextForStorage,
@@ -377,6 +463,7 @@ class ConversationController {
                     await this.handleMessageUpdate(id, newContent, container);
                 },
                 images,
+                attachments,
             );
 
             await this.view.scrollMessageToTop(userContainer);
@@ -616,6 +703,7 @@ class ConversationController {
                         await this.handleMessageUpdate(id, newContent, container);
                     },
                     msg.images || [],
+                    msg.attachments || [],
                     displayRole,
                 );
                 continue;
@@ -660,11 +748,12 @@ class ConversationController {
                     await this.handleMessageUpdate(id, newContent, container);
                 },
                 [],
+                [],
                 promptRole === 'system' ? 'System' : 'User',
             );
             await this.view.scrollMessageToTop(promptContainer);
 
-            this.messages = [{ role: promptRole, content: promptText, images: [] }];
+            this.messages = [{ role: promptRole, content: promptText, images: [], attachments: [] }];
 
             const url = new URL(window.location.href);
             url.searchParams.delete('id');

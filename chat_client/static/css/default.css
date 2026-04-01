@@ -132,6 +132,7 @@ nav svg {
 
 #prompt > form,
 #prompt > #image-preview,
+#prompt > #attachment-preview,
 #prompt > .actions {
     width: 100%;
     max-width: var(--width);
@@ -144,6 +145,7 @@ nav svg {
     .chat-container,
     #prompt > form,
     #prompt > #image-preview,
+    #prompt > #attachment-preview,
     #prompt > .actions {
         padding-left: 12px;
         padding-right: 12px;
@@ -253,6 +255,48 @@ nav svg {
     line-height: 1;
     border-radius: 16px;
     font-size: 16px;
+}
+
+.attachment-preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+    margin-bottom: 8px;
+}
+
+.attachment-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 36px;
+    max-width: 100%;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--background-alt);
+}
+
+.attachment-chip-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.attachment-chip-size {
+    opacity: 0.7;
+    font-size: 12px;
+}
+
+.attachment-chip-remove {
+    all: unset;
+    cursor: pointer;
+    width: 20px;
+    height: 20px;
+    border-radius: 999px;
+    text-align: center;
+    line-height: 20px;
+    background: rgba(0, 0, 0, 0.08);
 }
 
 .content {

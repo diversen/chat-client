@@ -69,6 +69,18 @@ async function createAssistantTurnEvents(dialogID, payload) {
     return data;
 }
 
+async function uploadAttachment(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+    const data = await Requests.asyncPost('/chat/upload-attachment', formData);
+
+    if (data.error) {
+        throw new Error(data.message);
+    }
+
+    return data;
+}
+
 async function isLoggedInOrRedirect() {
     
     const data = await Requests.asyncGetJson('/user/is-logged-in');
@@ -92,4 +104,4 @@ async function updateMessage(messageId, content) {
     return data;
 }
 
-export { createDialog, getMessages, createMessage, createAssistantTurnEvents, getConfig, isLoggedInOrRedirect, updateMessage };
+export { createDialog, getMessages, createMessage, createAssistantTurnEvents, getConfig, isLoggedInOrRedirect, updateMessage, uploadAttachment };

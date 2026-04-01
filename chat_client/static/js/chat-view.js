@@ -255,6 +255,58 @@ function createMessageImages(images = []) {
     return preview;
 }
 
+function formatAttachmentSize(sizeBytes) {
+    const size = Number(sizeBytes || 0);
+    if (!Number.isFinite(size) || size <= 0) return '';
+    if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)}MB`;
+    if (size >= 1024) return `${Math.round(size / 1024)}KB`;
+    return `${size}B`;
+}
+
+function createMessageAttachments(attachments = [], removable = false, onRemove = null) {
+    if (!Array.isArray(attachments) || attachments.length === 0) return null;
+
+    const preview = document.createElement('div');
+    preview.className = 'attachment-preview';
+
+    attachments.forEach((attachment) => {
+        const attachmentId = String(attachment?.attachment_id || attachment?.id || '');
+        const item = document.createElement('div');
+        item.className = 'attachment-chip';
+
+        const name = document.createElement('span');
+        name.className = 'attachment-chip-name';
+        name.textContent = String(attachment?.name || 'attachment');
+        item.appendChild(name);
+
+        const sizeText = formatAttachmentSize(attachment?.size_bytes || attachment?.size);
+        if (sizeText) {
+            const size = document.createElement('span');
+            size.className = 'attachment-chip-size';
+            size.textContent = sizeText;
+            item.appendChild(size);
+        }
+
+        if (removable) {
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'attachment-chip-remove';
+            remove.textContent = '×';
+            remove.setAttribute('aria-label', `Remove ${name.textContent}`);
+            remove.addEventListener('click', () => {
+                if (typeof onRemove === 'function') {
+                    onRemove(attachmentId);
+                }
+            });
+            item.appendChild(remove);
+        }
+
+        preview.appendChild(item);
+    });
+
+    return preview.children.length ? preview : null;
+}
+
 function tryParseJson(value) {
     if (typeof value !== 'string') return null;
     const trimmed = value.trim();
@@ -569,12 +621,17 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
     window.addEventListener('resize', resizeMessageInput);
 
     return {
-        renderStaticUserMessage(message, messageId = null, onEdit, images = [], displayRole = 'User') {
+        createMessageAttachments,
+        renderStaticUserMessage(message, messageId = null, onEdit, images = [], attachments = [], displayRole = 'User') {
             const safeDisplayRole = String(displayRole || 'User');
             const { container, contentElement } = createMessageElement(safeDisplayRole, messageId, 'User');
             const imagePreview = createMessageImages(images);
             if (imagePreview) {
                 contentElement.insertAdjacentElement('beforebegin', imagePreview);
+            }
+            const attachmentPreview = createMessageAttachments(attachments);
+            if (attachmentPreview) {
+                contentElement.insertAdjacentElement('beforebegin', attachmentPreview);
             }
             contentElement.style.whiteSpace = 'pre-wrap';
             contentElement.innerText = message;

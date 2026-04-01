@@ -29,6 +29,7 @@ chat_routes: list[Route] = [
     Route("/", chat_endpoints.chat_page),
     Route("/chat/{dialog_id:str}", chat_endpoints.chat_page),
     Route("/chat", chat_endpoints.chat_response_stream, methods=["POST"]),
+    Route("/chat/upload-attachment", chat_endpoints.upload_attachment, methods=["POST"]),
     Route("/config", chat_endpoints.config_),
     Route("/list", chat_endpoints.list_models, methods=["GET"]),
     Route("/chat/create-dialog", chat_endpoints.create_dialog, methods=["POST"]),

@@ -47,6 +47,42 @@ def test_map_openai_error_message_for_image_modality_in_response_json():
     assert chat_service.map_openai_error_message(error) == chat_service.IMAGE_MODALITY_ERROR_MESSAGE
 
 
+def test_summarize_messages_for_log_includes_attachment_paths():
+    summary = chat_service.summarize_messages_for_log(
+        [
+            {
+                "role": "user",
+                "content": "Read these files",
+                "attachments": [
+                    {"attachment_id": 1, "name": "notes.txt"},
+                    {"attachment_id": 2, "name": "report.csv"},
+                ],
+            }
+        ]
+    )
+
+    assert summary["attachment_count"] == 2
+    assert summary["attachment_paths"] == ["/mnt/data/notes.txt", "/mnt/data/report.csv"]
+
+
+def test_summarize_last_user_message_for_log_includes_attached_file_path_note():
+    summary = chat_service.summarize_last_user_message_for_log(
+        [
+            {"role": "system", "content": "You are helpful."},
+            {
+                "role": "user",
+                "content": (
+                    "Please inspect the file.\n\n"
+                    "Attached files available to tools:\n"
+                    "- /mnt/data/0059_cipher.txt"
+                ),
+            },
+        ]
+    )
+
+    assert "/mnt/data/0059_cipher.txt" in summary["last_user_message_full"]
+
+
 class DummyRequest:
     def __init__(self, disconnected_after_calls: int = 999):
         self.calls = 0

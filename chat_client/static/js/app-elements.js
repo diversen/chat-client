@@ -11,6 +11,9 @@ const promptElem = document.getElementById('prompt');
 const imageInputElem = document.getElementById('image-input');
 const imagePreviewElem = document.getElementById('image-preview');
 const attachImageButtonElem = document.getElementById('attach-image');
+const attachmentInputElem = document.getElementById('attachment-input');
+const attachmentPreviewElem = document.getElementById('attachment-preview');
+const attachFileButtonElem = document.getElementById('attach-file');
 const imagePreviewModalElem = document.getElementById('image-preview-modal');
 const imagePreviewModalImageElem = document.getElementById('image-preview-modal-image');
 const imagePreviewModalCloseElem = document.getElementById('image-preview-modal-close');
@@ -28,6 +31,9 @@ export {
     imageInputElem,
     imagePreviewElem,
     attachImageButtonElem,
+    attachmentInputElem,
+    attachmentPreviewElem,
+    attachFileButtonElem,
     imagePreviewModalElem,
     imagePreviewModalImageElem,
     imagePreviewModalCloseElem,

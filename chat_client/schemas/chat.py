@@ -6,11 +6,20 @@ class UploadedImageRequest(BaseModel):
     data_url: str
 
 
+class UploadedAttachmentRequest(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    attachment_id: int
+    name: str = ""
+    content_type: str = ""
+    size_bytes: int = 0
+
+
 class ChatMessageRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
     role: str
     content: str = ""
     images: list[UploadedImageRequest] = Field(default_factory=list)
+    attachments: list[UploadedAttachmentRequest] = Field(default_factory=list)
 
 
 class ChatStreamRequest(BaseModel):
@@ -31,6 +40,7 @@ class CreateMessageRequest(BaseModel):
     content: str
     model: str = ""
     images: list[UploadedImageRequest] = Field(default_factory=list)
+    attachments: list[UploadedAttachmentRequest] = Field(default_factory=list)
 
 
 class UpdateMessageRequest(BaseModel):

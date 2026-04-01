@@ -10,6 +10,8 @@ from typing import Any
 from openai import OpenAIError
 from starlette.requests import Request
 
+from chat_client.core.attachments import format_attachment_note, list_attachment_paths
+
 GENERIC_OPENAI_ERROR_MESSAGE = "An error occurred. Please try again later."
 IMAGE_MODALITY_ERROR_MESSAGE = "The selected model does not support image inputs. Remove attached images or choose a vision model."
 TOOL_ROUTER_MAX_TOKENS = 64
@@ -81,9 +83,18 @@ def _count_message_images(message: dict[str, Any]) -> int:
     return sum(1 for item in content if isinstance(item, dict) and item.get("type") == "image_url")
 
 
+def _count_message_attachments(message: dict[str, Any]) -> int:
+    attachments = message.get("attachments", [])
+    if isinstance(attachments, list):
+        return len(attachments)
+    return 0
+
+
 def summarize_messages_for_log(messages: list[dict[str, Any]]) -> dict[str, Any]:
     role_counts: dict[str, int] = {}
     image_count = 0
+    attachment_count = 0
+    attachment_paths: list[str] = []
     tool_call_count = 0
     text_chars = 0
 
@@ -93,6 +104,9 @@ def summarize_messages_for_log(messages: list[dict[str, Any]]) -> dict[str, Any]
         role = str(message.get("role", "")).strip() or "unknown"
         role_counts[role] = role_counts.get(role, 0) + 1
         image_count += _count_message_images(message)
+        attachment_count += _count_message_attachments(message)
+        if role == "user":
+            attachment_paths.extend(list_attachment_paths(message.get("attachments", [])))
         tool_calls = message.get("tool_calls", [])
         if isinstance(tool_calls, list):
             tool_call_count += len(tool_calls)
@@ -104,13 +118,46 @@ def summarize_messages_for_log(messages: list[dict[str, Any]]) -> dict[str, Any]
                 if isinstance(item, dict) and item.get("type") == "text":
                     text_chars += len(str(item.get("text", "")))
 
-    return {
+    summary = {
         "message_count": len(messages),
         "role_counts": role_counts,
         "image_count": image_count,
+        "attachment_count": attachment_count,
         "tool_call_count": tool_call_count,
         "text_chars": text_chars,
     }
+    if attachment_paths:
+        summary["attachment_paths"] = sorted(set(attachment_paths))
+    return summary
+
+
+def summarize_last_user_message_for_log(messages: list[dict[str, Any]]) -> dict[str, Any]:
+    for message in reversed(messages):
+        if not isinstance(message, dict):
+            continue
+        if str(message.get("role", "")).strip() != "user":
+            continue
+
+        content = message.get("content", "")
+        if isinstance(content, str):
+            return {
+                "last_user_message_full": content,
+            }
+
+        if isinstance(content, list):
+            text_parts: list[str] = []
+            for item in content:
+                if not isinstance(item, dict):
+                    continue
+                if item.get("type") == "text":
+                    text_parts.append(str(item.get("text", "")))
+                elif item.get("type") == "image_url":
+                    text_parts.append("[image]")
+            return {
+                "last_user_message_full": "\n".join(part for part in text_parts if part),
+            }
+
+    return {}
 
 
 def _split_thinking_and_answer_text(content: str) -> tuple[str, str]:
@@ -272,9 +319,12 @@ def normalize_chat_messages(messages: list[Any]) -> list[dict[str, Any]]:
             continue
 
         content = str(message.get("content", ""))
+        attachment_note = format_attachment_note(message.get("attachments", []))
+        if attachment_note:
+            content = f"{content}\n\n{attachment_note}".strip()
         images = message.get("images", [])
         if not isinstance(images, list) or not images:
-            normalized.append(message)
+            normalized.append({**message, "content": content})
             continue
 
         content_parts: list[dict[str, Any]] = []
