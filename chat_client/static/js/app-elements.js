@@ -9,10 +9,9 @@ const loadingSpinner = document.querySelector('.loading-spinner');
 const scrollToBottom = document.getElementById('scroll-to-bottom');
 const promptElem = document.getElementById('prompt');
 const imageInputElem = document.getElementById('image-input');
-const imagePreviewElem = document.getElementById('image-preview');
+const pendingUploadsElem = document.getElementById('pending-uploads');
 const attachImageButtonElem = document.getElementById('attach-image');
 const attachmentInputElem = document.getElementById('attachment-input');
-const attachmentPreviewElem = document.getElementById('attachment-preview');
 const attachFileButtonElem = document.getElementById('attach-file');
 const imagePreviewModalElem = document.getElementById('image-preview-modal');
 const imagePreviewModalImageElem = document.getElementById('image-preview-modal-image');
@@ -29,10 +28,9 @@ export {
     scrollToBottom,
     promptElem,
     imageInputElem,
-    imagePreviewElem,
+    pendingUploadsElem,
     attachImageButtonElem,
     attachmentInputElem,
-    attachmentPreviewElem,
     attachFileButtonElem,
     imagePreviewModalElem,
     imagePreviewModalImageElem,

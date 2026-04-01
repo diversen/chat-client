@@ -10,10 +10,9 @@ import {
     abortButtonElem,
     scrollToBottom,
     imageInputElem,
-    imagePreviewElem,
+    pendingUploadsElem,
     attachImageButtonElem,
     attachmentInputElem,
-    attachmentPreviewElem,
     attachFileButtonElem,
     selectModelElem,
     imagePreviewModalElem,
@@ -32,6 +31,14 @@ function fileToDataURL(file) {
     });
 }
 
+function formatAttachmentSize(sizeBytes) {
+    const size = Number(sizeBytes || 0);
+    if (!Number.isFinite(size) || size <= 0) return '';
+    if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)}MB`;
+    if (size >= 1024) return `${Math.round(size / 1024)}KB`;
+    return `${size}B`;
+}
+
 class ConversationController {
     constructor({ view, storage, auth, chat, config }) {
         this.view = view;
@@ -47,9 +54,9 @@ class ConversationController {
         this.pendingAttachments = [];
 
         this.wireUI();
-        this.updateImageAttachmentUI();
+        this.updateAttachmentUI();
         this.updateSendButtonState();
-        this.renderPendingAttachments();
+        this.renderPendingUploads();
     }
 
     setEditFormSubmissionEnabled(enabled) {
@@ -59,27 +66,50 @@ class ConversationController {
         });
     }
 
-    isVisionModelSelected() {
+    getSelectedModelCapabilities() {
         const selectedModel = this.view.getSelectedModel();
+        const modelCapabilities = this.config?.model_capabilities;
+        if (modelCapabilities && typeof modelCapabilities === 'object' && modelCapabilities[selectedModel]) {
+            return modelCapabilities[selectedModel];
+        }
         const visionModels = Array.isArray(this.config.vision_models) ? this.config.vision_models : [];
-        return visionModels.includes(selectedModel);
+        return {
+            supports_images: visionModels.includes(selectedModel),
+            supports_attachments: true,
+            supports_tools: false,
+        };
     }
 
-    updateImageAttachmentUI() {
-        const isVisionModel = this.isVisionModelSelected();
-        attachImageButtonElem.classList.toggle('hidden', !isVisionModel);
-        attachImageButtonElem.disabled = !isVisionModel;
-        imageInputElem.disabled = !isVisionModel;
+    selectedModelSupportsImages() {
+        return Boolean(this.getSelectedModelCapabilities()?.supports_images);
+    }
 
-        if (!isVisionModel && this.pendingImages.length > 0) {
+    selectedModelSupportsAttachments() {
+        return Boolean(this.getSelectedModelCapabilities()?.supports_attachments);
+    }
+
+    updateAttachmentUI() {
+        const supportsImages = this.selectedModelSupportsImages();
+        const supportsAttachments = this.selectedModelSupportsAttachments();
+        attachImageButtonElem.classList.toggle('hidden', !supportsImages);
+        attachImageButtonElem.disabled = !supportsImages;
+        imageInputElem.disabled = !supportsImages;
+        attachFileButtonElem.classList.toggle('hidden', !supportsAttachments);
+        attachFileButtonElem.disabled = !supportsAttachments;
+        attachmentInputElem.disabled = !supportsAttachments;
+
+        if (!supportsImages && this.pendingImages.length > 0) {
             this.clearPendingImages();
+        }
+        if (!supportsAttachments && this.pendingAttachments.length > 0) {
+            this.clearPendingAttachments();
         }
     }
 
     updateSendButtonState() {
         const hasText = messageElem.value.trim().length > 0;
-        const hasImages = this.isVisionModelSelected() && this.pendingImages.length > 0;
-        const hasAttachments = this.pendingAttachments.length > 0;
+        const hasImages = this.selectedModelSupportsImages() && this.pendingImages.length > 0;
+        const hasAttachments = this.selectedModelSupportsAttachments() && this.pendingAttachments.length > 0;
         const canSend = !this.isStreaming && (hasText || hasImages || hasAttachments);
 
         if (canSend) {
@@ -89,44 +119,148 @@ class ConversationController {
         }
     }
 
-    renderPendingImages() {
-        if (!this.pendingImages.length) {
-            imagePreviewElem.innerHTML = '';
-            imagePreviewElem.classList.add('hidden');
+    renderPendingUploads() {
+        if (!this.pendingImages.length && !this.pendingAttachments.length) {
+            pendingUploadsElem.innerHTML = '';
+            pendingUploadsElem.classList.add('hidden');
             return;
         }
 
-        imagePreviewElem.classList.remove('hidden');
-        imagePreviewElem.innerHTML = '';
+        pendingUploadsElem.classList.remove('hidden');
+        pendingUploadsElem.innerHTML = '';
 
-        this.pendingImages.forEach((img) => {
-            const item = document.createElement('div');
-            item.className = 'image-preview-item';
+        if (this.pendingImages.length) {
+            const imagePreview = document.createElement('div');
+            imagePreview.className = 'image-preview';
 
-            const thumbnail = document.createElement('img');
-            thumbnail.className = 'image-preview-thumb';
-            thumbnail.alt = img.name;
-            thumbnail.src = img.dataUrl;
-            thumbnail.addEventListener('click', () => {
-                this.openImagePreviewModal(img.dataUrl, img.name);
+            this.pendingImages.forEach((img) => {
+                const sizeText = formatAttachmentSize(img.size);
+                const item = document.createElement('div');
+                item.className = 'upload-preview-tile';
+
+                const tileButton = document.createElement('button');
+                tileButton.type = 'button';
+                tileButton.className = 'upload-preview-open';
+                tileButton.title = `Preview ${img.name}`;
+                tileButton.setAttribute('aria-label', `Preview ${img.name}`);
+                tileButton.addEventListener('click', () => {
+                    this.openImagePreviewModal(img.dataUrl, img.name);
+                });
+
+                const thumbnail = document.createElement('img');
+                thumbnail.className = 'upload-preview-thumb';
+                thumbnail.alt = img.name;
+                thumbnail.src = img.dataUrl;
+
+                const meta = document.createElement('div');
+                meta.className = 'upload-preview-meta';
+
+                const kindElement = document.createElement('span');
+                kindElement.className = 'upload-preview-kind';
+                kindElement.textContent = 'IMAGE';
+
+                const nameElement = document.createElement('span');
+                nameElement.className = 'upload-preview-name';
+                nameElement.textContent = img.name;
+
+                meta.appendChild(kindElement);
+                meta.appendChild(nameElement);
+
+                if (sizeText) {
+                    const sizeElement = document.createElement('span');
+                    sizeElement.className = 'upload-preview-size';
+                    sizeElement.textContent = sizeText;
+                    meta.appendChild(sizeElement);
+                }
+
+                tileButton.appendChild(thumbnail);
+                tileButton.appendChild(meta);
+
+                const remove = document.createElement('button');
+                remove.type = 'button';
+                remove.className = 'image-preview-remove';
+                remove.title = `Remove ${img.name}`;
+                remove.setAttribute('aria-label', `Remove ${img.name}`);
+                remove.textContent = '×';
+                remove.addEventListener('click', () => {
+                    this.pendingImages = this.pendingImages.filter((pending) => pending.id !== img.id);
+                    this.renderPendingUploads();
+                    this.updateSendButtonState();
+                });
+
+                item.appendChild(tileButton);
+                item.appendChild(remove);
+                imagePreview.appendChild(item);
             });
 
-            const remove = document.createElement('button');
-            remove.type = 'button';
-            remove.className = 'image-preview-remove';
-            remove.title = `Remove ${img.name}`;
-            remove.setAttribute('aria-label', `Remove ${img.name}`);
-            remove.textContent = '×';
-            remove.addEventListener('click', () => {
-                this.pendingImages = this.pendingImages.filter((pending) => pending.id !== img.id);
-                this.renderPendingImages();
-                this.updateSendButtonState();
+            pendingUploadsElem.appendChild(imagePreview);
+        }
+
+        if (this.pendingAttachments.length) {
+            const attachmentPreview = document.createElement('div');
+            attachmentPreview.className = 'image-preview';
+
+            this.pendingAttachments.forEach((attachment) => {
+                const attachmentId = String(attachment?.attachment_id || '');
+                const fileName = String(attachment?.name || 'attachment');
+                const fileExtension = (fileName.split('.').pop() || 'file').slice(0, 6).toUpperCase();
+                const sizeText = formatAttachmentSize(attachment?.size_bytes);
+                const item = document.createElement('div');
+                item.className = 'upload-preview-tile';
+
+                const tileButton = document.createElement('button');
+                tileButton.type = 'button';
+                tileButton.className = 'upload-preview-open';
+                tileButton.title = `Preview ${fileName}`;
+                tileButton.setAttribute('aria-label', `Preview ${fileName}`);
+                tileButton.addEventListener('click', () => {
+                    if (!attachmentId) return;
+                    window.open(`/chat/attachment/${attachmentId}/preview`, '_blank', 'noopener');
+                });
+
+                const extensionElement = document.createElement('span');
+                extensionElement.className = 'upload-preview-kind';
+                extensionElement.textContent = fileExtension;
+
+                const nameElement = document.createElement('span');
+                nameElement.className = 'upload-preview-name';
+                nameElement.textContent = fileName;
+
+                const meta = document.createElement('div');
+                meta.className = 'upload-preview-meta';
+                meta.appendChild(extensionElement);
+                meta.appendChild(nameElement);
+
+                if (sizeText) {
+                    const sizeElement = document.createElement('span');
+                    sizeElement.className = 'upload-preview-size';
+                    sizeElement.textContent = sizeText;
+                    meta.appendChild(sizeElement);
+                }
+
+                tileButton.appendChild(meta);
+
+                const remove = document.createElement('button');
+                remove.type = 'button';
+                remove.className = 'image-preview-remove';
+                remove.title = `Remove ${fileName}`;
+                remove.setAttribute('aria-label', `Remove ${fileName}`);
+                remove.textContent = '×';
+                remove.addEventListener('click', () => {
+                    this.pendingAttachments = this.pendingAttachments.filter(
+                        (pending) => String(pending.attachment_id) !== attachmentId,
+                    );
+                    this.renderPendingUploads();
+                    this.updateSendButtonState();
+                });
+
+                item.appendChild(tileButton);
+                item.appendChild(remove);
+                attachmentPreview.appendChild(item);
             });
 
-            item.appendChild(thumbnail);
-            item.appendChild(remove);
-            imagePreviewElem.appendChild(item);
-        });
+            pendingUploadsElem.appendChild(attachmentPreview);
+        }
     }
 
     openImagePreviewModal(dataUrl, name) {
@@ -141,44 +275,19 @@ class ConversationController {
         this.pendingImages = [];
         imageInputElem.value = '';
         this.closeImagePreviewModal();
-        this.renderPendingImages();
+        this.renderPendingUploads();
         this.updateSendButtonState();
-    }
-
-    renderPendingAttachments() {
-        if (!this.pendingAttachments.length) {
-            attachmentPreviewElem.innerHTML = '';
-            attachmentPreviewElem.classList.add('hidden');
-            return;
-        }
-
-        attachmentPreviewElem.classList.remove('hidden');
-        attachmentPreviewElem.innerHTML = '';
-        const preview = this.view.createMessageAttachments(
-            this.pendingAttachments,
-            true,
-            (attachmentId) => {
-                this.pendingAttachments = this.pendingAttachments.filter(
-                    (pending) => String(pending.attachment_id) !== String(attachmentId),
-                );
-                this.renderPendingAttachments();
-                this.updateSendButtonState();
-            },
-        );
-        if (preview) {
-            attachmentPreviewElem.appendChild(preview);
-        }
     }
 
     clearPendingAttachments() {
         this.pendingAttachments = [];
         attachmentInputElem.value = '';
-        this.renderPendingAttachments();
+        this.renderPendingUploads();
         this.updateSendButtonState();
     }
 
     async handleImageSelection(files) {
-        if (!this.isVisionModelSelected()) {
+        if (!this.selectedModelSupportsImages()) {
             this.clearPendingImages();
             imageInputElem.value = '';
             Flash.setMessage('The selected model does not support image inputs.', 'notice');
@@ -215,11 +324,18 @@ class ConversationController {
 
         this.pendingImages = this.pendingImages.concat(newImages);
         imageInputElem.value = '';
-        this.renderPendingImages();
+        this.renderPendingUploads();
         this.updateSendButtonState();
     }
 
     async handleAttachmentSelection(files) {
+        if (!this.selectedModelSupportsAttachments()) {
+            this.clearPendingAttachments();
+            attachmentInputElem.value = '';
+            Flash.setMessage('The selected model does not support file attachments.', 'notice');
+            return;
+        }
+
         const selectedFiles = Array.from(files || []);
         if (!selectedFiles.length) return;
 
@@ -238,7 +354,7 @@ class ConversationController {
         }
 
         attachmentInputElem.value = '';
-        this.renderPendingAttachments();
+        this.renderPendingUploads();
         this.updateSendButtonState();
     }
 
@@ -262,7 +378,7 @@ class ConversationController {
         });
 
         attachImageButtonElem.addEventListener('click', () => {
-            if (!this.isVisionModelSelected()) {
+            if (!this.selectedModelSupportsImages()) {
                 Flash.setMessage('The selected model does not support image inputs.', 'notice');
                 return;
             }
@@ -270,12 +386,16 @@ class ConversationController {
         });
 
         attachFileButtonElem.addEventListener('click', () => {
+            if (!this.selectedModelSupportsAttachments()) {
+                Flash.setMessage('The selected model does not support file attachments.', 'notice');
+                return;
+            }
             attachmentInputElem.click();
         });
 
         if (selectModelElem) {
             selectModelElem.addEventListener('change', () => {
-                this.updateImageAttachmentUI();
+                this.updateAttachmentUI();
                 this.updateSendButtonState();
             });
         }
@@ -381,8 +501,8 @@ class ConversationController {
     }
 
     validateUserMessage(userMessage) {
-        const hasImages = this.isVisionModelSelected() && this.pendingImages.length > 0;
-        const hasAttachments = this.pendingAttachments.length > 0;
+        const hasImages = this.selectedModelSupportsImages() && this.pendingImages.length > 0;
+        const hasAttachments = this.selectedModelSupportsAttachments() && this.pendingAttachments.length > 0;
         return !!(this.isStreaming === false && (userMessage || hasImages || hasAttachments));
     }
 
@@ -403,15 +523,17 @@ class ConversationController {
         try {
             await this.auth.ensure();
             const userMessage = messageElem.value.trim();
-            const images = this.isVisionModelSelected()
+            const images = this.selectedModelSupportsImages()
                 ? this.pendingImages.map((img) => ({ data_url: img.dataUrl }))
                 : [];
-            const attachments = this.pendingAttachments.map((attachment) => ({
-                attachment_id: attachment.attachment_id,
-                name: attachment.name,
-                content_type: attachment.content_type,
-                size_bytes: attachment.size_bytes,
-            }));
+            const attachments = this.selectedModelSupportsAttachments()
+                ? this.pendingAttachments.map((attachment) => ({
+                    attachment_id: attachment.attachment_id,
+                    name: attachment.name,
+                    content_type: attachment.content_type,
+                    size_bytes: attachment.size_bytes,
+                }))
+                : [];
             if (!this.validateUserMessage(userMessage)) return;
             const message = { role: 'user', content: userMessage, images: images, attachments };
             const attachmentSummary = attachments.length

@@ -41,6 +41,7 @@ def test_basic_routes():
         data = response.json()
         assert "default_model" in data
         assert "vision_models" in data
+        assert "model_capabilities" in data
         print("✓ Config endpoint works")
 
         # Test models list endpoint

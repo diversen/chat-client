@@ -429,6 +429,37 @@ class TestChatEndpoints(BaseTestCase):
         assert "tool_calls_collapsed_by_default" in data
         assert "system_message_models" in data
         assert "vision_models" in data
+        assert "model_capabilities" in data
+        assert isinstance(data["model_capabilities"], dict)
+
+    @patch("chat_client.endpoints.chat_endpoints.TOOL_MODELS", ["tool-model"])
+    @patch("chat_client.endpoints.chat_endpoints.VISION_MODELS", ["vision-model"])
+    @patch(
+        "chat_client.endpoints.chat_endpoints.MODELS",
+        {"vision-model": {"provider": "x"}, "tool-model": {"provider": "x"}, "combo-model": {"provider": "x"}},
+    )
+    def test_config_endpoint_includes_model_capabilities(self):
+        response = self.client.get("/config")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["model_capabilities"] == {
+            "vision-model": {
+                "supports_images": True,
+                "supports_tools": False,
+                "supports_attachments": False,
+            },
+            "tool-model": {
+                "supports_images": False,
+                "supports_tools": True,
+                "supports_attachments": True,
+            },
+            "combo-model": {
+                "supports_images": False,
+                "supports_tools": False,
+                "supports_attachments": False,
+            },
+        }
 
     def test_list_models(self):
         """Test GET /list (available models)"""
@@ -732,6 +763,8 @@ class TestChatEndpoints(BaseTestCase):
         assert data["error"] is True
 
     @patch("chat_client.endpoints.chat_endpoints.VISION_MODELS", ["test-model"])
+    @patch("chat_client.endpoints.chat_endpoints.TOOL_MODELS", ["test-model"])
+    @patch("chat_client.endpoints.chat_endpoints.MODELS", {"test-model": {"provider": "x"}})
     @patch("chat_client.repositories.attachment_repository.get_attachments")
     @patch("chat_client.repositories.chat_repository.create_message")
     @patch("chat_client.core.user_session.is_logged_in")
@@ -773,6 +806,8 @@ class TestChatEndpoints(BaseTestCase):
         )
         mock_get_attachments.assert_called_once_with(1, [7])
 
+    @patch("chat_client.endpoints.chat_endpoints.TOOL_MODELS", ["test-model"])
+    @patch("chat_client.endpoints.chat_endpoints.MODELS", {"test-model": {"provider": "x"}})
     @patch("chat_client.repositories.attachment_repository.get_attachments")
     @patch("chat_client.repositories.chat_repository.create_message")
     @patch("chat_client.core.user_session.is_logged_in")
@@ -812,6 +847,54 @@ class TestChatEndpoints(BaseTestCase):
         )
 
         assert response.status_code == 401
+
+    @patch("chat_client.repositories.attachment_repository.get_attachment")
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_preview_attachment_serves_html_as_plain_text(self, mock_logged_in, mock_get_attachment, tmp_path):
+        mock_logged_in.return_value = 1
+        html_path = tmp_path / "sample.html"
+        html_path.write_text("<h1>Hello</h1>", encoding="utf-8")
+        mock_get_attachment.return_value = {
+            "attachment_id": 7,
+            "name": "sample.html",
+            "content_type": "text/html",
+            "size_bytes": 14,
+            "storage_path": str(html_path),
+        }
+
+        response = self.client.get("/chat/attachment/7/preview")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("text/plain")
+        assert "<h1>Hello</h1>" in response.text
+
+    @patch("chat_client.repositories.attachment_repository.get_attachment")
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_preview_attachment_serves_images_inline(self, mock_logged_in, mock_get_attachment, tmp_path):
+        mock_logged_in.return_value = 1
+        image_path = tmp_path / "sample.png"
+        image_path.write_bytes(
+            b"\x89PNG\r\n\x1a\n"
+            b"\x00\x00\x00\rIHDR"
+            b"\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02\x00\x00\x00"
+            b"\x90wS\xde"
+            b"\x00\x00\x00\x0cIDAT\x08\x99c```\x00\x00\x00\x04\x00\x01"
+            b"\xf6\x178U"
+            b"\x00\x00\x00\x00IEND\xaeB`\x82"
+        )
+        mock_get_attachment.return_value = {
+            "attachment_id": 8,
+            "name": "sample.png",
+            "content_type": "image/png",
+            "size_bytes": image_path.stat().st_size,
+            "storage_path": str(image_path),
+        }
+
+        response = self.client.get("/chat/attachment/8/preview")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"].startswith("image/png")
+        assert response.headers["content-disposition"].startswith("inline;")
 
     @patch("chat_client.endpoints.chat_endpoints.attachment_service.build_attachment_storage_path")
     @patch("chat_client.repositories.attachment_repository.get_attachment")
@@ -871,6 +954,27 @@ class TestChatEndpoints(BaseTestCase):
         data = response.json()
         assert data["error"] is True
         assert "does not support image inputs" in data["message"]
+
+    @patch("chat_client.endpoints.chat_endpoints.TOOL_MODELS", [])
+    @patch("chat_client.endpoints.chat_endpoints.MODELS", {"test-model": {"provider": "x"}})
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_create_message_rejects_attachments_for_model_without_attachment_support(self, mock_logged_in):
+        mock_logged_in.return_value = 1
+
+        response = self.client.post(
+            "/chat/create-message/test-dialog",
+            json={
+                "content": "Use attached file",
+                "role": "user",
+                "model": "test-model",
+                "attachments": [{"attachment_id": 7, "name": "notes.txt", "content_type": "text/plain", "size_bytes": 5}],
+            },
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert data["error"] is True
+        assert "does not support file attachments" in data["message"]
 
     @patch("chat_client.core.user_session.is_logged_in")
     def test_get_dialog_not_authenticated(self, mock_logged_in):

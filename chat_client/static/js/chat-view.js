@@ -318,12 +318,15 @@ function tryParseJson(value) {
     }
 }
 
-function appendLabeledPre(container, label, value) {
+function appendLabeledPre(container, label, value, preClassName = '') {
     const labelElement = document.createElement('p');
     labelElement.innerHTML = `<strong>${label}:</strong>`;
     container.appendChild(labelElement);
 
     const pre = document.createElement('pre');
+    if (preClassName) {
+        pre.classList.add(preClassName);
+    }
     pre.textContent = value;
     container.appendChild(pre);
 }
@@ -401,7 +404,7 @@ function renderPythonToolCallMeta(metadata, payload) {
         return;
     }
 
-    appendLabeledPre(metadata, 'Result', payload.resultContent);
+    appendLabeledPre(metadata, 'Result', payload.resultContent, 'tool-call-result');
 }
 
 const TOOL_META_RENDERERS = {

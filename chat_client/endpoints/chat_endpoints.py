@@ -1,14 +1,16 @@
 import asyncio
+from html import escape
 import time
 import json
 import logging
 import uuid
+from pathlib import Path
 from typing import Any
 
 import data.config as config
 from openai import OpenAI
 from starlette.requests import Request
-from starlette.responses import StreamingResponse, JSONResponse, RedirectResponse
+from starlette.responses import StreamingResponse, JSONResponse, RedirectResponse, FileResponse, PlainTextResponse
 
 from chat_client.core import base_context
 from chat_client.core import attachments as attachment_service
@@ -109,6 +111,51 @@ def _resolve_tool_models() -> list[str]:
     if TOOL_MODELS:
         return TOOL_MODELS
     return []
+
+
+def _build_model_capabilities() -> dict[str, dict[str, bool]]:
+    vision_models = set(VISION_MODELS if isinstance(VISION_MODELS, list) else [])
+    tool_models = set(_resolve_tool_models())
+    capabilities: dict[str, dict[str, bool]] = {}
+    for model_name in MODELS.keys():
+        supports_images = model_name in vision_models
+        supports_tools = model_name in tool_models
+        capabilities[model_name] = {
+            "supports_images": supports_images,
+            "supports_tools": supports_tools,
+            "supports_attachments": supports_tools,
+        }
+    return capabilities
+
+
+def _supports_model_images(model_name: str) -> bool:
+    return bool(_build_model_capabilities().get(model_name, {}).get("supports_images"))
+
+
+def _supports_model_attachments(model_name: str) -> bool:
+    return bool(_build_model_capabilities().get(model_name, {}).get("supports_attachments"))
+
+
+def _attachment_preview_is_image(content_type: str, suffix: str) -> bool:
+    normalized = str(content_type or "").strip().lower()
+    return normalized.startswith("image/") or suffix in {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+
+
+def _attachment_preview_is_text(content_type: str, suffix: str) -> bool:
+    normalized = str(content_type or "").strip().lower()
+    if normalized in {
+        "text/plain",
+        "text/markdown",
+        "text/csv",
+        "application/json",
+        "application/x-python-code",
+        "text/x-python",
+        "application/xml",
+        "text/xml",
+        "text/html",
+    }:
+        return True
+    return suffix in {".txt", ".md", ".markdown", ".csv", ".json", ".py", ".yaml", ".yml", ".log", ".xml", ".html", ".htm"}
 
 
 async def chat_page(request: Request):
@@ -631,6 +678,50 @@ async def upload_attachment(request: Request):
         return json_error("Error uploading attachment", status_code=500)
 
 
+async def preview_attachment(request: Request):
+    try:
+        user_id_or_response = await get_user_id_or_redirect(
+            request,
+            notice="You must be logged in to preview attachments",
+        )
+        if not isinstance(user_id_or_response, int):
+            return user_id_or_response
+
+        attachment_id = int(request.path_params.get("attachment_id", 0))
+        attachment = await attachment_repository.get_attachment(user_id_or_response, attachment_id)
+        storage_path = Path(str(attachment.get("storage_path", "") or "")).expanduser()
+        if not storage_path.is_file():
+            return json_error("Attachment file was not found on disk.", status_code=404)
+
+        filename = str(attachment.get("name", "") or storage_path.name)
+        content_type = str(attachment.get("content_type", "") or "").strip().lower()
+        suffix = storage_path.suffix.lower()
+
+        if _attachment_preview_is_image(content_type, suffix):
+            response = FileResponse(str(storage_path), media_type=content_type or None, filename=filename)
+            response.headers["Content-Disposition"] = f'inline; filename="{escape(filename, quote=True)}"'
+            return response
+
+        if _attachment_preview_is_text(content_type, suffix):
+            text_content = storage_path.read_text(encoding="utf-8", errors="replace")
+            return PlainTextResponse(text_content, media_type="text/plain")
+
+        response = FileResponse(
+            str(storage_path),
+            media_type=content_type or "application/octet-stream",
+            filename=filename,
+        )
+        response.headers["Content-Disposition"] = f'attachment; filename="{escape(filename, quote=True)}"'
+        return response
+    except exceptions_validation.UserValidate as e:
+        return json_error(str(e), status_code=404)
+    except ValueError:
+        return json_error("Attachment id is invalid.", status_code=400)
+    except Exception:
+        logger.exception("Error previewing attachment")
+        return json_error("Error previewing attachment", status_code=500)
+
+
 async def config_(request: Request):
     """
     GET frontend configuration
@@ -641,6 +732,7 @@ async def config_(request: Request):
         "tool_calls_collapsed_by_default": TOOL_CALLS_COLLAPSED_BY_DEFAULT,
         "system_message_models": SYSTEM_MESSAGE_MODELS,
         "vision_models": VISION_MODELS,
+        "model_capabilities": _build_model_capabilities(),
     }
 
     return JSONResponse(config_values)
@@ -692,8 +784,14 @@ async def create_message(request: Request):
             selected_model = payload.model.strip()
             if not selected_model:
                 raise exceptions_validation.UserValidate("Model is required when attaching images")
-            if selected_model not in VISION_MODELS:
+            if not _supports_model_images(selected_model):
                 raise exceptions_validation.UserValidate(chat_service.IMAGE_MODALITY_ERROR_MESSAGE)
+        if payload.role == "user" and payload.attachments:
+            selected_model = payload.model.strip()
+            if not selected_model:
+                raise exceptions_validation.UserValidate("Model is required when attaching files")
+            if not _supports_model_attachments(selected_model):
+                raise exceptions_validation.UserValidate("The selected model does not support file attachments.")
         if payload.attachments:
             await attachment_repository.get_attachments(
                 user_id,
