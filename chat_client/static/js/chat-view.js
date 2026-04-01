@@ -533,12 +533,36 @@ function createAssistantSegmentShell(messageId = null, initialKind = 'Thinking',
 function createChatView({ config, renderStreamedResponseText, updateContentDiff }) {
     const toolCallsCollapsedByDefault = Boolean(config?.tool_calls_collapsed_by_default ?? true);
     const toolCallsOpenByDefault = !toolCallsCollapsedByDefault;
-    const getSegmentDefaultOpen = (kind) => {
-        const segmentKind = String(kind || '').toLowerCase();
-        if (segmentKind === 'answer') return true;
-        if (segmentKind === 'thinking') return false;
-        if (segmentKind === 'tool') return toolCallsOpenByDefault;
-        return true;
+    const getSegmentKindKey = (kind) => String(kind || '').toLowerCase();
+    const getSegmentBehavior = (kind) => {
+        const segmentKind = getSegmentKindKey(kind);
+        return {
+            kind: segmentKind,
+            isCollapsible: segmentKind === 'thinking' || segmentKind === 'answer' || segmentKind === 'tool',
+            defaultOpen: segmentKind === 'answer'
+                ? true
+                : segmentKind === 'tool'
+                    ? toolCallsOpenByDefault
+                    : false,
+        };
+    };
+    const setupCollapsibleSegment = (segment, bodyElement, kind, openState) => {
+        const behavior = getSegmentBehavior(kind);
+        if (!behavior.isCollapsible || !bodyElement) {
+            return null;
+        }
+
+        segment.setCollapsible(openState);
+        const syncVisibility = () => {
+            const isExpanded = String(segment.segmentHeader.getAttribute('aria-expanded') || '').toLowerCase() === 'true';
+            bodyElement.classList.toggle('hidden', !isExpanded);
+        };
+        syncVisibility();
+        bindToggleControl(segment.segmentHeader, bodyElement, behavior.kind);
+        return {
+            behavior,
+            syncVisibility,
+        };
     };
 
     resetMessageInputHeight();
@@ -585,21 +609,19 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                 const safeText = String(text || '');
                 if (!safeText.trim()) return null;
                 const segment = createAssistantSegmentShell(messageId, kind, false);
-                const segmentKind = String(kind || '').toLowerCase();
+                const behavior = getSegmentBehavior(kind);
                 segmentIndex += 1;
                 segment.setSegmentIndex(segmentIndex);
                 turnContentElement.appendChild(segment.container);
                 await renderStreamedResponseText(segment.contentElement, safeText);
-                if (segmentKind === 'thinking' || segmentKind === 'answer') {
+                if (behavior.isCollapsible) {
                     const isOpen = typeof segmentOpenStates[segmentStateIndex] === 'boolean'
                         ? segmentOpenStates[segmentStateIndex]
-                        : getSegmentDefaultOpen(segmentKind);
+                        : behavior.defaultOpen;
                     segmentStateIndex += 1;
-                    segment.setCollapsible(isOpen);
-                    segment.contentElement.classList.toggle('hidden', !isOpen);
-                    bindToggleControl(segment.segmentHeader, segment.contentElement, segmentKind);
+                    setupCollapsibleSegment(segment, segment.contentElement, behavior.kind, isOpen);
                 }
-                if (kind === 'Answer') {
+                if (behavior.kind === 'answer') {
                     renderCopyMessageButton(segment.container, safeText);
                     await addCopyButtons(segment.contentElement, config);
                 }
@@ -611,12 +633,12 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                 segmentIndex += 1;
                 segment.setSegmentIndex(segmentIndex);
                 turnContentElement.appendChild(segment.container);
+                const behavior = getSegmentBehavior('tool');
                 const segmentIsOpen = segmentOpenStates[segmentStateIndex];
                 segmentStateIndex += 1;
-                const openByDefault = typeof segmentIsOpen === 'boolean' ? segmentIsOpen : getSegmentDefaultOpen('tool');
+                const openByDefault = typeof segmentIsOpen === 'boolean' ? segmentIsOpen : behavior.defaultOpen;
                 const toolElement = createEmbeddedToolCallElement(toolPayload, openByDefault);
-                segment.setCollapsible(openByDefault);
-                bindToggleControl(segment.segmentHeader, toolElement.querySelector('.tool-call-body'), 'tool');
+                setupCollapsibleSegment(segment, toolElement.querySelector('.tool-call-body'), behavior.kind, openByDefault);
                 segment.contentElement.appendChild(toolElement);
                 return segment;
             };
@@ -690,19 +712,17 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
 
             const createTextSegment = (kind, showLoader = false) => {
                 const segment = createAssistantSegmentShell(null, kind, showLoader);
-                const segmentKind = String(kind || '').toLowerCase();
+                const behavior = getSegmentBehavior(kind);
                 segmentIndex += 1;
                 segment.setSegmentIndex(segmentIndex);
-                const isCollapsibleTextSegment = segmentKind === 'thinking' || segmentKind === 'answer';
-                const syncSegmentVisibility = () => {
-                    if (!isCollapsibleTextSegment) return;
-                    const isExpanded = String(segment.segmentHeader.getAttribute('aria-expanded') || '').toLowerCase() === 'true';
-                    segment.contentElement.classList.toggle('hidden', !isExpanded);
-                };
-                if (isCollapsibleTextSegment) {
-                    segment.setCollapsible(getSegmentDefaultOpen(segmentKind));
-                    syncSegmentVisibility();
-                    bindToggleControl(segment.segmentHeader, segment.contentElement, segmentKind);
+                const collapsibleState = setupCollapsibleSegment(
+                    segment,
+                    segment.contentElement,
+                    behavior.kind,
+                    behavior.defaultOpen,
+                );
+                if (!collapsibleState) {
+                    throw new Error(`Expected collapsible state for segment kind: ${behavior.kind}`);
                 }
 
                 const hiddenContentElem = document.createElement('div');
@@ -734,7 +754,7 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                                 pendingForceRender = false;
                                 const beforeBaseScrollHeight = lastBaseScrollHeight;
                                 await updateContentDiff(segment.contentElement, hiddenContentElem, streamedResponseText, force);
-                                syncSegmentVisibility();
+                                collapsibleState.syncVisibility();
                                 syncScrollAfterRender(beforeBaseScrollHeight);
                             }
                         } finally {

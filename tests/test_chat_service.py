@@ -69,10 +69,12 @@ class DummyStream:
         self.closed = True
 
 
-def _chunk(content: str | None = "", finish_reason=None, tool_calls=None):
+def _chunk(content: str | None = "", finish_reason=None, tool_calls=None, reasoning: str | None = None):
     delta_payload = {}
     if content is not None:
         delta_payload["content"] = content
+    if reasoning is not None:
+        delta_payload["reasoning"] = reasoning
     if tool_calls is not None:
         serialized_tool_calls = []
         for tool_call in tool_calls:
@@ -92,7 +94,7 @@ def _chunk(content: str | None = "", finish_reason=None, tool_calls=None):
     return SimpleNamespace(
         choices=[
             SimpleNamespace(
-                delta=SimpleNamespace(content=content, tool_calls=tool_calls),
+                delta=SimpleNamespace(content=content, tool_calls=tool_calls, reasoning=reasoning),
                 finish_reason=finish_reason,
             )
         ],
@@ -316,6 +318,80 @@ def test_chat_response_stream_tools_model_without_tool_calls_streams_on_first_ca
     assert len(chunks) == 1
     assert "streamed final" in chunks[0]
     assert final_stream.closed is True
+
+
+def test_chat_response_stream_retries_once_for_reasoning_only_incomplete_stream():
+    first_stream = DummyStream([_chunk("", reasoning="Thinking")])
+    second_stream = DummyStream([_chunk("final answer", finish_reason="stop")])
+    create_calls = []
+
+    def _create(**kwargs):
+        create_calls.append(kwargs)
+        return first_stream if len(create_calls) == 1 else second_stream
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=_create)))
+    request = DummyRequest(disconnected_after_calls=999)
+
+    async def _run():
+        chunks = []
+        async for chunk in chat_service.chat_response_stream(
+            request,
+            messages=[{"role": "user", "content": "hello"}],
+            model="test-model",
+            openai_client_cls=lambda **_: client,
+            provider_info_resolver=lambda _model: {},
+            tool_models=[],
+            tools_loader=lambda: [],
+            tool_executor=lambda _tool_call: "",
+            logger=logging.getLogger("test"),
+        ):
+            chunks.append(chunk)
+        return chunks
+
+    chunks = asyncio.run(_run())
+
+    assert len(create_calls) == 2
+    assert any('"reasoning": "Thinking"' in chunk for chunk in chunks)
+    assert any("final answer" in chunk for chunk in chunks)
+    assert not any(chat_service.INCOMPLETE_STREAM_ERROR_MESSAGE in chunk for chunk in chunks)
+    assert first_stream.closed is True
+    assert second_stream.closed is True
+
+
+def test_chat_response_stream_returns_error_after_second_reasoning_only_incomplete_stream():
+    first_stream = DummyStream([_chunk("", reasoning="Thinking")])
+    second_stream = DummyStream([_chunk("", reasoning="Still thinking")])
+    create_calls = []
+
+    def _create(**kwargs):
+        create_calls.append(kwargs)
+        return first_stream if len(create_calls) == 1 else second_stream
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=_create)))
+    request = DummyRequest(disconnected_after_calls=999)
+
+    async def _run():
+        chunks = []
+        async for chunk in chat_service.chat_response_stream(
+            request,
+            messages=[{"role": "user", "content": "hello"}],
+            model="test-model",
+            openai_client_cls=lambda **_: client,
+            provider_info_resolver=lambda _model: {},
+            tool_models=[],
+            tools_loader=lambda: [],
+            tool_executor=lambda _tool_call: "",
+            logger=logging.getLogger("test"),
+        ):
+            chunks.append(chunk)
+        return chunks
+
+    chunks = asyncio.run(_run())
+
+    assert len(create_calls) == 2
+    assert any(chat_service.INCOMPLETE_STREAM_ERROR_MESSAGE in chunk for chunk in chunks)
+    assert first_stream.closed is True
+    assert second_stream.closed is True
 
 
 def test_chat_response_stream_respects_configured_max_chat_loop_rounds():

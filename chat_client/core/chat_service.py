@@ -19,6 +19,7 @@ ASSISTANT_LOG_TEXT_PREVIEW_LIMIT = 64
 TOOL_ARGUMENTS_LOG_TEXT_PREVIEW_LIMIT = 64
 TOOL_RESULT_LOG_TEXT_PREVIEW_LIMIT = 128
 THINKING_TAG_PATTERN = re.compile(r"</?(?:think|thinking|thought)>", re.IGNORECASE)
+INCOMPLETE_STREAM_ERROR_MESSAGE = "The model ended the stream without producing an answer. Please try again."
 
 
 class ToolExecutionError(Exception):
@@ -48,6 +49,12 @@ class ToolArgumentsError(ToolExecutionError):
 class ToolBackendError(ToolExecutionError):
     """
     Raised when a backend fails while executing a tool.
+    """
+
+
+class IncompleteStreamError(Exception):
+    """
+    Raised when the provider ends a stream without a terminal result.
     """
 
 
@@ -638,6 +645,7 @@ async def chat_response_stream(
 
         tools_enabled = model in tool_models
         tool_definitions = tools_loader() if tools_enabled else []
+        incomplete_stream_retry_attempted = False
 
         rounds = 0
         while True:
@@ -825,6 +833,29 @@ async def chat_response_stream(
                     last_chunk_summary=last_chunk_summary or {},
                     **base_log_context,
                 )
+            stream_incomplete = (
+                chunk_count > 0
+                and finish_reason is None
+                and assistant_summary["content_chars"] == 0
+                and not tool_calls
+            )
+            if stream_incomplete:
+                if not incomplete_stream_retry_attempted:
+                    incomplete_stream_retry_attempted = True
+                    _log_event(
+                        logger,
+                        logging.WARNING,
+                        "chat.model.incomplete_stream.retry",
+                        round=rounds,
+                        chunk_count=chunk_count,
+                        chunks_with_choices=chunks_with_choices,
+                        chunks_with_delta=chunks_with_delta,
+                        first_chunk_summary=first_chunk_summary or {},
+                        last_chunk_summary=last_chunk_summary or {},
+                        **base_log_context,
+                    )
+                    continue
+                raise IncompleteStreamError(INCOMPLETE_STREAM_ERROR_MESSAGE)
             if tool_calls:
                 _log_event(
                     logger,
@@ -911,6 +942,15 @@ async def chat_response_stream(
         _log_event(logger, logging.ERROR, "chat.stream.openai_error", error_message=str(error), **base_log_context)
         logger.exception("OpenAI error")
         yield f"data: {json.dumps({'error': map_openai_error_message(error)})}\n\n"
+    except IncompleteStreamError as error:
+        _log_event(
+            logger,
+            logging.ERROR,
+            "chat.stream.incomplete_output",
+            error_message=str(error),
+            **base_log_context,
+        )
+        yield f"data: {json.dumps({'error': str(error)})}\n\n"
     except Exception as error:
         _log_event(
             logger,
