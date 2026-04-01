@@ -53,6 +53,19 @@ class TestChatEndpoints(BaseTestCase):
             "- /mnt/data/0059_cipher.txt"
         )
 
+    def test_build_user_message_text_includes_attachment_note(self):
+        from chat_client.core.chat_service import build_user_message_text
+
+        text = build_user_message_text(
+            {
+                "role": "user",
+                "content": "Read this",
+                "attachments": [{"attachment_id": 1, "name": "notes.txt"}],
+            }
+        )
+
+        assert text == "Read this\n\nAttached files available to tools:\n- /mnt/data/notes.txt"
+
     @patch("chat_client.endpoints.chat_endpoints.PROVIDERS", {"local": {"api_key": "key", "base_url": "http://x"}})
     def test_resolve_provider_info_handles_string_dict_and_unknown_models(self):
         from chat_client.endpoints.chat_endpoints import _resolve_provider_info
@@ -181,12 +194,27 @@ class TestChatEndpoints(BaseTestCase):
         assert mock_mcp_call.call_count == 1
 
     def test_attachment_mount_detection_supports_renamed_python_tool(self):
-        from chat_client.endpoints.chat_endpoints import _is_attachment_mount_tool
+        from chat_client.endpoints.chat_endpoints import _tool_uses_workspace_mount
         from chat_client.tools.python_tool import python
 
-        with patch("chat_client.endpoints.chat_endpoints.TOOL_REGISTRY", {"some_python_tool": python}):
-            assert _is_attachment_mount_tool("some_python_tool") is True
-            assert _is_attachment_mount_tool("python") is False
+        with patch(
+            "chat_client.endpoints.chat_endpoints.LOCAL_TOOL_DEFINITIONS",
+            [
+                {
+                    "name": "some_python_tool",
+                    "input_schema": {"type": "object"},
+                    "execution": {"mount_workspace": True},
+                }
+            ],
+        ):
+            assert _tool_uses_workspace_mount("some_python_tool") is True
+            assert _tool_uses_workspace_mount("python") is False
+
+        with (
+            patch("chat_client.endpoints.chat_endpoints.LOCAL_TOOL_DEFINITIONS", []),
+            patch("chat_client.endpoints.chat_endpoints.TOOL_REGISTRY", {"some_python_tool": python}),
+        ):
+            assert _tool_uses_workspace_mount("some_python_tool") is True
 
     def test_execute_tool_raises_when_no_backend_is_configured(self):
         from chat_client.core import chat_service
@@ -704,7 +732,7 @@ class TestChatEndpoints(BaseTestCase):
         assert data["error"] is True
 
     @patch("chat_client.endpoints.chat_endpoints.VISION_MODELS", ["test-model"])
-    @patch("chat_client.repositories.chat_repository.get_attachments")
+    @patch("chat_client.repositories.attachment_repository.get_attachments")
     @patch("chat_client.repositories.chat_repository.create_message")
     @patch("chat_client.core.user_session.is_logged_in")
     def test_create_message_authenticated(self, mock_logged_in, mock_create, mock_get_attachments):
@@ -745,7 +773,7 @@ class TestChatEndpoints(BaseTestCase):
         )
         mock_get_attachments.assert_called_once_with(1, [7])
 
-    @patch("chat_client.repositories.chat_repository.get_attachments")
+    @patch("chat_client.repositories.attachment_repository.get_attachments")
     @patch("chat_client.repositories.chat_repository.create_message")
     @patch("chat_client.core.user_session.is_logged_in")
     def test_create_message_validates_attachments(self, mock_logged_in, mock_create, mock_get_attachments):
@@ -786,9 +814,9 @@ class TestChatEndpoints(BaseTestCase):
         assert response.status_code == 401
 
     @patch("chat_client.endpoints.chat_endpoints.attachment_service.build_attachment_storage_path")
-    @patch("chat_client.repositories.chat_repository.get_attachment")
-    @patch("chat_client.repositories.chat_repository.update_attachment_storage_path")
-    @patch("chat_client.repositories.chat_repository.create_attachment")
+    @patch("chat_client.repositories.attachment_repository.get_attachment")
+    @patch("chat_client.repositories.attachment_repository.update_attachment_storage_path")
+    @patch("chat_client.repositories.attachment_repository.create_attachment")
     @patch("chat_client.core.user_session.is_logged_in")
     def test_upload_attachment_authenticated(
         self,

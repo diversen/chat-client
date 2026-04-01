@@ -318,38 +318,45 @@ def normalize_chat_messages(messages: list[Any]) -> list[dict[str, Any]]:
             normalized.append(message)
             continue
 
-        content = str(message.get("content", ""))
-        attachment_note = format_attachment_note(message.get("attachments", []))
-        if attachment_note:
-            content = f"{content}\n\n{attachment_note}".strip()
-        images = message.get("images", [])
-        if not isinstance(images, list) or not images:
-            normalized.append({**message, "content": content})
-            continue
-
-        content_parts: list[dict[str, Any]] = []
-        if content:
-            content_parts.append({"type": "text", "text": content})
-
-        for image in images:
-            if not isinstance(image, dict):
-                continue
-            data_url = str(image.get("data_url", "")).strip()
-            if not data_url.startswith("data:image/"):
-                continue
-            content_parts.append(
-                {
-                    "type": "image_url",
-                    "image_url": {"url": data_url},
-                }
-            )
-
-        if content_parts:
-            normalized.append({"role": "user", "content": content_parts})
-        else:
-            normalized.append({"role": "user", "content": content})
+        normalized.append(build_normalized_user_message(message))
 
     return normalized
+
+
+def build_user_message_text(message: dict[str, Any]) -> str:
+    content = str(message.get("content", ""))
+    attachment_note = format_attachment_note(message.get("attachments", []))
+    if attachment_note:
+        content = f"{content}\n\n{attachment_note}".strip()
+    return content
+
+
+def build_normalized_user_message(message: dict[str, Any]) -> dict[str, Any]:
+    content = build_user_message_text(message)
+    images = message.get("images", [])
+    if not isinstance(images, list) or not images:
+        return {**message, "content": content}
+
+    content_parts: list[dict[str, Any]] = []
+    if content:
+        content_parts.append({"type": "text", "text": content})
+
+    for image in images:
+        if not isinstance(image, dict):
+            continue
+        data_url = str(image.get("data_url", "")).strip()
+        if not data_url.startswith("data:image/"):
+            continue
+        content_parts.append(
+            {
+                "type": "image_url",
+                "image_url": {"url": data_url},
+            }
+        )
+
+    if content_parts:
+        return {"role": "user", "content": content_parts}
+    return {"role": "user", "content": content}
 
 
 def has_image_inputs(messages: list[Any]) -> bool:

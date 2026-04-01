@@ -1,4 +1,6 @@
 from chat_client.core import exceptions_validation
+from chat_client.repositories import attachment_repository
+from chat_client.repositories import image_repository
 
 from chat_client.models import Dialog, Message, Image, MessageImage, Attachment, MessageAttachment, ToolCallEvent, AssistantTurnEvent
 from chat_client.database.db_session import async_session
@@ -160,37 +162,14 @@ async def get_messages(user_id: int, dialog_id: str):
         images_by_message: dict[int, list[dict[str, str]]] = {}
         attachments_by_message: dict[int, list[dict[str, str | int]]] = {}
         if message_ids:
-            image_stmt = (
-                select(MessageImage.message_id, Image.data_url)
-                .join(Image, Image.image_id == MessageImage.image_id)
-                .where(MessageImage.message_id.in_(message_ids))
-                .order_by(MessageImage.message_image_id.asc())
+            images_by_message = await image_repository.load_message_images(
+                session,
+                message_ids=message_ids,
             )
-            image_result = await session.execute(image_stmt)
-            for message_id, data_url in image_result.all():
-                images_by_message.setdefault(message_id, []).append({"data_url": data_url})
-            attachment_stmt = (
-                select(
-                    MessageAttachment.message_id,
-                    Attachment.attachment_id,
-                    Attachment.name,
-                    Attachment.content_type,
-                    Attachment.size_bytes,
-                )
-                .join(Attachment, Attachment.attachment_id == MessageAttachment.attachment_id)
-                .where(MessageAttachment.message_id.in_(message_ids))
-                .order_by(MessageAttachment.message_attachment_id.asc())
+            attachments_by_message = await attachment_repository.load_message_attachments(
+                session,
+                message_ids=message_ids,
             )
-            attachment_result = await session.execute(attachment_stmt)
-            for message_id, attachment_id, name, content_type, size_bytes in attachment_result.all():
-                attachments_by_message.setdefault(message_id, []).append(
-                    {
-                        "attachment_id": int(attachment_id),
-                        "name": str(name),
-                        "content_type": str(content_type or ""),
-                        "size_bytes": int(size_bytes or 0),
-                    }
-                )
 
         combined_rows: list[tuple] = []
         for m in messages:
@@ -261,91 +240,6 @@ async def get_messages(user_id: int, dialog_id: str):
 
         combined_rows.sort(key=lambda row: row[0])
         return [row[1] for row in combined_rows]
-
-
-async def create_attachment(
-    user_id: int,
-    name: str,
-    content_type: str,
-    size_bytes: int,
-    storage_path: str,
-):
-    async with async_session() as session:
-        attachment = Attachment(
-            user_id=user_id,
-            name=name,
-            content_type=content_type,
-            size_bytes=size_bytes,
-            storage_path=storage_path,
-        )
-        session.add(attachment)
-        await session.commit()
-        await session.refresh(attachment)
-        return attachment.attachment_id
-
-
-async def update_attachment_storage_path(user_id: int, attachment_id: int, storage_path: str):
-    async with async_session() as session:
-        stmt = (
-            update(Attachment)
-            .where(Attachment.attachment_id == attachment_id, Attachment.user_id == user_id)
-            .values(storage_path=storage_path)
-        )
-        await session.execute(stmt)
-        await session.commit()
-
-
-async def get_attachment(user_id: int, attachment_id: int) -> dict[str, str | int]:
-    async with async_session() as session:
-        stmt = select(Attachment).where(Attachment.attachment_id == attachment_id, Attachment.user_id == user_id)
-        result = await session.execute(stmt)
-        attachment = result.scalar_one_or_none()
-        if attachment is None:
-            raise exceptions_validation.UserValidate("Attachment not found or not owned by user")
-
-        return {
-            "attachment_id": int(attachment.attachment_id or 0),
-            "name": attachment.name,
-            "content_type": attachment.content_type,
-            "size_bytes": int(attachment.size_bytes or 0),
-            "storage_path": attachment.storage_path,
-        }
-
-
-async def get_attachments(user_id: int, attachment_ids: list[int]) -> list[dict[str, str | int]]:
-    normalized_ids = []
-    for attachment_id in attachment_ids:
-        try:
-            normalized_ids.append(int(attachment_id))
-        except (TypeError, ValueError):
-            continue
-    if not normalized_ids:
-        return []
-
-    async with async_session() as session:
-        stmt = (
-            select(Attachment)
-            .where(Attachment.user_id == user_id, Attachment.attachment_id.in_(normalized_ids))
-            .order_by(Attachment.attachment_id.asc())
-        )
-        result = await session.execute(stmt)
-        attachments = result.scalars().all()
-        attachments_by_id = {
-            int(attachment.attachment_id or 0): {
-                "attachment_id": int(attachment.attachment_id or 0),
-                "name": attachment.name,
-                "content_type": attachment.content_type,
-                "size_bytes": int(attachment.size_bytes or 0),
-                "storage_path": attachment.storage_path,
-            }
-            for attachment in attachments
-        }
-
-    missing_ids = [attachment_id for attachment_id in normalized_ids if attachment_id not in attachments_by_id]
-    if missing_ids:
-        raise exceptions_validation.UserValidate("One or more attachments were not found.")
-
-    return [attachments_by_id[attachment_id] for attachment_id in normalized_ids]
 
 
 async def create_assistant_turn_events(

@@ -143,6 +143,9 @@ LOCAL_TOOL_DEFINITIONS = [
             "required": ["code"],
             "additionalProperties": False,
         },
+        "execution": {
+            "mount_workspace": True,
+        },
     },
     {
         "name": "python_insecure",
@@ -162,6 +165,9 @@ LOCAL_TOOL_DEFINITIONS = [
             },
             "required": ["code"],
             "additionalProperties": False,
+        },
+        "execution": {
+            "mount_workspace": True,
         },
     },
 ]

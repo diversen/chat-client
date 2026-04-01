@@ -20,5 +20,8 @@ BUILTIN_LOCAL_TOOL_DEFINITIONS = [
             "required": ["code"],
             "additionalProperties": False,
         },
+        "execution": {
+            "mount_workspace": True,
+        },
     },
 ]

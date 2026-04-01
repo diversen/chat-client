@@ -536,6 +536,10 @@ function createAssistantSegmentShell(messageId = null, initialKind = 'Thinking',
     contentElement.className = 'content';
     container.appendChild(contentElement);
 
+    const bodyElement = document.createElement('div');
+    bodyElement.className = 'assistant-segment-body';
+    contentElement.appendChild(bodyElement);
+
     const actionsElement = document.createElement('div');
     actionsElement.className = 'message-actions hidden';
     actionsElement.innerHTML = `
@@ -543,7 +547,7 @@ function createAssistantSegmentShell(messageId = null, initialKind = 'Thinking',
         ${copyIcon}
       </a>
     `;
-    container.appendChild(actionsElement);
+    contentElement.appendChild(actionsElement);
 
     return {
         container,
@@ -577,7 +581,8 @@ function createAssistantSegmentShell(messageId = null, initialKind = 'Thinking',
             segmentHeader.setAttribute('aria-expanded', String(Boolean(isOpen)));
             segmentHeader.title = `Show/hide ${String(initialKind || 'segment').toLowerCase()} details`;
         },
-        contentElement,
+        contentElement: bodyElement,
+        contentWrapperElement: contentElement,
         actionsElement,
     };
 }
@@ -676,7 +681,7 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                         ? segmentOpenStates[segmentStateIndex]
                         : behavior.defaultOpen;
                     segmentStateIndex += 1;
-                    setupCollapsibleSegment(segment, segment.contentElement, behavior.kind, isOpen);
+                    setupCollapsibleSegment(segment, segment.contentWrapperElement, behavior.kind, isOpen);
                 }
                 if (behavior.kind === 'answer') {
                     renderCopyMessageButton(segment.container, safeText);
@@ -774,7 +779,7 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                 segment.setSegmentIndex(segmentIndex);
                 const collapsibleState = setupCollapsibleSegment(
                     segment,
-                    segment.contentElement,
+                    segment.contentWrapperElement,
                     behavior.kind,
                     behavior.defaultOpen,
                 );
@@ -893,6 +898,12 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                     turnContentElement.appendChild(targetSegment.container);
                     const container = createEmbeddedToolCallElement(toolMessage, toolCallsOpenByDefault);
                     targetSegment.contentElement.appendChild(container);
+                    setupCollapsibleSegment(
+                        targetSegment,
+                        container.querySelector('.tool-call-body'),
+                        'tool',
+                        toolCallsOpenByDefault,
+                    );
                     const afterBaseScrollHeight = getBaseScrollHeight();
                     const consumedOnInsert = Math.max(0, afterBaseScrollHeight - beforeBaseScrollHeight);
                     consumeAnchorSpacerBy(consumedOnInsert, false);

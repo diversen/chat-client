@@ -14,8 +14,9 @@ from chat_client.core import base_context
 from chat_client.core import attachments as attachment_service
 from chat_client.core import chat_service
 from chat_client.core import mcp_client
+from chat_client.core import tool_executor
 from chat_client.core.templates import get_templates
-from chat_client.repositories import chat_repository, prompt_repository
+from chat_client.repositories import attachment_repository, chat_repository, prompt_repository
 from chat_client.core import exceptions_validation
 from chat_client.core.http import (
     parse_json_payload,
@@ -31,9 +32,6 @@ from chat_client.schemas.chat import (
     CreateMessageRequest,
     UpdateMessageRequest,
 )
-from chat_client.tools.python_tool import python as builtin_python_tool
-from chat_client.tools.python_tool import python_insecure as builtin_python_insecure_tool
-
 # Logger
 logger: logging.Logger = logging.getLogger(__name__)
 templates = get_templates()
@@ -85,63 +83,22 @@ def _has_mcp_config() -> bool:
 
 
 def _normalize_local_tool_definition(tool_definition: dict[str, Any]) -> dict[str, Any] | None:
-    if not isinstance(tool_definition, dict):
-        return None
+    return tool_executor.normalize_local_tool_definition(tool_definition, TOOL_REGISTRY)
 
-    name = tool_definition.get("name")
-    if not isinstance(name, str) or not name.strip():
-        return None
-    if name not in TOOL_REGISTRY:
-        return None
 
-    description = tool_definition.get("description", "")
-    input_schema = tool_definition.get("input_schema", {"type": "object", "properties": {}})
-    if not isinstance(input_schema, dict):
-        input_schema = {"type": "object", "properties": {}}
-
-    return {
-        "type": "function",
-        "function": {
-            "name": name,
-            "description": description if isinstance(description, str) else "",
-            "parameters": input_schema,
-        },
-    }
+def _get_local_tool_definition(name: str) -> dict[str, Any] | None:
+    return tool_executor.get_local_tool_definition(
+        name,
+        tool_registry=TOOL_REGISTRY,
+        local_tool_definitions=LOCAL_TOOL_DEFINITIONS,
+    )
 
 
 def _list_local_tools() -> list[dict[str, Any]]:
-    definitions: list[dict[str, Any]] = []
-    tools: list[dict[str, Any]] = []
-    if not _has_local_tool_registry():
-        return tools
-
-    if isinstance(LOCAL_TOOL_DEFINITIONS, list):
-        definitions = [tool for tool in LOCAL_TOOL_DEFINITIONS if isinstance(tool, dict)]
-    if definitions:
-        for definition in definitions:
-            normalized = _normalize_local_tool_definition(definition)
-            if normalized:
-                tools.append(normalized)
-        return tools
-
-    for name, function in TOOL_REGISTRY.items():
-        if not isinstance(name, str) or not name.strip():
-            continue
-        if not callable(function):
-            continue
-
-        description = getattr(function, "__doc__", "") or ""
-        tools.append(
-            {
-                "type": "function",
-                "function": {
-                    "name": name,
-                    "description": str(description).strip(),
-                    "parameters": {"type": "object", "properties": {}},
-                },
-            }
-        )
-    return tools
+    return tool_executor.list_local_tools(
+        tool_registry=TOOL_REGISTRY,
+        local_tool_definitions=LOCAL_TOOL_DEFINITIONS,
+    )
 
 
 def _resolve_tool_models() -> list[str]:
@@ -211,25 +168,49 @@ def _list_tools() -> list[dict]:
 
 
 def _find_tool_definition(name: str) -> dict[str, Any] | None:
-    if not isinstance(name, str) or not name.strip():
-        return None
-
-    for tool in _list_tools():
-        if not isinstance(tool, dict):
-            continue
-        function = tool.get("function", {})
-        if not isinstance(function, dict):
-            continue
-        if function.get("name") == name:
-            return tool
-    return None
+    return tool_executor.find_tool_definition(name, _list_tools())
 
 
-def _is_attachment_mount_tool(name: str) -> bool:
-    if not isinstance(name, str) or not name.strip():
-        return False
-    tool = TOOL_REGISTRY.get(name)
-    return tool in {builtin_python_tool, builtin_python_insecure_tool}
+def _get_local_tool_execution_options(name: str) -> dict[str, Any]:
+    return tool_executor.get_local_tool_execution_options(
+        name,
+        tool_registry=TOOL_REGISTRY,
+        local_tool_definitions=LOCAL_TOOL_DEFINITIONS,
+    )
+
+
+def _local_tool_accepts_attachment_workspace(name: str) -> bool:
+    return tool_executor.local_tool_accepts_attachment_workspace(name, TOOL_REGISTRY)
+
+
+def _tool_uses_workspace_mount(name: str) -> bool:
+    return tool_executor.tool_uses_workspace_mount(
+        name,
+        tool_registry=TOOL_REGISTRY,
+        local_tool_definitions=LOCAL_TOOL_DEFINITIONS,
+    )
+
+
+def _execute_local_tool_with_runtime_context(
+    tool_call: dict[str, Any],
+    *,
+    log_context: dict[str, Any] | None = None,
+    available_attachments: list[dict[str, Any]] | None = None,
+):
+    return tool_executor.execute_local_tool_with_runtime_context(
+        tool_call,
+        logger=logger,
+        tools=_list_tools(),
+        tool_registry=TOOL_REGISTRY,
+        local_tool_definitions=LOCAL_TOOL_DEFINITIONS,
+        has_local_tool_registry=_has_local_tool_registry(),
+        has_mcp_config=_has_mcp_config(),
+        mcp_server_url=MCP_SERVER_URL,
+        mcp_auth_token=MCP_AUTH_TOKEN,
+        mcp_timeout_seconds=MCP_TIMEOUT_SECONDS,
+        log_context=log_context,
+        available_attachments=available_attachments,
+    )
 
 
 def _build_chat_log_context(
@@ -262,64 +243,20 @@ def _execute_tool(
     log_context: dict[str, Any] | None = None,
     argument_overrides: dict[str, Any] | None = None,
 ):
-    func_name = str(tool_call.get("function", {}).get("name", "")).strip()
-    if not func_name:
-        raise chat_service.ToolArgumentsError("Tool call is missing function name.")
-
-    if not _has_local_tool_registry() and not _has_mcp_config():
-        raise chat_service.ToolNotConfiguredError(f'No tool backend is configured for tool "{func_name}".')
-
-    tool_definition = _find_tool_definition(func_name)
-    if tool_definition is None:
-        raise chat_service.ToolNotFoundError(f'Tool "{func_name}" does not exist.')
-
-    function = tool_definition.get("function", {})
-    parameters = function.get("parameters", {}) if isinstance(function, dict) else {}
-    args = chat_service.parse_tool_arguments(tool_call, logger)
-    if isinstance(parameters, dict):
-        chat_service.validate_tool_arguments(args, parameters, func_name)
-    call_args = dict(args)
-    if isinstance(argument_overrides, dict):
-        call_args.update(argument_overrides)
-
-    if _has_local_tool_registry() and func_name in TOOL_REGISTRY:
-        _log_chat_event(
-            logging.INFO,
-            "chat.tool.local.start",
-            tool_name=func_name,
-            arguments_preview=chat_service.summarize_tool_call_for_log(tool_call)["arguments_preview"],
-            **(log_context or {}),
-        )
-        try:
-            return TOOL_REGISTRY[func_name](**call_args)
-        except TypeError as error:
-            raise chat_service.ToolArgumentsError(
-                f'Tool "{func_name}" was called with invalid arguments: {error}'
-            ) from error
-        except chat_service.ToolExecutionError:
-            raise
-        except Exception as error:
-            raise chat_service.ToolBackendError(f'Tool "{func_name}" failed: {error}') from error
-    if _has_mcp_config():
-        _log_chat_event(
-            logging.INFO,
-            "chat.tool.mcp.start",
-            tool_name=func_name,
-            arguments_preview=chat_service.summarize_tool_call_for_log(tool_call)["arguments_preview"],
-            **(log_context or {}),
-        )
-        try:
-            return mcp_client.call_tool(
-                server_url=MCP_SERVER_URL,
-                auth_token=MCP_AUTH_TOKEN,
-                timeout_seconds=MCP_TIMEOUT_SECONDS,
-                name=func_name,
-                arguments=args,
-            )
-        except mcp_client.MCPClientError as error:
-            raise chat_service.ToolBackendError(f'MCP tool "{func_name}" failed: {error}') from error
-
-    raise chat_service.ToolNotConfiguredError(f'No tool backend is configured for tool "{func_name}".')
+    return tool_executor.execute_tool(
+        tool_call,
+        logger=logger,
+        tools=_list_tools(),
+        tool_registry=TOOL_REGISTRY,
+        local_tool_definitions=LOCAL_TOOL_DEFINITIONS,
+        has_local_tool_registry=_has_local_tool_registry(),
+        has_mcp_config=_has_mcp_config(),
+        mcp_server_url=MCP_SERVER_URL,
+        mcp_auth_token=MCP_AUTH_TOKEN,
+        mcp_timeout_seconds=MCP_TIMEOUT_SECONDS,
+        log_context=log_context,
+        argument_overrides=argument_overrides,
+    )
 
 
 def _serialize_tool_content(result) -> str:
@@ -524,18 +461,12 @@ async def _chat_response_stream(
         started_at = time.perf_counter()
         try:
             func_name = str(tool_call.get("function", {}).get("name", "")).strip()
-            if _is_attachment_mount_tool(func_name):
-                with attachment_service.prepare_tool_attachment_mount(tool_attachments) as (attachment_host_dir, _mounted_attachments):
-                    result = await asyncio.to_thread(
-                        _execute_tool,
-                        tool_call,
-                        log_context=log_context,
-                        argument_overrides={
-                            "attachment_host_dir": attachment_host_dir,
-                        },
-                    )
-            else:
-                result = await asyncio.to_thread(_execute_tool, tool_call, log_context=log_context)
+            result = await asyncio.to_thread(
+                _execute_local_tool_with_runtime_context,
+                tool_call,
+                log_context=log_context,
+                available_attachments=tool_attachments,
+            )
             result_text = _serialize_tool_content(result)
             return result
         except Exception as error:
@@ -615,7 +546,7 @@ async def chat_response_stream(request: Request):
             attachments = candidate.get("attachments", [])
             if not isinstance(attachments, list) or not attachments:
                 break
-            available_attachments = await chat_repository.get_attachments(
+            available_attachments = await attachment_repository.get_attachments(
                 logged_in,
                 [
                     int(attachment.get("attachment_id"))
@@ -673,7 +604,7 @@ async def upload_attachment(request: Request):
             content_type,
             size_bytes,
         )
-        attachment_id = await chat_repository.create_attachment(
+        attachment_id = await attachment_repository.create_attachment(
             user_id=user_id,
             name=safe_name,
             content_type=normalized_content_type or content_type,
@@ -686,8 +617,8 @@ async def upload_attachment(request: Request):
         storage_path = attachment_service.build_attachment_storage_path(attachment_id, safe_name)
         storage_path.parent.mkdir(parents=True, exist_ok=True)
         storage_path.write_bytes(file_bytes)
-        await chat_repository.update_attachment_storage_path(user_id, int(attachment_id), str(storage_path))
-        attachment = await chat_repository.get_attachment(user_id, int(attachment_id))
+        await attachment_repository.update_attachment_storage_path(user_id, int(attachment_id), str(storage_path))
+        attachment = await attachment_repository.get_attachment(user_id, int(attachment_id))
         return JSONResponse(attachment_service.serialize_attachment_response(attachment))
     except attachment_service.AttachmentValidationError as e:
         return json_error(str(e), status_code=400)
@@ -764,7 +695,7 @@ async def create_message(request: Request):
             if selected_model not in VISION_MODELS:
                 raise exceptions_validation.UserValidate(chat_service.IMAGE_MODALITY_ERROR_MESSAGE)
         if payload.attachments:
-            await chat_repository.get_attachments(
+            await attachment_repository.get_attachments(
                 user_id,
                 [attachment.attachment_id for attachment in payload.attachments],
             )

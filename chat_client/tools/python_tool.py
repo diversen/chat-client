@@ -1,178 +1,19 @@
-import importlib
-import os
-import subprocess
-import tempfile
-from contextlib import nullcontext
-
-from chat_client.core.attachments import resolve_tool_mount_dir
-
-MAX_CODE_LENGTH = 8_000
-DEFAULT_PYTHON_TOOL_TIMEOUT_SECONDS = 10.0
-DEFAULT_PYTHON_TOOL_DOCKER_IMAGE = "secure-python"
-NO_RESULT_ERROR = "[stderr]\nNo result produced. Please print the answer or end with an expression."
-ATTACHMENT_SOURCE_MOUNT_DIR = "/mnt/input"
-ATTACHMENT_TMPFS_SPEC = "rw,size=65m"
-
-
-def _build_runtime_prelude() -> str:
-    workspace_dir = resolve_tool_mount_dir()
-    return f"""
-import os as _chat_client_os
-import shutil as _chat_client_shutil
-from pathlib import Path as _chat_client_Path
-
-_CHAT_CLIENT_WORKSPACE_ROOT = _chat_client_Path({workspace_dir!r})
-_CHAT_CLIENT_SOURCE_ROOT = _chat_client_Path({ATTACHMENT_SOURCE_MOUNT_DIR!r})
-
-def _chat_client_populate_workspace():
-    _CHAT_CLIENT_WORKSPACE_ROOT.mkdir(parents=True, exist_ok=True)
-    if not _CHAT_CLIENT_SOURCE_ROOT.exists():
-        return
-    for child in _CHAT_CLIENT_SOURCE_ROOT.iterdir():
-        destination = _CHAT_CLIENT_WORKSPACE_ROOT / child.name
-        if child.is_dir():
-            if destination.exists():
-                _chat_client_shutil.rmtree(destination)
-            _chat_client_shutil.copytree(child, destination)
-            _chat_client_os.chmod(destination, 0o777)
-            for nested_path in destination.rglob("*"):
-                if nested_path.is_dir():
-                    _chat_client_os.chmod(nested_path, 0o777)
-                else:
-                    _chat_client_os.chmod(nested_path, 0o666)
-        else:
-            _chat_client_shutil.copy2(child, destination)
-            _chat_client_os.chmod(destination, 0o666)
-
-_chat_client_populate_workspace()
-""".strip()
-
-
-def _resolve_docker_image(docker_image: str | None) -> str:
-    image = str(docker_image or "").strip()
-    if image:
-        return image
-
-    try:
-        import data.config as config  # type: ignore
-
-        configured = str(getattr(config, "PYTHON_TOOL_DOCKER_IMAGE", "") or "").strip()
-        if configured:
-            return configured
-    except Exception:
-        pass
-
-    return DEFAULT_PYTHON_TOOL_DOCKER_IMAGE
-
-
-def _resolve_exec_timeout_seconds() -> float | None:
-    try:
-        config = importlib.import_module("data.config")
-
-        configured = getattr(config, "PYTHON_TOOL_TIMEOUT_SECONDS", DEFAULT_PYTHON_TOOL_TIMEOUT_SECONDS)
-        timeout = float(configured)
-    except Exception:
-        return DEFAULT_PYTHON_TOOL_TIMEOUT_SECONDS
-
-    if timeout < 0:
-        return DEFAULT_PYTHON_TOOL_TIMEOUT_SECONDS
-    if timeout == 0:
-        return None
-    return timeout
-
-
-def _run_in_docker(
-    code: str,
-    docker_image: str | None,
-    docker_args: list[str],
-    attachment_host_dir: str | None = None,
-) -> str:
-    try:
-        resolved_docker_image = _resolve_docker_image(docker_image)
-        timeout_seconds = _resolve_exec_timeout_seconds()
-        temp_attachment_dir_context = tempfile.TemporaryDirectory(prefix="chat-client-python-tool-empty-")
-        attachment_dir_context = (
-            nullcontext(attachment_host_dir)
-            if attachment_host_dir
-            else temp_attachment_dir_context
-        )
-        with attachment_dir_context as resolved_attachment_host_dir:
-            if not resolved_attachment_host_dir:
-                raise ValueError("attachment_host_dir is required")
-            with tempfile.NamedTemporaryFile(mode="w", suffix=".py", encoding="utf-8", delete=False) as code_file:
-                wrapped_code = f"{_build_runtime_prelude()}\n\n{code}"
-                code_file.write(wrapped_code)
-                code_file_path = code_file.name
-        os.chmod(code_file_path, 0o644)
-
-        docker_command = [
-            "docker",
-            "run",
-            *docker_args,
-            "--tmpfs",
-            f"{resolve_tool_mount_dir()}:{ATTACHMENT_TMPFS_SPEC}",
-            "-v",
-            f"{code_file_path}:/sandbox/script.py:ro",
-            "-v",
-            f"{resolved_attachment_host_dir}:{ATTACHMENT_SOURCE_MOUNT_DIR}:ro",
-        ]
-
-        completed = subprocess.run(
-            [*docker_command, resolved_docker_image, "/sandbox/script.py"],
-            text=True,
-            capture_output=True,
-            timeout=timeout_seconds,
-            check=False,
-        )
-    except FileNotFoundError:
-        return "[stderr]\nDocker is not installed or not available in PATH."
-    except subprocess.TimeoutExpired:
-        if timeout_seconds is None:
-            return "[stderr]\nExecution timed out."
-        return f"[stderr]\nExecution timed out after {timeout_seconds} seconds."
-    finally:
-        if "code_file_path" in locals():
-            try:
-                os.unlink(code_file_path)
-            except OSError:
-                pass
-
-    parts: list[str] = []
-    stdout_text = completed.stdout.rstrip()
-    stderr_text = completed.stderr.rstrip()
-    if stdout_text:
-        parts.append(stdout_text)
-    if stderr_text:
-        parts.append(f"[stderr]\n{stderr_text}")
-
-    output = "\n".join(parts).strip()
-    if not output or output == "OK":
-        return NO_RESULT_ERROR
-    return output
-
-
-def _validate_code_input(code: str) -> str | None:
-    if not isinstance(code, str):
-        return "[stderr]\nSecurityError: code must be a string."
-    if len(code) > MAX_CODE_LENGTH:
-        return f"[stderr]\nSecurityError: code exceeds max length ({MAX_CODE_LENGTH})."
-    return None
+from chat_client.tools.python_runtime import NO_RESULT_ERROR, run_python_in_docker, validate_code_input
 
 
 def python(
     code: str,
     docker_image: str | None = None,
-    attachment_ids: list[int] | None = None,
     attachment_host_dir: str | None = None,
 ) -> str:
     """
     Execute Python code in a hardened Docker container and return output/result.
     """
-    validation_error = _validate_code_input(code)
+    validation_error = validate_code_input(code)
     if validation_error:
         return validation_error
 
-    return _run_in_docker(
+    return run_python_in_docker(
         code,
         docker_image,
         [
@@ -204,17 +45,16 @@ def python(
 def python_insecure(
     code: str,
     docker_image: str | None = None,
-    attachment_ids: list[int] | None = None,
     attachment_host_dir: str | None = None,
 ) -> str:
     """
     Execute Python code in Docker with minimal restrictions for local testing.
     """
-    validation_error = _validate_code_input(code)
+    validation_error = validate_code_input(code)
     if validation_error:
         return validation_error
 
-    return _run_in_docker(
+    return run_python_in_docker(
         code,
         docker_image,
         [
