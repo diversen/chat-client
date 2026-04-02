@@ -15,6 +15,7 @@ from starlette.responses import StreamingResponse, JSONResponse, RedirectRespons
 from chat_client.core import base_context
 from chat_client.core import attachments as attachment_service
 from chat_client.core import chat_service
+from chat_client.core import config_utils
 from chat_client.core import mcp_client
 from chat_client.core import tool_executor
 from chat_client.core.templates import get_templates
@@ -54,7 +55,7 @@ CONFIGURED_TOOL_MODELS = getattr(config, "TOOL_MODELS", [])
 RESOLVED_CHAT_MAX_LOOP_ROUNDS = getattr(config, "CHAT_MAX_LOOP_ROUNDS", chat_service.DEFAULT_CHAT_MAX_LOOP_ROUNDS)
 
 # Backward-compatible aliases for existing patch points in tests and local imports.
-MODELS = CONFIGURED_MODELS
+MODELS = config_utils.resolve_models(CONFIGURED_MODELS, CONFIGURED_PROVIDERS)
 PROVIDERS = CONFIGURED_PROVIDERS
 MCP_SERVER_URL = CONFIGURED_MCP_SERVER_URL
 MCP_AUTH_TOKEN = CONFIGURED_MCP_AUTH_TOKEN

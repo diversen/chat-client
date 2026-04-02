@@ -12,6 +12,44 @@ from tests.test_base import BaseTestCase, mock_openai_client
 class TestChatEndpoints(BaseTestCase):
     """Test chat-related endpoints"""
 
+    def test_configured_models_are_resolved_with_ollama_provider_models(self):
+        from chat_client.core.config_utils import resolve_models
+
+        with patch("chat_client.core.config_utils.get_provider_models", return_value=["qwen3:latest", "phi4:latest"]):
+            resolved = resolve_models(
+                {"gpt-5-nano": "openai"},
+                {
+                    "openai": {"base_url": "https://api.openai.com/v1", "api_key": "key"},
+                    "ollama": {"base_url": "http://localhost:11434/v1", "api_key": "ollama"},
+                },
+            )
+
+        assert resolved == {
+            "gpt-5-nano": "openai",
+            "phi4:latest": "ollama",
+            "qwen3:latest": "ollama",
+        }
+
+    def test_resolve_models_ignores_missing_ollama_provider(self):
+        from chat_client.core.config_utils import resolve_models
+
+        with patch("chat_client.core.config_utils.get_provider_models") as mock_get_provider_models:
+            resolved = resolve_models({"gpt-5-nano": "openai"}, {"openai": {"base_url": "https://api.openai.com/v1"}})
+
+        assert resolved == {"gpt-5-nano": "openai"}
+        mock_get_provider_models.assert_not_called()
+
+    def test_resolve_models_returns_configured_models_when_ollama_lookup_fails(self):
+        from chat_client.core.config_utils import resolve_models
+
+        with patch("chat_client.core.config_utils.get_provider_models", side_effect=RuntimeError("offline")):
+            resolved = resolve_models(
+                {"gpt-5-nano": "openai"},
+                {"ollama": {"base_url": "http://localhost:11434/v1", "api_key": "ollama"}},
+            )
+
+        assert resolved == {"gpt-5-nano": "openai"}
+
     def test_normalize_chat_messages_with_images(self):
         """User messages with images should be converted to OpenAI content parts"""
         from chat_client.endpoints.chat_endpoints import _normalize_chat_messages

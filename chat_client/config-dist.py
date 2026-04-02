@@ -1,8 +1,6 @@
 import logging
 from pathlib import Path
-from chat_client.core.api_utils import get_provider_models
 from chat_client.tools.python_tool import python_hardened as python_hardened_tool
-from chat_client.tools.python_tool import python_relaxed as python_relaxed_tool
 
 
 # SMTP
@@ -90,19 +88,7 @@ MODELS = {
     # "gpt-5-nano": "openai",
     # "gemma-3-27b-it": "gemini",
 }
-
-# Add all ollama models to the list of models
-if "ollama" in PROVIDERS:
-    try:
-        ollama_models = get_provider_models(PROVIDERS["ollama"])
-        for ollama_model in ollama_models:
-            MODELS[ollama_model] = "ollama"
-    except Exception as e:
-        print(f"Error getting ollama provided models: {e}")
-        print("You can try to fix this by:")
-        print("a) Install and run the ollama server")
-        print("b) Edit the config.py file and remove the provider ollama")
-        exit()
+# Ollama models are discovered automatically from the configured provider at runtime.
 
 # Enable vision models (models that can process both text and images)
 VISION_MODELS: list[str] = ["ministral-3:14b"]
@@ -117,7 +103,6 @@ SYSTEM_MESSAGE_MODELS: list = ["nemotron-cascade-2:latest", "ministral-3:14b", "
 
 TOOL_REGISTRY = {
     "python_hardened": python_hardened_tool,
-    "python_relaxed": python_relaxed_tool,
 }
 
 # Optional explicit local tool definitions in MCP-style schema.
@@ -131,29 +116,6 @@ LOCAL_TOOL_DEFINITIONS = [
             "the code value is a single Python script string. Call the tool name exactly "
             'as "python_hardened". Do not invent related tool names such as "stateful_python" or '
             '"python_codeful". Return printed output or the final expression result.'
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string",
-                    "description": "Python code to execute.",
-                }
-            },
-            "required": ["code"],
-            "additionalProperties": False,
-        },
-        "execution": {
-            "mount_workspace": True,
-        },
-    },
-    {
-        "name": "python_relaxed",
-        "description": (
-            "Run Python code in a minimally restricted Docker container for local testing. "
-            'Use this tool only with a JSON object of the form {"code": "..."} where '
-            "the code value is a single Python script string. This variant does not "
-            "apply AST blocking and allows the container to use its normal network access."
         ),
         "input_schema": {
             "type": "object",
