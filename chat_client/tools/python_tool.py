@@ -1,7 +1,7 @@
 from chat_client.tools.python_runtime import NO_RESULT_ERROR, run_python_in_docker, validate_code_input
 
 
-def python(
+def python_hardened(
     code: str,
     docker_image: str | None = None,
     attachment_host_dir: str | None = None,
@@ -42,7 +42,7 @@ def python(
     )
 
 
-def python_insecure(
+def python_relaxed(
     code: str,
     docker_image: str | None = None,
     attachment_host_dir: str | None = None,

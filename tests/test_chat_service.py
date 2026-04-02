@@ -280,7 +280,7 @@ def test_chat_response_stream_ignores_tool_calls_for_non_tool_models():
                         index=0,
                         id="call_ignored",
                         type="function",
-                        function=SimpleNamespace(name="python", arguments='{"code":"print(1)"}'),
+                        function=SimpleNamespace(name="python_hardened", arguments='{"code":"print(1)"}'),
                     )
                 ],
             ),
@@ -305,12 +305,12 @@ def test_chat_response_stream_ignores_tool_calls_for_non_tool_models():
         chunks = []
         async for chunk in chat_service.chat_response_stream(
             request,
-            messages=[{"role": "user", "content": "use python"}],
+            messages=[{"role": "user", "content": "use python_hardened"}],
             model="plain-model",
             openai_client_cls=lambda **_: client,
             provider_info_resolver=lambda _model: {},
             tool_models=["tool-model"],
-            tools_loader=lambda: [{"type": "function", "function": {"name": "python"}}],
+            tools_loader=lambda: [{"type": "function", "function": {"name": "python_hardened"}}],
             tool_executor=_tool_executor,
             logger=logging.getLogger("test"),
         ):
@@ -328,23 +328,23 @@ def test_chat_response_stream_ignores_tool_calls_for_non_tool_models():
 
 
 def test_parse_tool_arguments_raises_on_invalid_json():
-    tool_call = {"function": {"name": "python", "arguments": '{"code": "print(1)"'}}
+    tool_call = {"function": {"name": "python_hardened", "arguments": '{"code": "print(1)"'}}
 
     try:
         chat_service.parse_tool_arguments(tool_call, logging.getLogger("test"))
         assert False, "Expected ToolArgumentsError"
     except chat_service.ToolArgumentsError as error:
-        assert str(error) == 'Tool "python" was called with invalid JSON arguments.'
+        assert str(error) == 'Tool "python_hardened" was called with invalid JSON arguments.'
 
 
 def test_parse_tool_arguments_requires_json_object():
-    tool_call = {"function": {"name": "python", "arguments": '["print(1)"]'}}
+    tool_call = {"function": {"name": "python_hardened", "arguments": '["print(1)"]'}}
 
     try:
         chat_service.parse_tool_arguments(tool_call, logging.getLogger("test"))
         assert False, "Expected ToolArgumentsError"
     except chat_service.ToolArgumentsError as error:
-        assert str(error) == 'Tool "python" requires JSON object arguments.'
+        assert str(error) == 'Tool "python_hardened" requires JSON object arguments.'
 
 
 def test_validate_tool_arguments_checks_required_unexpected_and_type():
@@ -358,22 +358,22 @@ def test_validate_tool_arguments_checks_required_unexpected_and_type():
     }
 
     try:
-        chat_service.validate_tool_arguments({}, schema, "python")
+        chat_service.validate_tool_arguments({}, schema, "python_hardened")
         assert False, "Expected required argument failure"
     except chat_service.ToolArgumentsError as error:
-        assert str(error) == 'Tool "python" requires argument "code".'
+        assert str(error) == 'Tool "python_hardened" requires argument "code".'
 
     try:
-        chat_service.validate_tool_arguments({"code": 1}, schema, "python")
+        chat_service.validate_tool_arguments({"code": 1}, schema, "python_hardened")
         assert False, "Expected type validation failure"
     except chat_service.ToolArgumentsError as error:
-        assert str(error) == 'Tool "python" requires argument "code" of type string.'
+        assert str(error) == 'Tool "python_hardened" requires argument "code" of type string.'
 
     try:
-        chat_service.validate_tool_arguments({"code": "print(1)", "x": 1}, schema, "python")
+        chat_service.validate_tool_arguments({"code": "print(1)", "x": 1}, schema, "python_hardened")
         assert False, "Expected unexpected argument failure"
     except chat_service.ToolArgumentsError as error:
-        assert str(error) == 'Tool "python" received unexpected arguments: "x".'
+        assert str(error) == 'Tool "python_hardened" received unexpected arguments: "x".'
 
 
 def test_chat_response_stream_tools_model_without_tool_calls_streams_on_first_call():
@@ -497,7 +497,7 @@ def test_chat_response_stream_respects_configured_max_chat_loop_rounds():
                         index=0,
                         id="call_once",
                         type="function",
-                        function=SimpleNamespace(name="python", arguments='{"code":"print(1)"}'),
+                        function=SimpleNamespace(name="python_hardened", arguments='{"code":"print(1)"}'),
                     )
                 ],
             ),
@@ -517,12 +517,12 @@ def test_chat_response_stream_respects_configured_max_chat_loop_rounds():
         chunks = []
         async for chunk in chat_service.chat_response_stream(
             request,
-            messages=[{"role": "user", "content": "use python"}],
+            messages=[{"role": "user", "content": "use python_hardened"}],
             model="tool-model",
             openai_client_cls=lambda **_: client,
             provider_info_resolver=lambda _model: {},
             tool_models=["tool-model"],
-            tools_loader=lambda: [{"type": "function", "function": {"name": "python"}}],
+            tools_loader=lambda: [{"type": "function", "function": {"name": "python_hardened"}}],
             tool_executor=lambda _tool_call: "1",
             max_chat_loop_rounds=1,
             logger=logging.getLogger("test"),
@@ -576,7 +576,7 @@ def test_chat_response_stream_keeps_tool_execution_errors_inside_chat():
             openai_client_cls=lambda **_: client,
             provider_info_resolver=lambda _model: {},
             tool_models=["tool-model"],
-            tools_loader=lambda: [{"type": "function", "function": {"name": "python"}}],
+            tools_loader=lambda: [{"type": "function", "function": {"name": "python_hardened"}}],
             tool_executor=_tool_executor,
             logger=logging.getLogger("test"),
         ):
@@ -610,7 +610,7 @@ def test_chat_response_stream_yields_tool_status_before_blocking_sync_tool_compl
                         index=0,
                         id="call_sleep",
                         type="function",
-                        function=SimpleNamespace(name="python_insecure", arguments='{"code":"import time; time.sleep(10)"}'),
+                        function=SimpleNamespace(name="python_relaxed", arguments='{"code":"import time; time.sleep(10)"}'),
                     )
                 ],
             ),
@@ -640,7 +640,7 @@ def test_chat_response_stream_yields_tool_status_before_blocking_sync_tool_compl
             openai_client_cls=lambda **_: client,
             provider_info_resolver=lambda _model: {},
             tool_models=["tool-model"],
-            tools_loader=lambda: [{"type": "function", "function": {"name": "python_insecure"}}],
+            tools_loader=lambda: [{"type": "function", "function": {"name": "python_relaxed"}}],
             tool_executor=_tool_executor,
             logger=logging.getLogger("test"),
         )
@@ -660,7 +660,7 @@ def test_chat_response_stream_yields_tool_status_before_blocking_sync_tool_compl
     assert '"content": ""' in streamed_finish_chunk
     assert '"tool_status"' in first_chunk
     assert '"phase": "start"' in first_chunk
-    assert '"tool_name": "python_insecure"' in first_chunk
+    assert '"tool_name": "python_relaxed"' in first_chunk
     assert any('"tool_call_id": "call_sleep"' in chunk for chunk in remaining_chunks)
     assert any("done" in chunk for chunk in remaining_chunks)
     assert first_stream.closed is True

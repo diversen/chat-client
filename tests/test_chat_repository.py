@@ -244,7 +244,7 @@ def test_get_messages_orders_by_sequence_index():
                     {
                         "event_type": "tool_call",
                         "tool_call_id": "call_same",
-                        "tool_name": "python",
+                        "tool_name": "python_hardened",
                         "arguments_json": '{"code":"1+1"}',
                         "result_text": "2",
                     },

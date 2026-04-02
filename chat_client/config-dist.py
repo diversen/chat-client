@@ -1,8 +1,8 @@
 import logging
 from pathlib import Path
 from chat_client.core.api_utils import get_provider_models
-from chat_client.tools.python_tool import python as python_tool
-from chat_client.tools.python_tool import python_insecure as python_insecure_tool
+from chat_client.tools.python_tool import python_hardened as python_hardened_tool
+from chat_client.tools.python_tool import python_relaxed as python_relaxed_tool
 
 
 # SMTP
@@ -116,20 +116,20 @@ SYSTEM_MESSAGE_MODELS: list = ["nemotron-cascade-2:latest", "ministral-3:14b", "
 
 
 TOOL_REGISTRY = {
-    "python": python_tool,
-    "python_insecure": python_insecure_tool,
+    "python_hardened": python_hardened_tool,
+    "python_relaxed": python_relaxed_tool,
 }
 
 # Optional explicit local tool definitions in MCP-style schema.
 # `name` must exist in TOOL_REGISTRY.
 LOCAL_TOOL_DEFINITIONS = [
     {
-        "name": "python",
+        "name": "python_hardened",
         "description": (
             "Run short Python code in a sandboxed container. "
             'Use this tool only with a JSON object of the form {"code": "..."} where '
             "the code value is a single Python script string. Call the tool name exactly "
-            'as "python". Do not invent related tool names such as "stateful_python" or '
+            'as "python_hardened". Do not invent related tool names such as "stateful_python" or '
             '"python_codeful". Return printed output or the final expression result.'
         ),
         "input_schema": {
@@ -148,7 +148,7 @@ LOCAL_TOOL_DEFINITIONS = [
         },
     },
     {
-        "name": "python_insecure",
+        "name": "python_relaxed",
         "description": (
             "Run Python code in a minimally restricted Docker container for local testing. "
             'Use this tool only with a JSON object of the form {"code": "..."} where '

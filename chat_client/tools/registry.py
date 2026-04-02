@@ -1,13 +1,13 @@
-from chat_client.tools.python_tool import python
+from chat_client.tools.python_tool import python_hardened
 
 BUILTIN_TOOL_REGISTRY = {
-    "python": python,
+    "python_hardened": python_hardened,
 }
 
 
 BUILTIN_LOCAL_TOOL_DEFINITIONS = [
     {
-        "name": "python",
+        "name": "python_hardened",
         "description": "Execute Python code and return output/result.",
         "input_schema": {
             "type": "object",

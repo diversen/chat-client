@@ -5,19 +5,19 @@ from pathlib import Path
 from unittest.mock import patch
 
 from chat_client.core.attachments import prepare_tool_attachment_mount
-from chat_client.tools.python_tool import NO_RESULT_ERROR, python, python_insecure
+from chat_client.tools.python_tool import NO_RESULT_ERROR, python_hardened, python_relaxed
 
 
 def test_python_tool_evaluates_expression():
     with patch("chat_client.tools.python_runtime.subprocess.run") as run_mock:
         run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="3\n", stderr="")
-        assert python("1 + 2") == "3"
+        assert python_hardened("1 + 2") == "3"
 
 
 def test_python_tool_allows_imports():
     with patch("chat_client.tools.python_runtime.subprocess.run") as run_mock:
         run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="ok\n", stderr="")
-        result = python("import os\nprint('ok')")
+        result = python_hardened("import os\nprint('ok')")
         assert result == "ok"
         run_mock.assert_called_once()
 
@@ -25,7 +25,7 @@ def test_python_tool_allows_imports():
 def test_python_tool_allows_open_calls_with_workspace_mount():
     with patch("chat_client.tools.python_runtime.subprocess.run") as run_mock:
         run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="ok\n", stderr="")
-        result = python("print(open('/mnt/data/notes.txt').read())", attachment_host_dir="/tmp/tool-files")
+        result = python_hardened("print(open('/mnt/data/notes.txt').read())", attachment_host_dir="/tmp/tool-files")
         assert result == "ok"
         called_args = run_mock.call_args[0][0]
         assert "/tmp/tool-files:/mnt/input:ro" in called_args
@@ -35,7 +35,7 @@ def test_python_tool_allows_open_calls_with_workspace_mount():
 def test_python_tool_allows_numpy_import():
     with patch("chat_client.tools.python_runtime.subprocess.run") as run_mock:
         run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="3\n", stderr="")
-        result = python("import numpy as np\nprint(np.array([1, 2, 3]).size)")
+        result = python_hardened("import numpy as np\nprint(np.array([1, 2, 3]).size)")
         assert result == "3"
         run_mock.assert_called_once()
 
@@ -43,7 +43,7 @@ def test_python_tool_allows_numpy_import():
 def test_python_tool_invokes_docker_with_hardening_flags():
     with patch("chat_client.tools.python_runtime.subprocess.run") as run_mock:
         run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="OK\n", stderr="")
-        result = python("x = 42", docker_image="secure-python-science")
+        result = python_hardened("x = 42", docker_image="secure-python-science")
 
         assert result == NO_RESULT_ERROR
         called_args = run_mock.call_args[0][0]
@@ -60,7 +60,7 @@ def test_python_tool_invokes_docker_with_hardening_flags():
 def test_python_tool_mounts_attachment_directory_when_present():
     with patch("chat_client.tools.python_runtime.subprocess.run") as run_mock:
         run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="ok\n", stderr="")
-        result = python("print('ok')", attachment_host_dir="/tmp/tool-files")
+        result = python_hardened("print('ok')", attachment_host_dir="/tmp/tool-files")
 
         assert result == "ok"
         called_args = run_mock.call_args[0][0]
@@ -71,7 +71,7 @@ def test_python_tool_mounts_attachment_directory_when_present():
 def test_python_tool_mounts_empty_directory_when_not_provided():
     with patch("chat_client.tools.python_runtime.subprocess.run") as run_mock:
         run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="ok\n", stderr="")
-        result = python("print('ok')")
+        result = python_hardened("print('ok')")
 
         assert result == "ok"
         called_args = run_mock.call_args[0][0]
@@ -105,14 +105,14 @@ def test_prepare_tool_attachment_mount_makes_staged_file_world_readable():
 def test_python_tool_empty_output_returns_retry_hint():
     with patch("chat_client.tools.python_runtime.subprocess.run") as run_mock:
         run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
-        assert python("x = 42") == NO_RESULT_ERROR
+        assert python_hardened("x = 42") == NO_RESULT_ERROR
 
 
 def test_python_tool_times_out_infinite_loop():
     timeout_error = subprocess.TimeoutExpired(cmd="docker", timeout=10)
     cleanup_result = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
     with patch("chat_client.tools.python_runtime.subprocess.run", side_effect=[timeout_error, cleanup_result]) as run_mock:
-        result = python("while True:\n    pass")
+        result = python_hardened("while True:\n    pass")
         assert "Execution timed out" in result
         assert run_mock.call_count == 2
         cleanup_args = run_mock.call_args_list[1][0][0]
@@ -122,7 +122,7 @@ def test_python_tool_times_out_infinite_loop():
 def test_python_tool_assigns_unique_container_name():
     with patch("chat_client.tools.python_runtime.subprocess.run") as run_mock:
         run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="ok\n", stderr="")
-        result = python("print('ok')")
+        result = python_hardened("print('ok')")
 
         assert result == "ok"
         called_args = run_mock.call_args[0][0]
@@ -134,26 +134,26 @@ def test_python_tool_assigns_unique_container_name():
 def test_python_tool_invalid_syntax_is_reported_by_runtime():
     with patch("chat_client.tools.python_runtime.subprocess.run") as run_mock:
         run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=1, stdout="", stderr="SyntaxError: invalid syntax\n")
-        result = python("if True print('x')")
+        result = python_hardened("if True print('x')")
         assert "SyntaxError" in result
 
 
 def test_python_tool_rejects_non_string_code():
-    assert "code must be a string" in python(123)  # type: ignore[arg-type]
+    assert "code must be a string" in python_hardened(123)  # type: ignore[arg-type]
 
 
-def test_python_insecure_allows_open_calls():
+def test_python_relaxed_allows_open_calls():
     with patch("chat_client.tools.python_runtime.subprocess.run") as run_mock:
         run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="ok\n", stderr="")
-        result = python_insecure("print(open('/etc/hosts').read())")
+        result = python_relaxed("print(open('/etc/hosts').read())")
         assert result == "ok"
         run_mock.assert_called_once()
 
 
-def test_python_insecure_invokes_docker_without_hardening_flags():
+def test_python_relaxed_invokes_docker_without_hardening_flags():
     with patch("chat_client.tools.python_runtime.subprocess.run") as run_mock:
         run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="OK\n", stderr="")
-        result = python_insecure("x = 42", docker_image="secure-python-science")
+        result = python_relaxed("x = 42", docker_image="secure-python-science")
 
         assert result == NO_RESULT_ERROR
         called_args = run_mock.call_args[0][0]
@@ -172,7 +172,7 @@ def test_python_tool_uses_configured_timeout():
     with patch.dict("sys.modules", {"data.config": config_module}):
         with patch("chat_client.tools.python_runtime.subprocess.run") as run_mock:
             run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="3\n", stderr="")
-            result = python("1 + 2")
+            result = python_hardened("1 + 2")
             assert result == "3"
             assert run_mock.call_args.kwargs["timeout"] == 30.0
 
@@ -182,6 +182,6 @@ def test_python_tool_zero_timeout_means_infinite():
     with patch.dict("sys.modules", {"data.config": config_module}):
         with patch("chat_client.tools.python_runtime.subprocess.run") as run_mock:
             run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="3\n", stderr="")
-            result = python("1 + 2")
+            result = python_hardened("1 + 2")
             assert result == "3"
             assert run_mock.call_args.kwargs["timeout"] is None

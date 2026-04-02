@@ -21,9 +21,9 @@ Simple python tool utilizing a sqlite3 backend and a minimal HTML / JavaScript f
 
 ## Python Tool Sandbox
 
-The built-in `python` tool runs code in a hardened Docker container and requires Docker to be installed.
+The built-in `python_hardened` tool runs code in a hardened Docker container and requires Docker to be installed.
 
-There is also a `python_insecure` tool for local testing. It still runs in Docker, but it skips AST safety checks and does not disable container network access.
+There is also a `python_relaxed` tool for local testing. It still runs in Docker, but it skips AST safety checks and does not disable container network access.
 
 Build the default image:
 

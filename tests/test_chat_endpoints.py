@@ -195,7 +195,7 @@ class TestChatEndpoints(BaseTestCase):
 
     def test_attachment_mount_detection_supports_renamed_python_tool(self):
         from chat_client.endpoints.chat_endpoints import _tool_uses_workspace_mount
-        from chat_client.tools.python_tool import python
+        from chat_client.tools.python_tool import python_hardened
 
         with patch(
             "chat_client.endpoints.chat_endpoints.LOCAL_TOOL_DEFINITIONS",
@@ -208,11 +208,11 @@ class TestChatEndpoints(BaseTestCase):
             ],
         ):
             assert _tool_uses_workspace_mount("some_python_tool") is True
-            assert _tool_uses_workspace_mount("python") is False
+            assert _tool_uses_workspace_mount("python_hardened") is False
 
         with (
             patch("chat_client.endpoints.chat_endpoints.LOCAL_TOOL_DEFINITIONS", []),
-            patch("chat_client.endpoints.chat_endpoints.TOOL_REGISTRY", {"some_python_tool": python}),
+            patch("chat_client.endpoints.chat_endpoints.TOOL_REGISTRY", {"some_python_tool": python_hardened}),
         ):
             assert _tool_uses_workspace_mount("some_python_tool") is True
 
@@ -220,7 +220,7 @@ class TestChatEndpoints(BaseTestCase):
         from chat_client.core import chat_service
         from chat_client.endpoints.chat_endpoints import _execute_tool
 
-        tool_call = {"function": {"name": "python", "arguments": '{"code":"print(1)"}'}}
+        tool_call = {"function": {"name": "python_hardened", "arguments": '{"code":"print(1)"}'}}
 
         with (
             patch("chat_client.endpoints.chat_endpoints.TOOL_REGISTRY", {}),
@@ -230,7 +230,7 @@ class TestChatEndpoints(BaseTestCase):
             with pytest.raises(chat_service.ToolNotConfiguredError) as error:
                 _execute_tool(tool_call)
 
-        assert str(error.value) == 'No tool backend is configured for tool "python".'
+        assert str(error.value) == 'No tool backend is configured for tool "python_hardened".'
 
     def test_execute_tool_raises_when_tool_does_not_exist(self):
         from chat_client.core import chat_service
@@ -239,12 +239,12 @@ class TestChatEndpoints(BaseTestCase):
         tool_call = {"function": {"name": "missing_tool", "arguments": "{}"}}
 
         with (
-            patch("chat_client.endpoints.chat_endpoints.TOOL_REGISTRY", {"python": lambda code: code}),
+            patch("chat_client.endpoints.chat_endpoints.TOOL_REGISTRY", {"python_hardened": lambda code: code}),
             patch(
                 "chat_client.endpoints.chat_endpoints.LOCAL_TOOL_DEFINITIONS",
                 [
                     {
-                        "name": "python",
+                        "name": "python_hardened",
                         "description": "Execute Python code",
                         "input_schema": {
                             "type": "object",
@@ -266,15 +266,15 @@ class TestChatEndpoints(BaseTestCase):
         from chat_client.core import chat_service
         from chat_client.endpoints.chat_endpoints import _execute_tool
 
-        tool_call = {"function": {"name": "python", "arguments": '{"code":"print(1)"'}}
+        tool_call = {"function": {"name": "python_hardened", "arguments": '{"code":"print(1)"'}}
 
         with (
-            patch("chat_client.endpoints.chat_endpoints.TOOL_REGISTRY", {"python": lambda code: code}),
+            patch("chat_client.endpoints.chat_endpoints.TOOL_REGISTRY", {"python_hardened": lambda code: code}),
             patch(
                 "chat_client.endpoints.chat_endpoints.LOCAL_TOOL_DEFINITIONS",
                 [
                     {
-                        "name": "python",
+                        "name": "python_hardened",
                         "description": "Execute Python code",
                         "input_schema": {
                             "type": "object",
@@ -290,21 +290,21 @@ class TestChatEndpoints(BaseTestCase):
             with pytest.raises(chat_service.ToolArgumentsError) as error:
                 _execute_tool(tool_call)
 
-        assert str(error.value) == 'Tool "python" was called with invalid JSON arguments.'
+        assert str(error.value) == 'Tool "python_hardened" was called with invalid JSON arguments.'
 
     def test_execute_tool_raises_for_invalid_argument_shape(self):
         from chat_client.core import chat_service
         from chat_client.endpoints.chat_endpoints import _execute_tool
 
-        tool_call = {"function": {"name": "python", "arguments": '{"code":1}'}}
+        tool_call = {"function": {"name": "python_hardened", "arguments": '{"code":1}'}}
 
         with (
-            patch("chat_client.endpoints.chat_endpoints.TOOL_REGISTRY", {"python": lambda code: code}),
+            patch("chat_client.endpoints.chat_endpoints.TOOL_REGISTRY", {"python_hardened": lambda code: code}),
             patch(
                 "chat_client.endpoints.chat_endpoints.LOCAL_TOOL_DEFINITIONS",
                 [
                     {
-                        "name": "python",
+                        "name": "python_hardened",
                         "description": "Execute Python code",
                         "input_schema": {
                             "type": "object",
@@ -320,7 +320,7 @@ class TestChatEndpoints(BaseTestCase):
             with pytest.raises(chat_service.ToolArgumentsError) as error:
                 _execute_tool(tool_call)
 
-        assert str(error.value) == 'Tool "python" requires argument "code" of type string.'
+        assert str(error.value) == 'Tool "python_hardened" requires argument "code" of type string.'
 
     def test_build_model_messages_from_dialog_history_groups_consecutive_tools(self):
         from chat_client.endpoints.chat_endpoints import _build_model_messages_from_dialog_history
@@ -366,7 +366,7 @@ class TestChatEndpoints(BaseTestCase):
                     {
                         "event_type": "tool_call",
                         "tool_call_id": "call_1",
-                        "tool_name": "python",
+                        "tool_name": "python_hardened",
                         "arguments_json": '{"code":"1+1"}',
                         "result_text": "2",
                         "error_text": "",
