@@ -165,8 +165,8 @@ nav svg {
 
 .upload-preview-tile {
     position: relative;
-    width: 96px;
-    height: 96px;
+    width: 84px;
+    height: 84px;
     border: 1px solid var(--border);
     border-radius: 10px;
     overflow: hidden;
@@ -184,7 +184,20 @@ nav svg {
 
 .upload-preview-thumb {
     width: 100%;
-    height: 56px;
+    height: 48px;
+    object-fit: cover;
+    display: block;
+    background: var(--background-main, var(--background-alt));
+}
+
+.message-image-tile {
+    width: 84px;
+    height: 84px;
+}
+
+.message-image-thumb {
+    width: 100%;
+    height: 100%;
     object-fit: cover;
     display: block;
     background: var(--background-main, var(--background-alt));
@@ -194,21 +207,21 @@ nav svg {
     display: flex;
     flex-direction: column;
     justify-content: flex-start;
-    gap: 3px;
+    gap: 2px;
     box-sizing: border-box;
-    padding: 8px;
-    min-height: 40px;
+    padding: 6px;
+    min-height: 36px;
 }
 
 .upload-preview-kind {
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
     letter-spacing: 0.04em;
     color: var(--selection);
 }
 
 .upload-preview-name {
-    font-size: 11px;
+    font-size: 10px;
     line-height: 1.2;
     word-break: break-word;
     display: -webkit-box;
@@ -218,7 +231,7 @@ nav svg {
 }
 
 .upload-preview-size {
-    font-size: 10px;
+    font-size: 9px;
     opacity: 0.7;
 }
 
@@ -309,38 +322,12 @@ nav svg {
     margin-bottom: 8px;
 }
 
-.attachment-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    min-height: 36px;
-    max-width: 100%;
-    padding: 6px 10px;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    background: var(--background-alt);
+.message-attachment-tile .upload-preview-meta {
+    min-height: 100%;
 }
 
-.attachment-chip-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.attachment-chip-size {
-    opacity: 0.7;
-    font-size: 12px;
-}
-
-.attachment-chip-remove {
-    all: unset;
-    cursor: pointer;
-    width: 20px;
-    height: 20px;
-    border-radius: 999px;
-    text-align: center;
-    line-height: 20px;
-    background: rgba(0, 0, 0, 0.08);
+.message-attachment-tile .upload-preview-name {
+    -webkit-line-clamp: 3;
 }
 
 .content {

@@ -238,17 +238,24 @@ function createMessageImages(images = []) {
         if (!dataUrl.startsWith('data:image/')) return;
 
         const item = document.createElement('div');
-        item.className = 'image-preview-item';
+        item.className = 'upload-preview-tile message-image-tile';
 
-        const thumbnail = document.createElement('img');
-        thumbnail.className = 'image-preview-thumb';
-        thumbnail.alt = `Message image ${index + 1}`;
-        thumbnail.src = dataUrl;
-        thumbnail.addEventListener('click', () => {
-            openImagePreviewModal(imagePreviewModalElem, imagePreviewModalImageElem, dataUrl, thumbnail.alt);
+        const tileButton = document.createElement('button');
+        tileButton.type = 'button';
+        tileButton.className = 'upload-preview-open';
+        tileButton.title = `Preview attached image ${index + 1}`;
+        tileButton.setAttribute('aria-label', `Preview attached image ${index + 1}`);
+        tileButton.addEventListener('click', () => {
+            openImagePreviewModal(imagePreviewModalElem, imagePreviewModalImageElem, dataUrl, tileButton.title);
         });
 
-        item.appendChild(thumbnail);
+        const thumbnail = document.createElement('img');
+        thumbnail.className = 'message-image-thumb';
+        thumbnail.alt = `Message image ${index + 1}`;
+        thumbnail.src = dataUrl;
+
+        tileButton.appendChild(thumbnail);
+        item.appendChild(tileButton);
         preview.appendChild(item);
     });
 
@@ -272,26 +279,50 @@ function createMessageAttachments(attachments = [], removable = false, onRemove 
 
     attachments.forEach((attachment) => {
         const attachmentId = String(attachment?.attachment_id || attachment?.id || '');
+        const fileName = String(attachment?.name || 'attachment');
+        const fileExtension = (fileName.split('.').pop() || 'file').slice(0, 6).toUpperCase();
         const item = document.createElement('div');
-        item.className = 'attachment-chip';
+        item.className = 'upload-preview-tile message-attachment-tile';
+
+        const tileButton = document.createElement(attachmentId ? 'button' : 'div');
+        if (attachmentId) {
+            tileButton.type = 'button';
+            tileButton.title = `Preview ${fileName}`;
+            tileButton.setAttribute('aria-label', `Preview ${fileName}`);
+            tileButton.addEventListener('click', () => {
+                window.open(`/chat/attachment/${attachmentId}/preview`, '_blank', 'noopener');
+            });
+        }
+        tileButton.className = 'upload-preview-open';
+
+        const meta = document.createElement('div');
+        meta.className = 'upload-preview-meta';
+
+        const kind = document.createElement('span');
+        kind.className = 'upload-preview-kind';
+        kind.textContent = fileExtension;
+        meta.appendChild(kind);
 
         const name = document.createElement('span');
-        name.className = 'attachment-chip-name';
-        name.textContent = String(attachment?.name || 'attachment');
-        item.appendChild(name);
+        name.className = 'upload-preview-name';
+        name.textContent = fileName;
+        meta.appendChild(name);
 
         const sizeText = formatAttachmentSize(attachment?.size_bytes || attachment?.size);
         if (sizeText) {
             const size = document.createElement('span');
-            size.className = 'attachment-chip-size';
+            size.className = 'upload-preview-size';
             size.textContent = sizeText;
-            item.appendChild(size);
+            meta.appendChild(size);
         }
+
+        tileButton.appendChild(meta);
+        item.appendChild(tileButton);
 
         if (removable) {
             const remove = document.createElement('button');
             remove.type = 'button';
-            remove.className = 'attachment-chip-remove';
+            remove.className = 'image-preview-remove';
             remove.textContent = '×';
             remove.setAttribute('aria-label', `Remove ${name.textContent}`);
             remove.addEventListener('click', () => {
