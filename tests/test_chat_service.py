@@ -270,6 +270,63 @@ def test_chat_response_stream_uses_streaming_tool_loop():
     assert final_stream.closed is True
 
 
+def test_chat_response_stream_ignores_tool_calls_for_non_tool_models():
+    stream = DummyStream(
+        [
+            _chunk(
+                None,
+                tool_calls=[
+                    SimpleNamespace(
+                        index=0,
+                        id="call_ignored",
+                        type="function",
+                        function=SimpleNamespace(name="python", arguments='{"code":"print(1)"}'),
+                    )
+                ],
+            ),
+            _chunk("", finish_reason="tool_calls"),
+        ]
+    )
+    create_calls = []
+    executed_calls = []
+
+    def _create(**kwargs):
+        create_calls.append(kwargs)
+        return stream
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=_create)))
+    request = DummyRequest(disconnected_after_calls=999)
+
+    def _tool_executor(tool_call):
+        executed_calls.append(tool_call)
+        return "should not run"
+
+    async def _run():
+        chunks = []
+        async for chunk in chat_service.chat_response_stream(
+            request,
+            messages=[{"role": "user", "content": "use python"}],
+            model="plain-model",
+            openai_client_cls=lambda **_: client,
+            provider_info_resolver=lambda _model: {},
+            tool_models=["tool-model"],
+            tools_loader=lambda: [{"type": "function", "function": {"name": "python"}}],
+            tool_executor=_tool_executor,
+            logger=logging.getLogger("test"),
+        ):
+            chunks.append(chunk)
+        return chunks
+
+    chunks = asyncio.run(_run())
+
+    assert len(create_calls) == 1
+    assert "tools" not in create_calls[0]
+    assert executed_calls == []
+    assert any('"tool_calls"' in chunk for chunk in chunks)
+    assert not any('"tool_status"' in chunk for chunk in chunks)
+    assert stream.closed is True
+
+
 def test_parse_tool_arguments_raises_on_invalid_json():
     tool_call = {"function": {"name": "python", "arguments": '{"code": "print(1)"'}}
 

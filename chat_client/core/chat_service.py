@@ -816,6 +816,16 @@ async def chat_response_stream(
                 return
 
             tool_calls = _collect_streamed_tool_calls(tool_call_state)
+            if tool_calls and not tools_enabled:
+                _log_event(
+                    logger,
+                    logging.WARNING,
+                    "chat.model.unexpected_tool_calls_ignored",
+                    round=rounds,
+                    tool_calls=[summarize_tool_call_for_log(tool_call) for tool_call in tool_calls],
+                    **base_log_context,
+                )
+                tool_calls = []
             assistant_content = "".join(assistant_content_parts)
             assistant_summary = summarize_assistant_text_for_log(assistant_content)
             _log_event(
