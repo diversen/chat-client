@@ -562,6 +562,9 @@ function createAssistantSegmentShell(messageId = null, initialKind = 'Thinking',
             const safeIndex = Number(index);
             segmentStep.textContent = Number.isFinite(safeIndex) && safeIndex > 0 ? `Step ${safeIndex}` : 'Step';
         },
+        setStepVisible(isVisible) {
+            segmentStep.classList.toggle('hidden', !isVisible);
+        },
         setSegmentKind(kind) {
             const safeKind = String(kind || '').trim();
             segmentKindElement.textContent = safeKind || 'Thinking';
@@ -623,6 +626,65 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
             syncVisibility,
         };
     };
+    const resolveSegmentOpenState = (behavior, openState) => (
+        typeof openState === 'boolean' ? openState : behavior.defaultOpen
+    );
+    const appendCommittedTextSegment = async (
+        parentElement,
+        {
+            kind,
+            text,
+            messageId = null,
+            stepIndex,
+            openState,
+        },
+    ) => {
+        const safeText = String(text || '');
+        if (!safeText.trim()) return null;
+        const segment = createAssistantSegmentShell(messageId, kind, false);
+        const behavior = getSegmentBehavior(kind);
+        segment.setSegmentIndex(stepIndex);
+        parentElement.appendChild(segment.container);
+        await renderStreamedResponseText(segment.contentElement, safeText);
+        if (behavior.isCollapsible) {
+            setupCollapsibleSegment(
+                segment,
+                segment.contentWrapperElement,
+                behavior.kind,
+                resolveSegmentOpenState(behavior, openState),
+            );
+        }
+        if (behavior.kind === 'answer') {
+            renderCopyMessageButton(segment.container, safeText);
+            await addCopyButtons(segment.contentElement, config);
+        }
+        return segment;
+    };
+    const appendCommittedToolSegment = (
+        parentElement,
+        {
+            toolPayload,
+            stepIndex,
+            openState,
+        },
+    ) => {
+        const segment = createAssistantSegmentShell(null, 'Tool', false);
+        const behavior = getSegmentBehavior('tool');
+        segment.setSegmentIndex(stepIndex);
+        parentElement.appendChild(segment.container);
+        const toolElement = createEmbeddedToolCallElement(
+            toolPayload,
+            resolveSegmentOpenState(behavior, openState),
+        );
+        setupCollapsibleSegment(
+            segment,
+            toolElement.querySelector('.tool-call-body'),
+            behavior.kind,
+            resolveSegmentOpenState(behavior, openState),
+        );
+        segment.contentElement.appendChild(toolElement);
+        return segment;
+    };
 
     resetMessageInputHeight();
     window.addEventListener('resize', resizeMessageInput);
@@ -669,42 +731,14 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
             }
 
             let segmentIndex = 0;
-            const appendStaticTextSegment = async (kind, text, messageId = null) => {
-                const safeText = String(text || '');
-                if (!safeText.trim()) return null;
-                const segment = createAssistantSegmentShell(messageId, kind, false);
-                const behavior = getSegmentBehavior(kind);
+            const nextStepIndex = () => {
                 segmentIndex += 1;
-                segment.setSegmentIndex(segmentIndex);
-                turnContentElement.appendChild(segment.container);
-                await renderStreamedResponseText(segment.contentElement, safeText);
-                if (behavior.isCollapsible) {
-                    const isOpen = typeof segmentOpenStates[segmentStateIndex] === 'boolean'
-                        ? segmentOpenStates[segmentStateIndex]
-                        : behavior.defaultOpen;
-                    segmentStateIndex += 1;
-                    setupCollapsibleSegment(segment, segment.contentWrapperElement, behavior.kind, isOpen);
-                }
-                if (behavior.kind === 'answer') {
-                    renderCopyMessageButton(segment.container, safeText);
-                    await addCopyButtons(segment.contentElement, config);
-                }
-                return segment;
+                return segmentIndex;
             };
-
-            const appendStaticToolSegment = (toolPayload) => {
-                const segment = createAssistantSegmentShell(null, 'Tool', false);
-                segmentIndex += 1;
-                segment.setSegmentIndex(segmentIndex);
-                turnContentElement.appendChild(segment.container);
-                const behavior = getSegmentBehavior('tool');
-                const segmentIsOpen = segmentOpenStates[segmentStateIndex];
+            const nextSegmentOpenState = () => {
+                const openState = segmentOpenStates[segmentStateIndex];
                 segmentStateIndex += 1;
-                const openByDefault = typeof segmentIsOpen === 'boolean' ? segmentIsOpen : behavior.defaultOpen;
-                const toolElement = createEmbeddedToolCallElement(toolPayload, openByDefault);
-                setupCollapsibleSegment(segment, toolElement.querySelector('.tool-call-body'), behavior.kind, openByDefault);
-                segment.contentElement.appendChild(toolElement);
-                return segment;
+                return openState;
             };
 
             for (const item of turnMessages) {
@@ -719,7 +753,11 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                             error_text: String(item?.error_text || ''),
                         }
                         : item;
-                    appendStaticToolSegment(toolPayload);
+                    appendCommittedToolSegment(turnContentElement, {
+                        toolPayload,
+                        stepIndex: nextStepIndex(),
+                        openState: nextSegmentOpenState(),
+                    });
                     continue;
                 }
 
@@ -743,8 +781,21 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                     }
                 }
 
-                await appendStaticTextSegment('Thinking', reasoningText, item?.message_id || null);
-                await appendStaticTextSegment('Answer', contentText, item?.message_id || null);
+                const hasReasoning = String(reasoningText || '').trim().length > 0;
+                await appendCommittedTextSegment(turnContentElement, {
+                    kind: 'Thinking',
+                    text: reasoningText,
+                    messageId: item?.message_id || null,
+                    stepIndex: hasReasoning ? nextStepIndex() : segmentIndex + 1,
+                    openState: hasReasoning ? nextSegmentOpenState() : undefined,
+                });
+                const hasContent = String(contentText || '').trim().length > 0;
+                await appendCommittedTextSegment(turnContentElement, {
+                    kind: 'Answer',
+                    text: contentText,
+                    messageId: item?.message_id || null,
+                    stepIndex: hasContent ? nextStepIndex() : segmentIndex + 1,
+                });
             }
 
             if (!turnContentElement.children.length) {
@@ -774,11 +825,17 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
             let lastBaseScrollHeight = getBaseScrollHeight();
             let segmentIndex = 0;
 
-            const createTextSegment = (kind, showLoader = false) => {
+            const createTextSegment = (kind, showLoader = false, options = {}) => {
                 const segment = createAssistantSegmentShell(null, kind, showLoader);
                 const behavior = getSegmentBehavior(kind);
-                segmentIndex += 1;
-                segment.setSegmentIndex(segmentIndex);
+                const isTransient = Boolean(options.transient);
+                if (Boolean(options.hideStep)) {
+                    segment.setStepVisible(false);
+                }
+                if (!isTransient) {
+                    segmentIndex += 1;
+                    segment.setSegmentIndex(segmentIndex);
+                }
                 const collapsibleState = setupCollapsibleSegment(
                     segment,
                     segment.contentWrapperElement,
@@ -846,8 +903,9 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                         pendingForceRender = true;
                         await flushPendingRender();
                         return {
-                            segmentKind: kind.toLowerCase(),
-                            displayText: streamedResponseText,
+                            kind: kind.toLowerCase(),
+                            text: streamedResponseText,
+                            isVisible: streamedResponseText.trim().length > 0,
                         };
                     },
                 };
@@ -863,7 +921,7 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                     }
                     if (activeAssistantSegment) return null;
                     const beforeBaseScrollHeight = getBaseScrollHeight();
-                    activeAssistantSegment = createTextSegment(kind, Boolean(options.showLoader));
+                    activeAssistantSegment = createTextSegment(kind, Boolean(options.showLoader), options);
                     turnContentElement.appendChild(activeAssistantSegment.container);
                     const afterBaseScrollHeight = getBaseScrollHeight();
                     const consumedOnInsert = Math.max(0, afterBaseScrollHeight - beforeBaseScrollHeight);
@@ -882,7 +940,7 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                     const finalized = await activeAssistantSegment.finalize();
                     const segment = activeAssistantSegment;
                     if (segment.segmentKind === 'answer') {
-                        renderCopyMessageButton(segment.container, finalized.displayText);
+                        renderCopyMessageButton(segment.container, finalized.text);
                         await addCopyButtons(segment.contentElement, config);
                     }
                     activeAssistantSegment = null;
@@ -894,23 +952,16 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                 },
                 appendToolCall(toolMessage) {
                     const beforeBaseScrollHeight = getBaseScrollHeight();
-                    const targetSegment = createAssistantSegmentShell(null, 'Tool', false);
                     segmentIndex += 1;
-                    targetSegment.setSegmentIndex(segmentIndex);
-                    turnContentElement.appendChild(targetSegment.container);
-                    const container = createEmbeddedToolCallElement(toolMessage, toolCallsOpenByDefault);
-                    targetSegment.contentElement.appendChild(container);
-                    setupCollapsibleSegment(
-                        targetSegment,
-                        container.querySelector('.tool-call-body'),
-                        'tool',
-                        toolCallsOpenByDefault,
-                    );
+                    const targetSegment = appendCommittedToolSegment(turnContentElement, {
+                        toolPayload: toolMessage,
+                        stepIndex: segmentIndex,
+                    });
                     const afterBaseScrollHeight = getBaseScrollHeight();
                     const consumedOnInsert = Math.max(0, afterBaseScrollHeight - beforeBaseScrollHeight);
                     consumeAnchorSpacerBy(consumedOnInsert, false);
                     lastBaseScrollHeight = afterBaseScrollHeight;
-                    return container;
+                    return targetSegment;
                 },
                 removeIfEmpty() {
                     if (!turnContentElement.children.length) {

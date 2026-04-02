@@ -645,11 +645,49 @@ class ConversationController {
         this.setEditFormSubmissionEnabled(false);
         this.updateSendButtonState();
 
-        const assistantSegments = [];
-        const turnEvents = [];
+        const streamedTurnEvents = [];
         const turnId = this.createTurnId();
         let turnUi = null;
         const hasVisibleText = (rawText) => String(rawText || '').trim().length > 0;
+        const discardFinalizedSegment = (finalized) => {
+            finalized.container.remove();
+        };
+        const appendAssistantTurnEvent = (event) => {
+            streamedTurnEvents.push(event);
+        };
+        const persistFinalizedAnswer = (displayText) => {
+            appendAssistantTurnEvent({
+                event_type: 'assistant_segment',
+                reasoning_text: '',
+                content_text: displayText,
+            });
+        };
+        const persistFinalizedThinking = (displayText) => {
+            appendAssistantTurnEvent({
+                event_type: 'assistant_segment',
+                reasoning_text: displayText,
+                content_text: '',
+            });
+        };
+        const appendToolTurnEvent = (toolCall) => {
+            appendAssistantTurnEvent({
+                event_type: 'tool_call',
+                tool_call_id: String(toolCall.tool_call_id || ''),
+                tool_name: String(toolCall.tool_name || ''),
+                arguments_json: String(toolCall.arguments_json || '{}'),
+                result_text: String(toolCall.content || ''),
+                error_text: String(toolCall.error_text || ''),
+            });
+        };
+        const buildAssistantMessagesFromTurnEvents = (events) => (
+            Array.isArray(events)
+                ? events
+                    .filter((event) => event?.event_type === 'assistant_segment')
+                    .map((event) => String(event?.content_text || ''))
+                    .filter((contentText) => hasVisibleText(contentText))
+                    .map((content) => ({ role: 'assistant', content }))
+                : []
+        );
 
         const ensureAssistantContainer = async (kind = 'Thinking', options = {}) => {
             if (!turnUi) {
@@ -662,42 +700,44 @@ class ConversationController {
             }
             return segment;
         };
+        const classifyFinalizedSegment = (finalized) => {
+            const kind = String(finalized?.kind || '').toLowerCase();
+            const text = String(finalized?.text || '');
+            const isVisible = Boolean(finalized?.isVisible);
+            if (!isVisible || !hasVisibleText(text)) {
+                return { action: 'discard', text };
+            }
+            if (kind === 'answer') {
+                return { action: 'answer', text };
+            }
+            if (kind === 'thinking') {
+                return { action: 'thinking', text };
+            }
+            return { action: 'discard', text };
+        };
 
         const finalizeAssistantContainer = async () => {
             if (!turnUi) return;
             const finalized = await turnUi.finalizeAssistantSegment();
             if (!finalized) return;
-            const segmentKind = String(finalized?.segmentKind || '').toLowerCase();
-            const displayText = String(finalized?.displayText || '');
+            const classified = classifyFinalizedSegment(finalized);
 
-            if (!hasVisibleText(displayText)) {
-                finalized.container.remove();
+            if (classified.action === 'discard') {
+                discardFinalizedSegment(finalized);
                 return;
             }
 
-            if (segmentKind === 'answer') {
-                assistantSegments.push({
-                    message: { role: 'assistant', content: displayText },
-                    container: finalized.container,
-                });
-                turnEvents.push({
-                    event_type: 'assistant_segment',
-                    reasoning_text: '',
-                    content_text: displayText,
-                });
+            if (classified.action === 'answer') {
+                persistFinalizedAnswer(classified.text);
                 return;
             }
 
-            if (segmentKind === 'thinking') {
-                turnEvents.push({
-                    event_type: 'assistant_segment',
-                    reasoning_text: displayText,
-                    content_text: '',
-                });
+            if (classified.action === 'thinking') {
+                persistFinalizedThinking(classified.text);
                 return;
             }
 
-            finalized.container.remove();
+            discardFinalizedSegment(finalized);
         };
 
         try {
@@ -711,7 +751,7 @@ class ConversationController {
                     if (currentSegment && currentSegment.segmentKind !== 'tool') {
                         await finalizeAssistantContainer();
                     }
-                    const activeUi = await ensureAssistantContainer('Tool', { showLoader: true });
+                    const activeUi = await ensureAssistantContainer('Tool', { showLoader: true, transient: true, hideStep: true });
                     activeUi.setLoading(true);
                     const toolName = String(chunk.toolStatus.tool_name || 'tool');
                     activeUi.setStatus(`Calling tool: ${toolName}...`);
@@ -723,14 +763,7 @@ class ConversationController {
                         turnUi = this.view.createAssistantTurn();
                     }
                     turnUi.appendToolCall(chunk.toolCall);
-                    turnEvents.push({
-                        event_type: 'tool_call',
-                        tool_call_id: String(chunk.toolCall.tool_call_id || ''),
-                        tool_name: String(chunk.toolCall.tool_name || ''),
-                        arguments_json: String(chunk.toolCall.arguments_json || '{}'),
-                        result_text: String(chunk.toolCall.content || ''),
-                        error_text: String(chunk.toolCall.error_text || ''),
-                    });
+                    appendToolTurnEvent(chunk.toolCall);
                     continue;
                 }
 
@@ -774,23 +807,23 @@ class ConversationController {
 
             await finalizeAssistantContainer();
 
-            if (this.dialogId && turnEvents.length > 0) {
+            if (this.dialogId && streamedTurnEvents.length > 0) {
                 await this.storage.createAssistantTurnEvents(this.dialogId, {
                     turn_id: turnId,
-                    events: turnEvents,
+                    events: streamedTurnEvents,
                 });
             }
 
-            for (const segment of assistantSegments) {
-                this.messages.push(segment.message);
+            for (const message of buildAssistantMessagesFromTurnEvents(streamedTurnEvents)) {
+                this.messages.push(message);
             }
             if (turnUi) {
                 const liveTurnContainer = turnUi.container;
-                if (turnEvents.length > 0) {
+                if (streamedTurnEvents.length > 0) {
                     const segmentOpenStates = Array.from(
                         liveTurnContainer.querySelectorAll('.assistant-segment-header.assistant-segment-toggle'),
                     ).map((toggle) => String(toggle.getAttribute('aria-expanded') || '').toLowerCase() === 'true');
-                    await this.view.renderStaticAssistantTurn(turnEvents, liveTurnContainer, { segmentOpenStates });
+                    await this.view.renderStaticAssistantTurn(streamedTurnEvents, liveTurnContainer, { segmentOpenStates });
                     liveTurnContainer.remove();
                 } else {
                     turnUi.removeIfEmpty();
