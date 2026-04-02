@@ -704,7 +704,7 @@ a.is-disabled-link {
 
 .assistant-segment-header {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     flex-wrap: wrap;
     gap: 8px;
     margin-bottom: 4px;

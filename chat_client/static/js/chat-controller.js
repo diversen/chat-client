@@ -707,7 +707,11 @@ class ConversationController {
                 messages: this.messages,
             }, this.abortController.signal)) {
                 if (chunk.toolStatus) {
-                    const activeUi = await ensureAssistantContainer('Thinking', { showLoader: true });
+                    const currentSegment = turnUi?.getActiveAssistantSegment?.();
+                    if (currentSegment && currentSegment.segmentKind !== 'tool') {
+                        await finalizeAssistantContainer();
+                    }
+                    const activeUi = await ensureAssistantContainer('Tool', { showLoader: true });
                     activeUi.setLoading(true);
                     const toolName = String(chunk.toolStatus.tool_name || 'tool');
                     activeUi.setStatus(`Calling tool: ${toolName}...`);
@@ -732,7 +736,7 @@ class ConversationController {
 
                 if (chunk.reasoningOpenClose || chunk.reasoning) {
                     const activeUi = await ensureAssistantContainer('Thinking');
-                    activeUi.setLoading(false);
+                    activeUi.setLoading(true);
                     activeUi.clearStatus();
                     if (chunk.reasoning) {
                         void activeUi.appendText(chunk.reasoning);
