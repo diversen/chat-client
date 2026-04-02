@@ -9,6 +9,7 @@ import {
     imagePreviewModalImageElem,
 } from './app-elements.js';
 import { addCopyButtons } from './app-copy-buttons.js';
+import { Flash } from './flash.js';
 import { copyIcon, checkIcon, editIcon } from './app-icons.js';
 import { mdNoHTML } from './markdown.js';
 import { openImagePreviewModal } from './image-preview-modal.js';
@@ -205,12 +206,12 @@ function showEditForm(container, originalMessage, onEdit) {
     sendButton.addEventListener('click', async () => {
         const newContent = textarea.value.trim();
         if (!newContent) {
-            alert('Message content cannot be empty');
+            Flash.setMessage('Message content cannot be empty', 'error');
             return;
         }
         const messageId = container.getAttribute('data-message-id');
         if (!messageId) {
-            alert('Cannot edit message: message ID not found');
+            Flash.setMessage('Cannot edit message: message ID not found', 'error');
             return;
         }
         try {
@@ -219,7 +220,7 @@ function showEditForm(container, originalMessage, onEdit) {
             await onEdit(messageId, newContent, container);
         } catch (error) {
             console.error('Error updating message:', error);
-            alert('Error updating message. Please try again.');
+            Flash.setMessage('Error updating message. Please try again.', 'error');
             sendButton.disabled = false;
             sendButton.textContent = 'Send';
         }
