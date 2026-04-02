@@ -360,6 +360,40 @@ class TestChatEndpoints(BaseTestCase):
 
         assert str(error.value) == 'Tool "python_hardened" requires argument "code" of type string.'
 
+    def test_execute_tool_raises_backend_error_when_python_runtime_cannot_start(self):
+        from chat_client.core import chat_service
+        from chat_client.endpoints.chat_endpoints import _execute_tool
+        from chat_client.tools.python_runtime import PythonRuntimeError
+
+        tool_call = {"function": {"name": "python_hardened", "arguments": '{"code":"print(1)"}'}}
+
+        with (
+            patch(
+                "chat_client.endpoints.chat_endpoints.TOOL_REGISTRY",
+                {"python_hardened": lambda code: (_ for _ in ()).throw(PythonRuntimeError("missing image"))},
+            ),
+            patch(
+                "chat_client.endpoints.chat_endpoints.LOCAL_TOOL_DEFINITIONS",
+                [
+                    {
+                        "name": "python_hardened",
+                        "description": "Execute Python code",
+                        "input_schema": {
+                            "type": "object",
+                            "properties": {"code": {"type": "string"}},
+                            "required": ["code"],
+                            "additionalProperties": False,
+                        },
+                    }
+                ],
+            ),
+            patch("chat_client.endpoints.chat_endpoints.MCP_SERVER_URL", ""),
+        ):
+            with pytest.raises(chat_service.ToolBackendError) as error:
+                _execute_tool(tool_call)
+
+        assert str(error.value) == 'Tool "python_hardened" failed: missing image'
+
     def test_build_model_messages_from_dialog_history_groups_consecutive_tools(self):
         from chat_client.endpoints.chat_endpoints import _build_model_messages_from_dialog_history
 

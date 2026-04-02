@@ -9,10 +9,16 @@ from chat_client.core.attachments import resolve_tool_mount_dir
 
 MAX_CODE_LENGTH = 8_000
 DEFAULT_PYTHON_TOOL_TIMEOUT_SECONDS = 10.0
-DEFAULT_PYTHON_TOOL_DOCKER_IMAGE = "secure-python"
+PYTHON_TOOL_DOCKER_IMAGE = "chat-client-python-tool"
 NO_RESULT_ERROR = "[stderr]\nNo result produced. Please print the answer or end with an expression."
 ATTACHMENT_SOURCE_MOUNT_DIR = "/mnt/input"
 ATTACHMENT_TMPFS_SPEC = "rw,size=65m"
+
+
+class PythonRuntimeError(RuntimeError):
+    """
+    Raised when the Docker-backed Python runtime cannot be started.
+    """
 
 
 def build_container_name() -> str:
@@ -69,17 +75,7 @@ def resolve_docker_image(docker_image: str | None) -> str:
     image = str(docker_image or "").strip()
     if image:
         return image
-
-    try:
-        import data.config as config  # type: ignore
-
-        configured = str(getattr(config, "PYTHON_TOOL_DOCKER_IMAGE", "") or "").strip()
-        if configured:
-            return configured
-    except Exception:
-        pass
-
-    return DEFAULT_PYTHON_TOOL_DOCKER_IMAGE
+    return PYTHON_TOOL_DOCKER_IMAGE
 
 
 def resolve_exec_timeout_seconds() -> float | None:
@@ -104,6 +100,27 @@ def validate_code_input(code: str) -> str | None:
     if len(code) > MAX_CODE_LENGTH:
         return f"[stderr]\nSecurityError: code exceeds max length ({MAX_CODE_LENGTH})."
     return None
+
+
+def _format_docker_runtime_error(stderr_text: str, resolved_docker_image: str) -> str:
+    lowered = stderr_text.lower()
+    if (
+        "unable to find image" in lowered
+        or "pull access denied" in lowered
+        or "repository does not exist" in lowered
+        or "no such image" in lowered
+    ):
+        return (
+            f'Docker image "{resolved_docker_image}" is not available for the Python tool. '
+            "Build, load, or configure a valid image before retrying."
+        )
+    if "cannot connect to the docker daemon" in lowered:
+        return "Docker is installed but the daemon is not reachable."
+    if "permission denied" in lowered and "docker" in lowered:
+        return "Docker is installed but the current process does not have permission to use it."
+    if stderr_text.strip():
+        return f"Docker failed to start the Python tool container: {stderr_text.strip()}"
+    return "Docker failed to start the Python tool container."
 
 
 def run_python_in_docker(
@@ -153,18 +170,23 @@ def run_python_in_docker(
             check=False,
         )
     except FileNotFoundError:
-        return "[stderr]\nDocker is not installed or not available in PATH."
+        raise PythonRuntimeError("Docker is not installed or not available in PATH.")
     except subprocess.TimeoutExpired:
         force_remove_container(container_name)
         if timeout_seconds is None:
-            return "[stderr]\nExecution timed out."
-        return f"[stderr]\nExecution timed out after {timeout_seconds} seconds."
+            raise PythonRuntimeError("Python tool execution timed out.")
+        raise PythonRuntimeError(f"Python tool execution timed out after {timeout_seconds} seconds.")
     finally:
         if "code_file_path" in locals():
             try:
                 os.unlink(code_file_path)
             except OSError:
                 pass
+
+    if completed.returncode == 125:
+        raise PythonRuntimeError(
+            _format_docker_runtime_error(completed.stderr or completed.stdout, resolved_docker_image)
+        )
 
     parts: list[str] = []
     stdout_text = completed.stdout.rstrip()

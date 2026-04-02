@@ -45,10 +45,6 @@ REQUEST_MAX_SIZE = 10 * 1024 * 1024
 # Use mathjax for rendering math
 USE_KATEX = True
 
-# Docker image used by the built-in python tool sandbox.
-# Use "secure-python" for base or "secure-python-science" for numpy/sympy/pandas.
-PYTHON_TOOL_DOCKER_IMAGE = "secure-python-science"
-
 # Timeout for the built-in python tools in seconds.
 # Set to 0 for no timeout.
 PYTHON_TOOL_TIMEOUT_SECONDS = 10

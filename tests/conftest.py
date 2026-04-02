@@ -36,7 +36,6 @@ def _install_test_config() -> None:
     config_module.MCP_AUTH_TOKEN = ""
     config_module.MCP_TIMEOUT_SECONDS = 5.0
     config_module.MCP_TOOLS_CACHE_SECONDS = 0.0
-    config_module.PYTHON_TOOL_DOCKER_IMAGE = "secure-python"
     config_module.ATTACHMENT_STORAGE_DIR = data_dir / "attachments"
     config_module.MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024
     config_module.PYTHON_TOOL_ATTACHMENT_MOUNT_DIR = "/mnt/data"

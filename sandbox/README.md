@@ -4,23 +4,13 @@ This directory contains a hardened Docker setup used by the `python` tool for ex
 
 Files:
 
-- `secure_python.Dockerfile`: minimal runtime image.
 - `secure_python_science.Dockerfile`: runtime image with pinned `numpy`, `sympy`, and `pandas`.
-- `build_secure_python.sh`: builds `base` or `science` image.
-- `run_secure_python.sh`: runs a script with hardened runtime flags.
+- `build_python_tool.sh`: builds the `chat-client-python-tool` image from the science Dockerfile.
 
 ## Build
 
-Base image:
-
 ```bash
-sandbox/build_secure_python.sh base
-```
-
-Science image:
-
-```bash
-sandbox/build_secure_python.sh science
+sandbox/build_python_tool.sh
 ```
 
 ## Why This Is Secure (Defense in Depth)
@@ -54,5 +44,5 @@ No single control is enough; the strength is the combination.
 1. Keep host OS, kernel, Docker Engine, and base images patched.
 2. Do not run with `--privileged` and do not mount Docker socket.
 3. Keep image dependencies minimal and pinned.
-4. Use `secure-python` for general usage; use `secure-python-science` only when needed.
+4. Build and use the pinned `chat-client-python-tool` image.
 5. Periodically review runtime flags and limits as workloads change.

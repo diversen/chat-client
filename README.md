@@ -25,22 +25,11 @@ The built-in `python_hardened` tool runs code in a hardened Docker container and
 
 There is also a `python_relaxed` tool for local testing. It still runs in Docker, but it skips AST safety checks and does not disable container network access.
 
-Build the default image:
+The Python tool uses the hardcoded Docker image `chat-client-python-tool`, built from the pinned science runtime with `numpy`, `sympy`, and `pandas`.
+Build it before using the tool:
 
 ```bash
-sandbox/build_secure_python.sh base
-```
-
-Build a science image with `numpy`, `sympy`, and `pandas` (pinned):
-
-```bash
-sandbox/build_secure_python.sh science
-```
-
-Set which image the tool should use in `data/config.py`:
-
-```python
-PYTHON_TOOL_DOCKER_IMAGE = "secure-python-science"
+sandbox/build_python_tool.sh
 ```
 
 Set the execution timeout in `data/config.py`:

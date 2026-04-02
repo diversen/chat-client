@@ -6,6 +6,7 @@ from chat_client.core import attachments as attachment_service
 from chat_client.core import chat_service
 from chat_client.core import mcp_client
 from chat_client.core.tool_config import LocalToolSpec, normalize_local_tool_specs
+from chat_client.tools.python_runtime import PythonRuntimeError
 
 
 def normalize_local_tool_definition(
@@ -194,6 +195,8 @@ def execute_tool(
             ) from error
         except chat_service.ToolExecutionError:
             raise
+        except PythonRuntimeError as error:
+            raise chat_service.ToolBackendError(f'Tool "{func_name}" failed: {error}') from error
         except Exception as error:
             raise chat_service.ToolBackendError(f'Tool "{func_name}" failed: {error}') from error
 

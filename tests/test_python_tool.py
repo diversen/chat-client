@@ -4,8 +4,11 @@ import types
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from chat_client.core.attachments import prepare_tool_attachment_mount
 from chat_client.tools.python_tool import NO_RESULT_ERROR, python_hardened, python_relaxed
+from chat_client.tools.python_runtime import PythonRuntimeError
 
 
 def test_python_tool_evaluates_expression():
@@ -43,7 +46,7 @@ def test_python_tool_allows_numpy_import():
 def test_python_tool_invokes_docker_with_hardening_flags():
     with patch("chat_client.tools.python_runtime.subprocess.run") as run_mock:
         run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="OK\n", stderr="")
-        result = python_hardened("x = 42", docker_image="secure-python-science")
+        result = python_hardened("x = 42", docker_image="chat-client-python-tool")
 
         assert result == NO_RESULT_ERROR
         called_args = run_mock.call_args[0][0]
@@ -54,7 +57,7 @@ def test_python_tool_invokes_docker_with_hardening_flags():
         assert "--cap-drop=ALL" in called_args
         assert "--security-opt" in called_args
         assert "no-new-privileges" in called_args
-        assert "secure-python-science" in called_args
+        assert "chat-client-python-tool" in called_args
 
 
 def test_python_tool_mounts_attachment_directory_when_present():
@@ -112,8 +115,9 @@ def test_python_tool_times_out_infinite_loop():
     timeout_error = subprocess.TimeoutExpired(cmd="docker", timeout=10)
     cleanup_result = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
     with patch("chat_client.tools.python_runtime.subprocess.run", side_effect=[timeout_error, cleanup_result]) as run_mock:
-        result = python_hardened("while True:\n    pass")
-        assert "Execution timed out" in result
+        with pytest.raises(PythonRuntimeError) as error:
+            python_hardened("while True:\n    pass")
+        assert "timed out" in str(error.value)
         assert run_mock.call_count == 2
         cleanup_args = run_mock.call_args_list[1][0][0]
         assert cleanup_args[:3] == ["docker", "rm", "-f"]
@@ -138,6 +142,21 @@ def test_python_tool_invalid_syntax_is_reported_by_runtime():
         assert "SyntaxError" in result
 
 
+def test_python_tool_raises_when_docker_image_is_missing():
+    stderr = (
+        "Unable to find image 'chat-client-python-tool:latest' locally\n"
+        "docker: Error response from daemon: pull access denied for chat-client-python-tool, "
+        "repository does not exist or may require 'docker login': denied: requested access "
+        "to the resource is denied\n"
+    )
+    with patch("chat_client.tools.python_runtime.subprocess.run") as run_mock:
+        run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=125, stdout="", stderr=stderr)
+        with pytest.raises(PythonRuntimeError) as error:
+            python_hardened("print('ok')")
+
+    assert 'Docker image "chat-client-python-tool" is not available' in str(error.value)
+
+
 def test_python_tool_rejects_non_string_code():
     assert "code must be a string" in python_hardened(123)  # type: ignore[arg-type]
 
@@ -153,7 +172,7 @@ def test_python_relaxed_allows_open_calls():
 def test_python_relaxed_invokes_docker_without_hardening_flags():
     with patch("chat_client.tools.python_runtime.subprocess.run") as run_mock:
         run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="OK\n", stderr="")
-        result = python_relaxed("x = 42", docker_image="secure-python-science")
+        result = python_relaxed("x = 42", docker_image="chat-client-python-tool")
 
         assert result == NO_RESULT_ERROR
         called_args = run_mock.call_args[0][0]
@@ -164,7 +183,7 @@ def test_python_relaxed_invokes_docker_without_hardening_flags():
         assert "--read-only" not in called_args
         assert "--cap-drop=ALL" not in called_args
         assert "--security-opt" not in called_args
-        assert "secure-python-science" in called_args
+        assert "chat-client-python-tool" in called_args
 
 
 def test_python_tool_uses_configured_timeout():
