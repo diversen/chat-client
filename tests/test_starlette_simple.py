@@ -64,16 +64,18 @@ def test_user_routes():
     client = SyncASGITestClient(app)
     try:
         # Test signup GET
-        response = client.get("/user/signup")
-        assert response.status_code == 200, f"Signup GET failed: {response.status_code}"
-        assert "Sign up" in response.text
-        print("✓ Signup GET works")
+        with patch("chat_client.repositories.prompt_repository.list_prompts", return_value=[]):
+            response = client.get("/user/signup")
+            assert response.status_code == 200, f"Signup GET failed: {response.status_code}"
+            assert "Sign up" in response.text
+            print("✓ Signup GET works")
 
         # Test login GET
-        response = client.get("/user/login")
-        assert response.status_code == 200, f"Login GET failed: {response.status_code}"
-        assert "Login" in response.text
-        print("✓ Login GET works")
+        with patch("chat_client.repositories.prompt_repository.list_prompts", return_value=[]):
+            response = client.get("/user/login")
+            assert response.status_code == 200, f"Login GET failed: {response.status_code}"
+            assert "Login" in response.text
+            print("✓ Login GET works")
 
         # Test captcha
         response = client.get("/captcha")
@@ -103,11 +105,12 @@ def test_authenticated_routes():
     try:
         # Test chat page when authenticated
         with patch("chat_client.core.user_session.is_logged_in", return_value=1):  # Mock logged in user
-            with patch("chat_client.repositories.prompt_repository.list_prompts", return_value=[]):
-                response = client.get("/")
-                assert response.status_code == 200, f"Chat page failed: {response.status_code}"
-                assert "Chat" in response.text
-                print("✓ Chat page works when authenticated")
+            with patch("chat_client.repositories.user_repository.get_profile", return_value={}):
+                with patch("chat_client.repositories.prompt_repository.list_prompts", return_value=[]):
+                    response = client.get("/")
+                    assert response.status_code == 200, f"Chat page failed: {response.status_code}"
+                    assert "Chat" in response.text
+                    print("✓ Chat page works when authenticated")
 
             # Test is-logged-in when authenticated
             response = client.get("/user/is-logged-in")
@@ -117,10 +120,11 @@ def test_authenticated_routes():
             print("✓ Is-logged-in works when authenticated")
 
             # Test prompt list
-            with patch("chat_client.repositories.prompt_repository.list_prompts", return_value=[]):
-                response = client.get("/prompt")
-                assert response.status_code == 200
-                print("✓ Prompt list works when authenticated")
+            with patch("chat_client.repositories.user_repository.get_profile", return_value={}):
+                with patch("chat_client.repositories.prompt_repository.list_prompts", return_value=[]):
+                    response = client.get("/prompt")
+                    assert response.status_code == 200
+                    print("✓ Prompt list works when authenticated")
     finally:
         client.close()
 

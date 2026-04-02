@@ -179,14 +179,15 @@ class TestStarletteBackend:
             # Test profile operations
             with patch("chat_client.core.user_session.is_logged_in", return_value=1):
                 # Get profile
-                with patch(
-                    "chat_client.repositories.user_repository.get_profile",
-                    return_value={"email": "test@example.com", "username": "test-user"},
-                ):
-                    response = client.get("/user/profile")
-                    assert response.status_code == 200
-                    assert "Profile" in response.text
-                    print("  ✓ Get profile works")
+                with patch("chat_client.repositories.prompt_repository.list_prompts", return_value=[]):
+                    with patch(
+                        "chat_client.repositories.user_repository.get_profile",
+                        return_value={"email": "test@example.com", "username": "test-user"},
+                    ):
+                        response = client.get("/user/profile")
+                        assert response.status_code == 200
+                        assert "Profile" in response.text
+                        print("  ✓ Get profile works")
 
                 # Update profile
                 with patch("chat_client.repositories.user_repository.update_profile", return_value=True):
