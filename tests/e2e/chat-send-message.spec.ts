@@ -5,7 +5,15 @@ import { login } from './helpers/auth';
 function ensureManagedTestUser(): void {
   if (process.env.E2E_MANAGED_SERVER !== '1') return;
   execSync(
-    'SKIP_PROVIDER_MODEL_DISCOVERY=1 SESSION_HTTPS_ONLY=0 python -m chat_client.cli create-user --email "playwright@example.com" --password "Playwright123!"',
+    'SKIP_PROVIDER_MODEL_DISCOVERY=1 SESSION_HTTPS_ONLY=0 python -m chat_client.cli init-system',
+    { stdio: 'inherit' },
+  );
+  execSync(
+    "SKIP_PROVIDER_MODEL_DISCOVERY=1 SESSION_HTTPS_ONLY=0 python - <<'PY'\n" +
+      'import asyncio\n' +
+      'from chat_client.cli import _create_user\n' +
+      "asyncio.run(_create_user('playwright@example.com', 'Playwright123!'))\n" +
+      'PY',
     { stdio: 'inherit' },
   );
 }
@@ -79,4 +87,51 @@ test('second user message aligns directly below top bar after short assistant re
       });
     })
     .toBeLessThanOrEqual(3);
+});
+
+test('renders valid KaTeX, preserves prose dollars, and highlights invalid expressions', async ({ page }) => {
+  ensureManagedTestUser();
+
+  await page.route('**/chat', async (route) => {
+    const assistantText = [
+      'Valid display math:',
+      '',
+      String.raw`\[`,
+      String.raw`\prod_{j=1}^{i-1}(i^i)_j = \prod_{j=1}^{i-1}\bigl(i^i\bmod j\bigr).`,
+      String.raw`\]`,
+      '',
+      'Inline math still works: $(i^i)_m$.',
+      '',
+      'Currency-style prose should stay prose: price is $5 today.',
+      '',
+      'Broken math should be highlighted: $\\prod_{i=2}^{12} (i^i)_\\prod$.',
+    ].join('\n');
+
+    const sseBody = [
+      `data: ${JSON.stringify({ choices: [{ delta: { content: assistantText } }] })}`,
+      'data: [DONE]',
+      '',
+    ].join('\n');
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/event-stream',
+      body: sseBody,
+    });
+  });
+
+  await login(page);
+
+  await page.fill('#message', 'Test KaTeX rendering');
+  await page.click('#send');
+
+  const assistantContent = page.locator('.assistant-message .content').last();
+  await expect(assistantContent).toContainText('Valid display math:');
+  await expect(assistantContent.locator('.katex-display')).toHaveCount(1);
+  await expect(assistantContent.locator('.katex')).toHaveCount(2);
+  await expect(assistantContent).toContainText('price is $5 today.');
+
+  const katexError = assistantContent.locator('.katex-error');
+  await expect(katexError).toHaveCount(1);
+  await expect(katexError).toContainText(String.raw`$\prod_{i=2}^{12} (i^i)_\prod$`);
 });

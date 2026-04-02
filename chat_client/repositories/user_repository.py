@@ -1,4 +1,5 @@
 from starlette.requests import Request
+from dataclasses import dataclass
 from chat_client.database.cache import DatabaseCache
 from chat_client.core.send_mail import send_smtp_message
 
@@ -19,6 +20,13 @@ from chat_client.database.db_session import async_session
 
 logger: logging.Logger = logging.getLogger(__name__)
 THEME_PREFERENCES = {"system", "light", "dark"}
+
+
+@dataclass(frozen=True)
+class CreateLocalUserResult:
+    user_id: int
+    email: str
+    created: bool
 
 
 def _password_hash(password: str, cost: int = 12) -> str:
@@ -94,6 +102,43 @@ async def create_user(request: Request):
             raise exceptions_validation.UserValidate("Failed to send reset email. Please try and sign up again later.")
 
         return {"user_id": new_user.user_id, "email": new_user.email}
+
+
+async def create_local_user(
+    email: str,
+    password: str,
+    *,
+    verified: int = 1,
+) -> CreateLocalUserResult:
+    password_hash = _password_hash(password)
+
+    async with async_session() as session:
+        stmt = select(User).where(User.email == email)
+        result = await session.execute(stmt)
+        existing_user = result.scalar_one_or_none()
+
+        if existing_user:
+            assert existing_user.user_id is not None
+            return CreateLocalUserResult(
+                user_id=existing_user.user_id,
+                email=existing_user.email,
+                created=False,
+            )
+
+        new_user = User(
+            email=email,
+            password_hash=password_hash,
+            verified=verified,
+            random=secrets.token_urlsafe(32),
+        )
+        session.add(new_user)
+        await session.commit()
+        assert new_user.user_id is not None
+        return CreateLocalUserResult(
+            user_id=new_user.user_id,
+            email=new_user.email,
+            created=True,
+        )
 
 
 async def verify_user(request: Request):

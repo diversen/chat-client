@@ -939,6 +939,14 @@ a.delete svg {
 
 .katex-display { overflow: auto hidden }
 
+.katex-error {
+    color: #b42318;
+    background: rgba(180, 35, 24, 0.12);
+    border: 1px solid rgba(180, 35, 24, 0.28);
+    border-radius: 0.2rem;
+    padding: 0 0.18rem;
+}
+
 a {
     word-break: break-all;
     overflow-wrap: anywhere;

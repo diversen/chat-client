@@ -1,11 +1,10 @@
-import { mdNoHTML } from './markdown.js';
 import { getConfig } from './app-dialog.js';
 import {
     loadingSpinner,
 } from './app-elements.js';
 import { initAppEvents } from './app-events.js';
 import { dd } from './diff-dom.js';
-import { modifyStreamedText } from './utils.js';
+import { renderKatex, renderMarkdownWithKatex } from './katex-render.js';
 import { storageService, authService, chatService } from './chat-services.js';
 import { ConversationController } from './chat-controller.js';
 import { createChatView } from './chat-view.js';
@@ -28,37 +27,6 @@ const STREAM_RENDER_CONFIG = {
 function highlightCodeInElement(element) {
     const codeBlocks = element.querySelectorAll('pre code');
     codeBlocks.forEach(hljs.highlightElement);
-}
-
-/**
- * Render math if enabled
- */
-function renderKatex(contentElem) {
-    // This is not working optimally. 
-    // LLMs might produce sentences like: 
-    // a) (sufficiently well-behaved) or
-    // b) ( e^{i\omega t} ).
-    // 
-    // Besides that markdown usually also escapes the backslash
-    // and this may mess up rendering.
-    //
-    // Fix matrix rendering. This be done like this:
-    // Replace '\\' with '\\cr'
-    if (useKatex) {
-        renderMathInElement(contentElem, {
-            delimiters: [
-                { left: "$$", right: "$$", display: true },
-                { left: "$", right: "$", display: false },
-                { left: "\\(", right: "\\)", display: false },
-                { left: "\\begin{equation}", right: "\\end{equation}", display: true },
-                { left: "\\begin{align}", right: "\\end{align}", display: true },
-                { left: "\\begin{alignat}", right: "\\end{alignat}", display: true },
-                { left: "\\begin{gather}", right: "\\end{gather}", display: true },
-                { left: "\\begin{CD}", right: "\\end{CD}", display: true },
-                { left: "\\[", right: "\\]", display: true },
-            ],
-        });
-    }
 }
 
 function shouldRunHighlight(isFinal = true) {
@@ -110,8 +78,13 @@ function splitThinkingSegments(rawText) {
 }
 
 function appendRenderedMarkdown(target, markdownText) {
+    if (useKatex) {
+        renderMarkdownWithKatex(target, markdownText);
+        return;
+    }
+
     const container = document.createElement('div');
-    container.innerHTML = mdNoHTML.render(markdownText);
+    container.innerHTML = mdNoHTML.render(modifyStreamedText(markdownText));
     while (container.firstChild) {
         target.appendChild(container.firstChild);
     }
@@ -187,15 +160,14 @@ async function renderStreamedResponseText(contentElement, streamedResponseText, 
 
     let thinkingIndex = 0;
     for (const segment of segments) {
-        const normalizedText = modifyStreamedText(segment.text);
         if (segment.type === 'thinking') {
             const isOpen = previousThinkingStates[thinkingIndex] === true;
-            const thinkingBlock = createThinkingBlock(normalizedText, isOpen);
+            const thinkingBlock = createThinkingBlock(segment.text, isOpen);
             contentElement.appendChild(thinkingBlock);
             thinkingIndex += 1;
             continue;
         }
-        appendRenderedMarkdown(contentElement, normalizedText);
+        appendRenderedMarkdown(contentElement, segment.text);
     }
     bindThinkingToggleEvents(contentElement);
 
@@ -204,7 +176,7 @@ async function renderStreamedResponseText(contentElement, streamedResponseText, 
         highlightCodeInElement(contentElement);
     }
     if (shouldRunKatex(isFinal)) {
-        renderKatex(contentElement);
+        renderKatex(contentElement, useKatex);
     }
 
     const endTime = performance.now();

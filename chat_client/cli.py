@@ -4,16 +4,12 @@ import click
 import subprocess
 import logging
 import asyncio
-import secrets
 import chat_client.core.set_system_path  # noqa
-from chat_client.repositories.user_repository import _password_hash
+from chat_client.repositories import user_repository
 from chat_client.database.migration import Migration
 from data.config import DATA_DIR, LOG_LEVEL
 from chat_client import __version__, __program__
 from chat_client.core.logging import setup_logging
-from chat_client.models import User
-from chat_client.database.db_session import async_session
-from sqlalchemy import select
 from pathlib import Path
 
 setup_logging(LOG_LEVEL)
@@ -119,27 +115,12 @@ def create_user(email: str, password: str):
 
 
 async def _create_user(email: str, password: str):
-    password_hash = _password_hash(password)
+    result = await user_repository.create_local_user(email, password, verified=1)
+    if result.created:
+        logger.info("Created user: %s", result.email)
+        return
 
-    async with async_session() as session:
-        # Check if user with email already exists
-        stmt = select(User).where(User.email == email)
-        result = await session.execute(stmt)
-        existing_user = result.scalar_one_or_none()
-
-        if existing_user:
-            logger.info("User already exists. Please login or reset your password.")
-            return
-
-        # Insert new user
-        new_user = User(
-            email=email,
-            password_hash=password_hash,
-            verified=1,
-            random=secrets.token_urlsafe(32),
-        )
-        session.add(new_user)
-        await session.commit()
+    logger.info("User already exists. Please login or reset your password.")
 
 
 @cli.command(help="Init the system")
