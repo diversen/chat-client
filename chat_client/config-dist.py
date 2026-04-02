@@ -98,20 +98,20 @@ SYSTEM_MESSAGE_MODELS: list = ["nemotron-cascade-2:latest", "ministral-3:14b", "
 
 
 TOOL_REGISTRY = {
-    "python_hardened": python_hardened_tool,
+    "python_tool": python_hardened_tool,
 }
+
 
 # Optional explicit local tool definitions in MCP-style schema.
 # `name` must exist in TOOL_REGISTRY.
 LOCAL_TOOL_DEFINITIONS = [
     {
-        "name": "python_hardened",
+        "name": "python_tool",
         "description": (
-            "Run short Python code in a sandboxed container. "
+            "Run Python code in a sandboxed container. "
             'Use this tool only with a JSON object of the form {"code": "..."} where '
             "the code value is a single Python script string. Call the tool name exactly "
-            'as "python_hardened". Do not invent related tool names such as "stateful_python" or '
-            '"python_codeful". Return printed output or the final expression result.'
+            'as "python_tool".'
         ),
         "input_schema": {
             "type": "object",
