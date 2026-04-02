@@ -4,8 +4,8 @@ This directory contains a hardened Docker setup used by the `python` tool for ex
 
 Files:
 
-- `secure_python_science.Dockerfile`: runtime image with pinned `numpy`, `sympy`, and `pandas`.
-- `build_python_tool.sh`: builds the `chat-client-python-tool` image from the science Dockerfile.
+- `chat_client_python_tool.Dockerfile`: runtime image with pinned `numpy`, `sympy`, and `pandas`.
+- `build_python_tool.sh`: builds the `chat-client-python-tool` image from the Python tool Dockerfile.
 
 ## Build
 

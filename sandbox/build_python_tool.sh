@@ -7,7 +7,7 @@ if [[ $# -gt 0 ]]; then
 fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-DOCKERFILE="${SCRIPT_DIR}/secure_python_science.Dockerfile"
+DOCKERFILE="${SCRIPT_DIR}/chat_client_python_tool.Dockerfile"
 IMAGE_NAME="chat-client-python-tool"
 
 docker build -t "${IMAGE_NAME}" -f "${DOCKERFILE}" "${SCRIPT_DIR}"
