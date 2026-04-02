@@ -109,9 +109,26 @@ def test_python_tool_empty_output_returns_retry_hint():
 
 
 def test_python_tool_times_out_infinite_loop():
-    with patch("chat_client.tools.python_runtime.subprocess.run", side_effect=subprocess.TimeoutExpired(cmd="docker", timeout=10)):
+    timeout_error = subprocess.TimeoutExpired(cmd="docker", timeout=10)
+    cleanup_result = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+    with patch("chat_client.tools.python_runtime.subprocess.run", side_effect=[timeout_error, cleanup_result]) as run_mock:
         result = python("while True:\n    pass")
         assert "Execution timed out" in result
+        assert run_mock.call_count == 2
+        cleanup_args = run_mock.call_args_list[1][0][0]
+        assert cleanup_args[:3] == ["docker", "rm", "-f"]
+
+
+def test_python_tool_assigns_unique_container_name():
+    with patch("chat_client.tools.python_runtime.subprocess.run") as run_mock:
+        run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="ok\n", stderr="")
+        result = python("print('ok')")
+
+        assert result == "ok"
+        called_args = run_mock.call_args[0][0]
+        assert "--name" in called_args
+        name_arg = called_args[called_args.index("--name") + 1]
+        assert name_arg.startswith("chat-client-python-tool-")
 
 
 def test_python_tool_invalid_syntax_is_reported_by_runtime():

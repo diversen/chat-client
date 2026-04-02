@@ -2,6 +2,7 @@ import importlib
 import os
 import subprocess
 import tempfile
+import uuid
 from contextlib import nullcontext
 
 from chat_client.core.attachments import resolve_tool_mount_dir
@@ -12,6 +13,22 @@ DEFAULT_PYTHON_TOOL_DOCKER_IMAGE = "secure-python"
 NO_RESULT_ERROR = "[stderr]\nNo result produced. Please print the answer or end with an expression."
 ATTACHMENT_SOURCE_MOUNT_DIR = "/mnt/input"
 ATTACHMENT_TMPFS_SPEC = "rw,size=65m"
+
+
+def build_container_name() -> str:
+    return f"chat-client-python-tool-{uuid.uuid4().hex[:12]}"
+
+
+def force_remove_container(container_name: str) -> None:
+    try:
+        subprocess.run(
+            ["docker", "rm", "-f", container_name],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    except Exception:
+        pass
 
 
 def build_runtime_prelude() -> str:
@@ -95,6 +112,7 @@ def run_python_in_docker(
     docker_args: list[str],
     attachment_host_dir: str | None = None,
 ) -> str:
+    container_name = build_container_name()
     try:
         resolved_docker_image = resolve_docker_image(docker_image)
         timeout_seconds = resolve_exec_timeout_seconds()
@@ -117,6 +135,8 @@ def run_python_in_docker(
             "docker",
             "run",
             *docker_args,
+            "--name",
+            container_name,
             "--tmpfs",
             f"{resolve_tool_mount_dir()}:{ATTACHMENT_TMPFS_SPEC}",
             "-v",
@@ -135,6 +155,7 @@ def run_python_in_docker(
     except FileNotFoundError:
         return "[stderr]\nDocker is not installed or not available in PATH."
     except subprocess.TimeoutExpired:
+        force_remove_container(container_name)
         if timeout_seconds is None:
             return "[stderr]\nExecution timed out."
         return f"[stderr]\nExecution timed out after {timeout_seconds} seconds."

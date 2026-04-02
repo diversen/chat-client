@@ -598,10 +598,8 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
         const segmentKind = getSegmentKindKey(kind);
         return {
             kind: segmentKind,
-            isCollapsible: segmentKind === 'thinking' || segmentKind === 'answer' || segmentKind === 'tool',
-            defaultOpen: segmentKind === 'answer'
-                ? true
-                : segmentKind === 'tool'
+            isCollapsible: segmentKind === 'thinking' || segmentKind === 'tool',
+            defaultOpen: segmentKind === 'tool'
                     ? toolCallsOpenByDefault
                     : false,
         };
@@ -786,7 +784,7 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                     behavior.kind,
                     behavior.defaultOpen,
                 );
-                if (!collapsibleState) {
+                if (behavior.isCollapsible && !collapsibleState) {
                     throw new Error(`Expected collapsible state for segment kind: ${behavior.kind}`);
                 }
 
@@ -819,7 +817,7 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                                 pendingForceRender = false;
                                 const beforeBaseScrollHeight = lastBaseScrollHeight;
                                 await updateContentDiff(segment.contentElement, hiddenContentElem, streamedResponseText, force);
-                                collapsibleState.syncVisibility();
+                                collapsibleState?.syncVisibility();
                                 syncScrollAfterRender(beforeBaseScrollHeight);
                             }
                         } finally {
