@@ -621,7 +621,6 @@ pre code {
     max-width: 100%;
     min-height: 60px;
     padding: 10px;
-    border: 1px solid var(--border);
     border-radius: 4px;
     background-color: var(--nav-background);
     color: var(--text-main);
@@ -639,10 +638,9 @@ pre code {
 
 .edit-cancel, .edit-send {
     padding: 8px 16px;
-    border: 1px solid var(--border);
     border-radius: 4px;
-    background-color: var(--button-base);
-    color: var(--text-main);
+    background-color: color-mix(in srgb, var(--button-base) 78%, black);
+    color: var(--text-bright);
     cursor: pointer;
     font-size: 14px;
 }
@@ -651,15 +649,6 @@ pre code {
     background-color: var(--button-hover);
 }
 
-.edit-send {
-    background-color: var(--links);
-    color: white;
-    border-color: var(--links);
-}
-
-.edit-send:hover {
-    background-color: var(--focus);
-}
 
 .edit-send:disabled {
     background-color: #666;

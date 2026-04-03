@@ -195,10 +195,14 @@ function showEditForm(container, originalMessage, onEdit) {
     const textarea = editForm.querySelector('.edit-textarea');
     const cancelButton = editForm.querySelector('.edit-cancel');
     const sendButton = editForm.querySelector('.edit-send');
+    const resizeEditTextarea = () => {
+        textarea.style.height = 'auto';
+        textarea.style.height = `${textarea.scrollHeight}px`;
+    };
 
     textarea.focus();
-    textarea.style.height = 'auto';
-    textarea.style.height = textarea.scrollHeight + 'px';
+    resizeEditTextarea();
+    textarea.addEventListener('input', resizeEditTextarea);
 
     cancelButton.addEventListener('click', () => {
         hideEditForm(container);
