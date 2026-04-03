@@ -375,11 +375,8 @@ nav svg {
     padding: 14px 16px;
     box-sizing: border-box;
     max-width: min(68%, 720px);
-}
-
-.user-message {
     margin-left: auto;
-    background: var(--user-message-background, rgba(140, 148, 160, 0.34));
+    background: var(--nav-background);
     box-shadow: none;
 }
 
