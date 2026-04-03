@@ -510,6 +510,14 @@ def _resolve_max_chat_loop_rounds(value: Any) -> int:
     return resolved
 
 
+def _resolve_empty_answer_retry_count(value: Any) -> int:
+    try:
+        resolved = int(value)
+    except (TypeError, ValueError):
+        return 0
+    return max(resolved, 0)
+
+
 def _normalize_tool_calls(raw_tool_calls: Any) -> list[dict[str, Any]]:
     normalized: list[dict[str, Any]] = []
     if not isinstance(raw_tool_calls, list):
@@ -670,6 +678,8 @@ async def chat_response_stream(
     tools_loader: Callable[[], list[dict[str, Any]]],
     tool_executor: Callable[[dict[str, Any]], Any],
     max_chat_loop_rounds: int = DEFAULT_CHAT_MAX_LOOP_ROUNDS,
+    empty_answer_retry_count: int = 0,
+    retry_on_empty_answer_stop: bool = False,
     logger: logging.Logger,
     trace_id: str = "",
     user_id: Any = None,
@@ -684,12 +694,15 @@ async def chat_response_stream(
     try:
         provider_info = provider_info_resolver(model)
         max_rounds = _resolve_max_chat_loop_rounds(max_chat_loop_rounds)
+        max_empty_answer_retries = _resolve_empty_answer_retry_count(empty_answer_retry_count)
 
         _log_event(
             logger,
             logging.INFO,
             "chat.model.session.start",
             max_rounds=max_rounds,
+            empty_answer_retry_count=max_empty_answer_retries,
+            retry_on_empty_answer_stop=retry_on_empty_answer_stop,
             tools_enabled=model in tool_models,
             **summarize_messages_for_log(messages),
             **base_log_context,
@@ -702,7 +715,7 @@ async def chat_response_stream(
 
         tools_enabled = model in tool_models
         tool_definitions = tools_loader() if tools_enabled else []
-        incomplete_stream_retry_attempted = False
+        empty_answer_retry_attempts = 0
 
         rounds = 0
         while True:
@@ -900,20 +913,33 @@ async def chat_response_stream(
                     last_chunk_summary=last_chunk_summary or {},
                     **base_log_context,
                 )
+            answer_missing = assistant_summary["answer_chars"] == 0 and not tool_calls
             stream_incomplete = (
                 chunk_count > 0
                 and finish_reason is None
-                and assistant_summary["content_chars"] == 0
-                and not tool_calls
+                and answer_missing
             )
-            if stream_incomplete:
-                if not incomplete_stream_retry_attempted:
-                    incomplete_stream_retry_attempted = True
+            empty_stopped_answer = (
+                chunk_count > 0
+                and finish_reason is not None
+                and answer_missing
+                and retry_on_empty_answer_stop
+            )
+            if stream_incomplete or empty_stopped_answer:
+                if empty_answer_retry_attempts < max_empty_answer_retries:
+                    empty_answer_retry_attempts += 1
                     _log_event(
                         logger,
                         logging.WARNING,
-                        "chat.model.incomplete_stream.retry",
+                        (
+                            "chat.model.incomplete_stream.retry"
+                            if stream_incomplete
+                            else "chat.model.empty_answer_stop.retry"
+                        ),
                         round=rounds,
+                        retry_attempt=empty_answer_retry_attempts,
+                        max_retry_count=max_empty_answer_retries,
+                        finish_reason=str(finish_reason or ""),
                         chunk_count=chunk_count,
                         chunks_with_choices=chunks_with_choices,
                         chunks_with_delta=chunks_with_delta,
@@ -922,7 +948,8 @@ async def chat_response_stream(
                         **base_log_context,
                     )
                     continue
-                raise IncompleteStreamError(INCOMPLETE_STREAM_ERROR_MESSAGE)
+                if stream_incomplete:
+                    raise IncompleteStreamError(INCOMPLETE_STREAM_ERROR_MESSAGE)
             if tool_calls:
                 _log_event(
                     logger,

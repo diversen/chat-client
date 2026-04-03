@@ -57,6 +57,14 @@ PYTHON_TOOL_ATTACHMENT_MOUNT_DIR = "/mnt/data"
 # This includes tool-calling rounds and the final no-tool answer round.
 CHAT_MAX_LOOP_ROUNDS = 50
 
+# Number of extra attempts allowed when a streamed response ends without visible answer content.
+# Set to 0 to disable retries.
+CHAT_EMPTY_ANSWER_RETRY_COUNT = 1
+
+# When True, also retry responses that end with finish_reason="stop" but still produce no answer content.
+# When False, only incomplete no-finish streams are retried.
+CHAT_RETRY_ON_EMPTY_ANSWER_STOP = False
+
 PROVIDERS = {
     # "openai": {
     #     "base_url": "https://api.openai.com/v1",

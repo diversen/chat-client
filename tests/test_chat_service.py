@@ -436,6 +436,7 @@ def test_chat_response_stream_retries_once_for_reasoning_only_incomplete_stream(
             tool_models=[],
             tools_loader=lambda: [],
             tool_executor=lambda _tool_call: "",
+            empty_answer_retry_count=1,
             logger=logging.getLogger("test"),
         ):
             chunks.append(chunk)
@@ -474,6 +475,7 @@ def test_chat_response_stream_returns_error_after_second_reasoning_only_incomple
             tool_models=[],
             tools_loader=lambda: [],
             tool_executor=lambda _tool_call: "",
+            empty_answer_retry_count=1,
             logger=logging.getLogger("test"),
         ):
             chunks.append(chunk)
@@ -485,6 +487,79 @@ def test_chat_response_stream_returns_error_after_second_reasoning_only_incomple
     assert any(chat_service.INCOMPLETE_STREAM_ERROR_MESSAGE in chunk for chunk in chunks)
     assert first_stream.closed is True
     assert second_stream.closed is True
+
+
+def test_chat_response_stream_retries_empty_stopped_answer_when_enabled():
+    first_stream = DummyStream([_chunk("", reasoning="Thinking", finish_reason="stop")])
+    second_stream = DummyStream([_chunk("final answer", finish_reason="stop")])
+    create_calls = []
+
+    def _create(**kwargs):
+        create_calls.append(kwargs)
+        return first_stream if len(create_calls) == 1 else second_stream
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=_create)))
+    request = DummyRequest(disconnected_after_calls=999)
+
+    async def _run():
+        chunks = []
+        async for chunk in chat_service.chat_response_stream(
+            request,
+            messages=[{"role": "user", "content": "hello"}],
+            model="test-model",
+            openai_client_cls=lambda **_: client,
+            provider_info_resolver=lambda _model: {},
+            tool_models=[],
+            tools_loader=lambda: [],
+            tool_executor=lambda _tool_call: "",
+            empty_answer_retry_count=1,
+            retry_on_empty_answer_stop=True,
+            logger=logging.getLogger("test"),
+        ):
+            chunks.append(chunk)
+        return chunks
+
+    chunks = asyncio.run(_run())
+
+    assert len(create_calls) == 2
+    assert any('"reasoning": "Thinking"' in chunk for chunk in chunks)
+    assert any("final answer" in chunk for chunk in chunks)
+    assert first_stream.closed is True
+    assert second_stream.closed is True
+
+
+def test_chat_response_stream_does_not_retry_empty_stopped_answer_by_default():
+    stream = DummyStream([_chunk("", reasoning="Thinking", finish_reason="stop")])
+    create_calls = []
+
+    def _create(**kwargs):
+        create_calls.append(kwargs)
+        return stream
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=_create)))
+    request = DummyRequest(disconnected_after_calls=999)
+
+    async def _run():
+        chunks = []
+        async for chunk in chat_service.chat_response_stream(
+            request,
+            messages=[{"role": "user", "content": "hello"}],
+            model="test-model",
+            openai_client_cls=lambda **_: client,
+            provider_info_resolver=lambda _model: {},
+            tool_models=[],
+            tools_loader=lambda: [],
+            tool_executor=lambda _tool_call: "",
+            logger=logging.getLogger("test"),
+        ):
+            chunks.append(chunk)
+        return chunks
+
+    chunks = asyncio.run(_run())
+
+    assert len(create_calls) == 1
+    assert any('"reasoning": "Thinking"' in chunk for chunk in chunks)
+    assert stream.closed is True
 
 
 def test_chat_response_stream_respects_configured_max_chat_loop_rounds():

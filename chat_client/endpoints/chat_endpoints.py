@@ -54,6 +54,8 @@ CONFIGURED_TOOL_REGISTRY = getattr(config, "TOOL_REGISTRY", {})
 CONFIGURED_LOCAL_TOOL_DEFINITIONS = getattr(config, "LOCAL_TOOL_DEFINITIONS", [])
 CONFIGURED_TOOL_MODELS = getattr(config, "TOOL_MODELS", [])
 RESOLVED_CHAT_MAX_LOOP_ROUNDS = getattr(config, "CHAT_MAX_LOOP_ROUNDS", chat_service.DEFAULT_CHAT_MAX_LOOP_ROUNDS)
+RESOLVED_CHAT_EMPTY_ANSWER_RETRY_COUNT = getattr(config, "CHAT_EMPTY_ANSWER_RETRY_COUNT", 1)
+RESOLVED_CHAT_RETRY_ON_EMPTY_ANSWER_STOP = bool(getattr(config, "CHAT_RETRY_ON_EMPTY_ANSWER_STOP", False))
 
 # Backward-compatible aliases for existing patch points in tests and local imports.
 MODELS = config_utils.resolve_models(CONFIGURED_MODELS, CONFIGURED_PROVIDERS)
@@ -700,6 +702,8 @@ async def _chat_response_stream(
         tools_loader=_list_tools,
         tool_executor=_tool_executor_with_persist,
         max_chat_loop_rounds=CHAT_MAX_LOOP_ROUNDS,
+        empty_answer_retry_count=RESOLVED_CHAT_EMPTY_ANSWER_RETRY_COUNT,
+        retry_on_empty_answer_stop=RESOLVED_CHAT_RETRY_ON_EMPTY_ANSWER_STOP,
         logger=logger,
         trace_id=trace_id,
         user_id=logged_in,
