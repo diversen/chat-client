@@ -10,6 +10,7 @@ chat_client.egg-info
 prompt.md
 uv.lock
 tests/.test-data/
+.codex
 
 # Playwright
 /test-results/
