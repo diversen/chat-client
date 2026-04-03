@@ -520,16 +520,19 @@ class TestChatEndpoints(BaseTestCase):
                 "supports_images": True,
                 "supports_tools": False,
                 "supports_attachments": False,
+                "supports_thinking": False,
             },
             "tool-model": {
                 "supports_images": False,
                 "supports_tools": True,
                 "supports_attachments": True,
+                "supports_thinking": False,
             },
             "combo-model": {
                 "supports_images": False,
                 "supports_tools": False,
                 "supports_attachments": False,
+                "supports_thinking": False,
             },
         }
 

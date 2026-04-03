@@ -17,6 +17,7 @@ from chat_client.core import attachments as attachment_service
 from chat_client.core import chat_service
 from chat_client.core import config_utils
 from chat_client.core import mcp_client
+from chat_client.core import model_capabilities
 from chat_client.core import tool_executor
 from chat_client.core.templates import get_templates
 from chat_client.repositories import attachment_repository, chat_repository, prompt_repository
@@ -77,6 +78,15 @@ def _resolve_provider_info(model: str) -> dict:
     return chat_service.resolve_provider_info(model, MODELS, PROVIDERS)
 
 
+def _model_capabilities_cache_token() -> dict[str, Any]:
+    return {
+        "providers": PROVIDERS,
+        "models": MODELS,
+        "vision_models": VISION_MODELS,
+        "tool_models": TOOL_MODELS,
+    }
+
+
 def _has_local_tool_registry() -> bool:
     return isinstance(TOOL_REGISTRY, dict) and bool(TOOL_REGISTRY)
 
@@ -105,36 +115,56 @@ def _list_local_tools() -> list[dict[str, Any]]:
 
 
 def _resolve_tool_models() -> list[str]:
-    if not isinstance(TOOL_MODELS, list):
-        return []
-    if "*" in TOOL_MODELS:
-        return list(MODELS.keys())
-    if TOOL_MODELS:
-        return TOOL_MODELS
-    return []
+    return model_capabilities.resolve_tool_models(
+        models=MODELS,
+        vision_models=VISION_MODELS,
+        tool_models=TOOL_MODELS,
+        provider_info_resolver=_resolve_provider_info,
+        cache_token=_model_capabilities_cache_token(),
+    )
 
 
 def _build_model_capabilities() -> dict[str, dict[str, bool]]:
-    vision_models = set(VISION_MODELS if isinstance(VISION_MODELS, list) else [])
-    tool_models = set(_resolve_tool_models())
-    capabilities: dict[str, dict[str, bool]] = {}
-    for model_name in MODELS.keys():
-        supports_images = model_name in vision_models
-        supports_tools = model_name in tool_models
-        capabilities[model_name] = {
-            "supports_images": supports_images,
-            "supports_tools": supports_tools,
-            "supports_attachments": supports_tools,
-        }
-    return capabilities
+    return model_capabilities.build_model_capabilities(
+        models=MODELS,
+        vision_models=VISION_MODELS,
+        tool_models=TOOL_MODELS,
+        provider_info_resolver=_resolve_provider_info,
+        cache_token=_model_capabilities_cache_token(),
+    )
 
 
 def _supports_model_images(model_name: str) -> bool:
-    return bool(_build_model_capabilities().get(model_name, {}).get("supports_images"))
+    return model_capabilities.supports_model_images(
+        model_name=model_name,
+        models=MODELS,
+        vision_models=VISION_MODELS,
+        tool_models=TOOL_MODELS,
+        provider_info_resolver=_resolve_provider_info,
+        cache_token=_model_capabilities_cache_token(),
+    )
 
 
 def _supports_model_attachments(model_name: str) -> bool:
-    return bool(_build_model_capabilities().get(model_name, {}).get("supports_attachments"))
+    return model_capabilities.supports_model_attachments(
+        model_name=model_name,
+        models=MODELS,
+        vision_models=VISION_MODELS,
+        tool_models=TOOL_MODELS,
+        provider_info_resolver=_resolve_provider_info,
+        cache_token=_model_capabilities_cache_token(),
+    )
+
+
+def log_model_capabilities_summary(logger_: logging.Logger | None = None) -> dict[str, dict[str, bool]]:
+    return model_capabilities.warm_and_log_model_capabilities(
+        logger=logger_ or logger,
+        models=MODELS,
+        vision_models=VISION_MODELS,
+        tool_models=TOOL_MODELS,
+        provider_info_resolver=_resolve_provider_info,
+        cache_token=_model_capabilities_cache_token(),
+    )
 
 
 def _attachment_preview_is_image(content_type: str, suffix: str) -> bool:
