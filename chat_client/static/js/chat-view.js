@@ -19,6 +19,7 @@ const MIN_ANCHOR_SPACER_HEIGHT_PX = 20;
 const EXTRA_STREAMING_SLACK_PX = 100;
 const MESSAGE_INPUT_MIN_HEIGHT_PX = 60;
 const MESSAGE_INPUT_MAX_VIEWPORT_HEIGHT_RATIO = 0.25;
+const MESSAGE_TOP_BAR_GAP_PX = 16;
 
 function resizeMessageInput() {
     if (!messageElem) return;
@@ -1032,7 +1033,8 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
 
             const getNavOffset = () => {
                 const topBar = document.querySelector('.top-bar');
-                return topBar ? topBar.getBoundingClientRect().height : 80;
+                const topBarHeight = topBar ? topBar.getBoundingClientRect().height : 80;
+                return Math.ceil(topBarHeight + MESSAGE_TOP_BAR_GAP_PX);
             };
 
             const align = () => {

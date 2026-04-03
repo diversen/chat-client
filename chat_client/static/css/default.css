@@ -111,7 +111,7 @@ nav svg {
     padding: 0px 10px calc(20px + var(--prompt-height, 120px));
     scrollbar-width: thin;
     white-space: normal;
-    margin-top: 0;
+    margin-top: 12px;
     margin-bottom: 20px;
     scrollbar-color: var(--nav-background) transparent;
     overflow-anchor: none;
@@ -340,6 +340,10 @@ nav svg {
     margin-bottom: 0;
 }
 
+.assistant-segment-body > :last-child {
+    margin-bottom: 0;
+}
+
 .markdown-table {
   max-width: 100%;
   overflow-x: auto;
@@ -362,6 +366,26 @@ nav svg {
 .tool-message {
     scroll-margin-top: var(--main-menu-top);
     padding: 10px 0;
+    margin-bottom: 24px;
+}
+
+.user-message {
+    border: none;
+    border-radius: 18px;
+    padding: 14px 16px;
+    box-sizing: border-box;
+    max-width: min(68%, 720px);
+}
+
+.user-message {
+    margin-left: auto;
+    background: var(--user-message-background, rgba(140, 148, 160, 0.34));
+    box-shadow: none;
+}
+
+.user-message > .role,
+.assistant-message > .role {
+    display: none;
 }
 
 
@@ -571,14 +595,18 @@ pre code {
 .message-actions {
     display: flex;
     gap: 0.5em;
-    margin-top: 0.5em;
+    margin-top: 0.2em;
+}
+
+.user-message .message-actions {
+    justify-content: flex-end;
 }
 
 .message-actions svg {
     color: var(--nav-text);
     fill: var(--nav-text);
-    width: 15px;
-    height: 15px;
+    width: 18px;
+    height: 18px;
 }
 
 .edit-form {
@@ -765,7 +793,6 @@ a.is-disabled-link {
 }
 
 .tool-call-body pre {
-    max-height: 24rem;
     overflow: auto;
 }
 
