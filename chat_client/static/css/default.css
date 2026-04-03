@@ -380,6 +380,11 @@ nav svg {
     box-shadow: none;
 }
 
+.user-message:has(.edit-form) {
+    width: 100%;
+    max-width: 100%;
+}
+
 .user-message > .role,
 .assistant-message > .role {
     display: none;
@@ -608,18 +613,21 @@ pre code {
 
 .edit-form {
     margin-top: 10px;
+    width: 100%;
 }
 
 .edit-textarea {
     width: 100%;
+    max-width: 100%;
     min-height: 60px;
     padding: 10px;
     border: 1px solid var(--border);
     border-radius: 4px;
-    background-color: var(--background-alt);
+    background-color: var(--nav-background);
     color: var(--text-main);
     resize: vertical;
     box-sizing: border-box;
+    display: block;
 }
 
 .edit-buttons {
