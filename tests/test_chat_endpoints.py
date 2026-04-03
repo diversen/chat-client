@@ -568,7 +568,7 @@ class TestChatEndpoints(BaseTestCase):
         assert "default_model" in data
         assert "use_katex" in data
         assert "tool_calls_collapsed_by_default" in data
-        assert "system_message_models" in data
+        assert "system_message_denylist" in data
         assert "vision_models" in data
         assert "model_capabilities" in data
         assert isinstance(data["model_capabilities"], dict)
@@ -590,18 +590,21 @@ class TestChatEndpoints(BaseTestCase):
                 "supports_tools": False,
                 "supports_attachments": False,
                 "supports_thinking": False,
+                "supports_system_messages": True,
             },
             "tool-model": {
                 "supports_images": False,
                 "supports_tools": True,
                 "supports_attachments": True,
                 "supports_thinking": False,
+                "supports_system_messages": True,
             },
             "combo-model": {
                 "supports_images": False,
                 "supports_tools": False,
                 "supports_attachments": False,
                 "supports_thinking": False,
+                "supports_system_messages": True,
             },
         }
 

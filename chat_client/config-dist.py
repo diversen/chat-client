@@ -89,9 +89,9 @@ MODELS = {
 # Enable vision models (models that can process both text and images)
 VISION_MODELS: list[str] = []
 
-# System models are models that are capable of injecting initial system instruction into the model template.
-# Not all models supports this, so we need to specify which models that should receive system instructions.
-SYSTEM_MESSAGE_MODELS: list = []
+# Models listed here are explicitly forced to not receive system messages.
+# Their custom prompts will instead be injected as the first user message.
+SYSTEM_MESSAGE_DENYLIST: list = []
 
 # Optional local tool registry (preferred over MCP when configured).
 # Functions must be callables that accept keyword arguments.

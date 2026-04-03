@@ -90,4 +90,3 @@ def test_get_ollama_model_capabilities_returns_false_tools_when_probe_fails():
         "supports_tools": False,
         "supports_thinking": False,
     }
-

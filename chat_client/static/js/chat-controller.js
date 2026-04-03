@@ -499,9 +499,8 @@ class ConversationController {
     }
 
     getInitialPromptRole() {
-        const selectedModel = this.view.getSelectedModel();
-        const systemMessageModels = Array.isArray(this.config.system_message_models) ? this.config.system_message_models : [];
-        return systemMessageModels.includes(selectedModel) ? 'system' : 'user';
+        const supportsSystemMessages = Boolean(this.getSelectedModelCapabilities()?.supports_system_messages);
+        return supportsSystemMessages ? 'system' : 'user';
     }
 
     createTurnId() {

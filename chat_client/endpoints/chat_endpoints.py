@@ -49,7 +49,7 @@ CONFIGURED_MCP_AUTH_TOKEN = getattr(config, "MCP_AUTH_TOKEN", "")
 RESOLVED_MCP_TIMEOUT_SECONDS = float(getattr(config, "MCP_TIMEOUT_SECONDS", 20.0))
 RESOLVED_MCP_TOOLS_CACHE_SECONDS = float(getattr(config, "MCP_TOOLS_CACHE_SECONDS", 60.0))
 CONFIGURED_TOOL_CALLS_COLLAPSED_BY_DEFAULT = bool(getattr(config, "TOOL_CALLS_COLLAPSED_BY_DEFAULT", True))
-CONFIGURED_SYSTEM_MESSAGE_MODELS = getattr(config, "SYSTEM_MESSAGE_MODELS", [])
+CONFIGURED_SYSTEM_MESSAGE_DENYLIST = getattr(config, "SYSTEM_MESSAGE_DENYLIST", [])
 CONFIGURED_VISION_MODELS = getattr(config, "VISION_MODELS", [])
 CONFIGURED_TOOL_REGISTRY = getattr(config, "TOOL_REGISTRY", {})
 CONFIGURED_LOCAL_TOOL_DEFINITIONS = getattr(config, "LOCAL_TOOL_DEFINITIONS", [])
@@ -64,7 +64,7 @@ MCP_AUTH_TOKEN = CONFIGURED_MCP_AUTH_TOKEN
 MCP_TIMEOUT_SECONDS = RESOLVED_MCP_TIMEOUT_SECONDS
 MCP_TOOLS_CACHE_SECONDS = RESOLVED_MCP_TOOLS_CACHE_SECONDS
 TOOL_CALLS_COLLAPSED_BY_DEFAULT = CONFIGURED_TOOL_CALLS_COLLAPSED_BY_DEFAULT
-SYSTEM_MESSAGE_MODELS = CONFIGURED_SYSTEM_MESSAGE_MODELS
+SYSTEM_MESSAGE_DENYLIST = CONFIGURED_SYSTEM_MESSAGE_DENYLIST
 VISION_MODELS = CONFIGURED_VISION_MODELS
 TOOL_REGISTRY = CONFIGURED_TOOL_REGISTRY
 LOCAL_TOOL_DEFINITIONS = CONFIGURED_LOCAL_TOOL_DEFINITIONS
@@ -85,6 +85,7 @@ def _model_capabilities_cache_token() -> dict[str, Any]:
         "models": MODELS,
         "vision_models": VISION_MODELS,
         "tool_models": TOOL_MODELS,
+        "system_message_denylist": SYSTEM_MESSAGE_DENYLIST,
     }
 
 
@@ -120,6 +121,7 @@ def _resolve_tool_models() -> list[str]:
         models=MODELS,
         vision_models=VISION_MODELS,
         tool_models=TOOL_MODELS,
+        system_message_denylist=SYSTEM_MESSAGE_DENYLIST,
         provider_info_resolver=_resolve_provider_info,
         cache_token=_model_capabilities_cache_token(),
     )
@@ -130,6 +132,7 @@ def _build_model_capabilities() -> dict[str, dict[str, bool]]:
         models=MODELS,
         vision_models=VISION_MODELS,
         tool_models=TOOL_MODELS,
+        system_message_denylist=SYSTEM_MESSAGE_DENYLIST,
         provider_info_resolver=_resolve_provider_info,
         cache_token=_model_capabilities_cache_token(),
     )
@@ -141,6 +144,7 @@ def _supports_model_images(model_name: str) -> bool:
         models=MODELS,
         vision_models=VISION_MODELS,
         tool_models=TOOL_MODELS,
+        system_message_denylist=SYSTEM_MESSAGE_DENYLIST,
         provider_info_resolver=_resolve_provider_info,
         cache_token=_model_capabilities_cache_token(),
     )
@@ -152,6 +156,7 @@ def _supports_model_attachments(model_name: str) -> bool:
         models=MODELS,
         vision_models=VISION_MODELS,
         tool_models=TOOL_MODELS,
+        system_message_denylist=SYSTEM_MESSAGE_DENYLIST,
         provider_info_resolver=_resolve_provider_info,
         cache_token=_model_capabilities_cache_token(),
     )
@@ -163,6 +168,7 @@ def log_model_capabilities_summary(logger_: logging.Logger | None = None) -> dic
         models=MODELS,
         vision_models=VISION_MODELS,
         tool_models=TOOL_MODELS,
+        system_message_denylist=SYSTEM_MESSAGE_DENYLIST,
         provider_info_resolver=_resolve_provider_info,
         cache_token=_model_capabilities_cache_token(),
     )
@@ -877,7 +883,7 @@ async def config_(request: Request):
         "default_model": getattr(config, "DEFAULT_MODEL", ""),
         "use_katex": getattr(config, "USE_KATEX", False),
         "tool_calls_collapsed_by_default": TOOL_CALLS_COLLAPSED_BY_DEFAULT,
-        "system_message_models": SYSTEM_MESSAGE_MODELS,
+        "system_message_denylist": SYSTEM_MESSAGE_DENYLIST,
         "vision_models": VISION_MODELS,
         "model_capabilities": _build_model_capabilities(),
     }

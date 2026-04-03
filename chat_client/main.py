@@ -24,6 +24,7 @@ MODELS = config_utils.resolve_models(getattr(config, "MODELS", {}), getattr(conf
 PROVIDERS = getattr(config, "PROVIDERS", {})
 VISION_MODELS = getattr(config, "VISION_MODELS", [])
 TOOL_MODELS = getattr(config, "TOOL_MODELS", [])
+SYSTEM_MESSAGE_DENYLIST = getattr(config, "SYSTEM_MESSAGE_DENYLIST", [])
 
 
 def _resolve_provider_info(model: str) -> dict:
@@ -36,6 +37,7 @@ def _model_capabilities_cache_token() -> dict:
         "models": MODELS,
         "vision_models": VISION_MODELS,
         "tool_models": TOOL_MODELS,
+        "system_message_denylist": SYSTEM_MESSAGE_DENYLIST,
     }
 
 
@@ -46,6 +48,7 @@ async def lifespan(app):
         models=MODELS,
         vision_models=VISION_MODELS,
         tool_models=TOOL_MODELS,
+        system_message_denylist=SYSTEM_MESSAGE_DENYLIST,
         provider_info_resolver=_resolve_provider_info,
         cache_token=_model_capabilities_cache_token(),
     )

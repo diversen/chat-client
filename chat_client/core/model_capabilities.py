@@ -37,15 +37,23 @@ def _build_cache_key(
     models: dict[str, Any],
     vision_models: list[str] | None,
     tool_models: list[str] | None,
+    system_message_denylist: list[str] | None,
     cache_token: Any = None,
 ) -> str:
     payload = {
         "models": _normalize_cache_value(models),
         "vision_models": _normalize_cache_value(vision_models if isinstance(vision_models, list) else []),
         "tool_models": _normalize_cache_value(tool_models if isinstance(tool_models, list) else []),
+        "system_message_denylist": _normalize_cache_value(
+            system_message_denylist if isinstance(system_message_denylist, list) else []
+        ),
         "cache_token": _normalize_cache_value(cache_token),
     }
     return json.dumps(payload, sort_keys=True, separators=(",", ":"))
+
+
+def _supports_system_messages_for_model(model_name: str, system_message_denylist: set[str]) -> bool:
+    return model_name not in system_message_denylist
 
 
 def build_model_capabilities(
@@ -53,6 +61,7 @@ def build_model_capabilities(
     models: dict[str, Any],
     vision_models: list[str] | None,
     tool_models: list[str] | None,
+    system_message_denylist: list[str] | None,
     provider_info_resolver: Callable[[str], dict[str, Any]],
     cache_token: Any = None,
 ) -> dict[str, dict[str, bool]]:
@@ -60,6 +69,7 @@ def build_model_capabilities(
         models=models,
         vision_models=vision_models,
         tool_models=tool_models,
+        system_message_denylist=system_message_denylist,
         cache_token=cache_token,
     )
     cached = _MODEL_CAPABILITIES_CACHE.get(cache_key)
@@ -67,6 +77,7 @@ def build_model_capabilities(
         return {model_name: dict(details) for model_name, details in cached.items()}
 
     configured_vision_models = set(vision_models if isinstance(vision_models, list) else [])
+    configured_system_message_denylist = set(system_message_denylist if isinstance(system_message_denylist, list) else [])
     configured_tool_models: set[str] = set()
     if isinstance(tool_models, list):
         if "*" in tool_models:
@@ -82,11 +93,13 @@ def build_model_capabilities(
 
         supports_images = model_name in configured_vision_models or bool(detected_capabilities.get("supports_images"))
         supports_tools = model_name in configured_tool_models or bool(detected_capabilities.get("supports_tools"))
+        supports_system_messages = _supports_system_messages_for_model(model_name, configured_system_message_denylist)
         capabilities[model_name] = {
             "supports_images": supports_images,
             "supports_tools": supports_tools,
             "supports_attachments": supports_tools,
             "supports_thinking": bool(detected_capabilities.get("supports_thinking")),
+            "supports_system_messages": supports_system_messages,
         }
     _MODEL_CAPABILITIES_CACHE[cache_key] = {model_name: dict(details) for model_name, details in capabilities.items()}
     return {model_name: dict(details) for model_name, details in capabilities.items()}
@@ -97,6 +110,7 @@ def resolve_tool_models(
     models: dict[str, Any],
     vision_models: list[str] | None,
     tool_models: list[str] | None,
+    system_message_denylist: list[str] | None,
     provider_info_resolver: Callable[[str], dict[str, Any]],
     cache_token: Any = None,
 ) -> list[str]:
@@ -104,6 +118,7 @@ def resolve_tool_models(
         models=models,
         vision_models=vision_models,
         tool_models=tool_models,
+        system_message_denylist=system_message_denylist,
         provider_info_resolver=provider_info_resolver,
         cache_token=cache_token,
     )
@@ -116,6 +131,7 @@ def supports_model_images(
     models: dict[str, Any],
     vision_models: list[str] | None,
     tool_models: list[str] | None,
+    system_message_denylist: list[str] | None,
     provider_info_resolver: Callable[[str], dict[str, Any]],
     cache_token: Any = None,
 ) -> bool:
@@ -123,6 +139,7 @@ def supports_model_images(
         models=models,
         vision_models=vision_models,
         tool_models=tool_models,
+        system_message_denylist=system_message_denylist,
         provider_info_resolver=provider_info_resolver,
         cache_token=cache_token,
     )
@@ -135,6 +152,7 @@ def supports_model_attachments(
     models: dict[str, Any],
     vision_models: list[str] | None,
     tool_models: list[str] | None,
+    system_message_denylist: list[str] | None,
     provider_info_resolver: Callable[[str], dict[str, Any]],
     cache_token: Any = None,
 ) -> bool:
@@ -142,6 +160,7 @@ def supports_model_attachments(
         models=models,
         vision_models=vision_models,
         tool_models=tool_models,
+        system_message_denylist=system_message_denylist,
         provider_info_resolver=provider_info_resolver,
         cache_token=cache_token,
     )
@@ -154,6 +173,7 @@ def warm_and_log_model_capabilities(
     models: dict[str, Any],
     vision_models: list[str] | None,
     tool_models: list[str] | None,
+    system_message_denylist: list[str] | None,
     provider_info_resolver: Callable[[str], dict[str, Any]],
     cache_token: Any = None,
 ) -> dict[str, dict[str, bool]]:
@@ -161,6 +181,7 @@ def warm_and_log_model_capabilities(
         models=models,
         vision_models=vision_models,
         tool_models=tool_models,
+        system_message_denylist=system_message_denylist,
         provider_info_resolver=provider_info_resolver,
         cache_token=cache_token,
     )
