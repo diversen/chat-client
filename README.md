@@ -19,6 +19,8 @@ Simple python tool utilizing a sqlite3 backend and a minimal HTML / JavaScript f
 * Custom system prompts
 * Tool calling using MCP (Model Context Protocol) protocol. 
 
+See [docs/mcp.md](docs/mcp.md) for the current MCP config notes.
+
 ## Python Tool Sandbox
 
 The built-in `python_hardened` tool runs code in a hardened Docker container and requires Docker to be installed.
