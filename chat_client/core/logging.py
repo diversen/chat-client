@@ -1,7 +1,6 @@
 import logging
 import os
 from pathlib import Path
-from data.config import DATA_DIR
 from concurrent_log_handler import ConcurrentRotatingFileHandler
 import typing
 
@@ -16,6 +15,7 @@ formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(messag
 
 
 def get_rotating_file_handler(level: typing.Any, file_name):
+    Path(file_name).parent.mkdir(parents=True, exist_ok=True)
     Path(file_name).touch()
     handler = ConcurrentRotatingFileHandler(file_name, maxBytes=MAX_LOG_SIZE, backupCount=BACKUP_COUNT)
     handler.setLevel(level)
@@ -23,12 +23,7 @@ def get_rotating_file_handler(level: typing.Any, file_name):
     return handler
 
 
-# check if data dir exists and create it if not
-if not os.path.exists(DATA_DIR):
-    os.makedirs(DATA_DIR)
-
-
-def setup_logging(log_level: int = logging.INFO):
+def setup_logging(log_level: int = logging.INFO, data_dir: str | os.PathLike[str] = "data"):
     """
     Configures the logging setup with the specified log level.
     """
@@ -49,7 +44,7 @@ def setup_logging(log_level: int = logging.INFO):
     logger.addHandler(console_handler)
 
     # Rotating File Handler
-    log_file = Path(DATA_DIR) / "main.log"
+    log_file = Path(data_dir) / "main.log"
     rotating_file_handler = get_rotating_file_handler(log_level, log_file)
     logger.addHandler(rotating_file_handler)
 
