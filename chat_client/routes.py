@@ -35,6 +35,7 @@ chat_routes: list[Route] = [
     Route("/list", chat_endpoints.list_models, methods=["GET"]),
     Route("/chat/create-dialog", chat_endpoints.create_dialog, methods=["POST"]),
     Route("/chat/create-message/{dialog_id}", chat_endpoints.create_message, methods=["POST"]),
+    Route("/chat/generate-dialog-title/{dialog_id}", chat_endpoints.generate_dialog_title, methods=["POST"]),
     Route("/chat/create-assistant-turn-events/{dialog_id}", chat_endpoints.create_assistant_turn_events, methods=["POST"]),
     Route("/chat/update-message/{message_id}", chat_endpoints.update_message, methods=["POST"]),
     Route("/chat/delete-dialog/{dialog_id}", chat_endpoints.delete_dialog, methods=["POST"]),

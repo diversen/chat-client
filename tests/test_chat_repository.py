@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from chat_client.models import AssistantTurnEvent, Base, ToolCallEvent, User
+from chat_client.models import AssistantTurnEvent, Base, Dialog, ToolCallEvent, User
 
 
 def _aiosqlite_available() -> bool:
@@ -189,6 +189,68 @@ def test_get_messages_returns_assistant_turn_items():
             assert messages[1]["events"][1]["event_type"] == "tool_call"
             assert messages[1]["events"][2]["content_text"] == "Useful answer"
 
+        finally:
+            chat_repository.async_session = original_session_factory
+            sys.modules.pop("data.config", None)
+            sys.modules.pop("data", None)
+            await engine.dispose()
+            if db_path.exists():
+                db_path.unlink()
+            Path(temp_dir).rmdir()
+
+    asyncio.run(_run())
+
+
+def test_update_dialog_title_updates_existing_dialog():
+    async def _run():
+        temp_dir = tempfile.mkdtemp()
+        db_path = Path(temp_dir) / "test_chat_repository_update_dialog_title.db"
+        engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}", echo=False)
+        session_factory = async_sessionmaker(engine, expire_on_commit=False)
+
+        data_module = ModuleType("data")
+        config_module = ModuleType("data.config")
+        config_module.DATABASE = db_path
+        data_module.config = config_module
+        sys.modules["data"] = data_module
+        sys.modules["data.config"] = config_module
+
+        from chat_client.repositories import chat_repository
+
+        original_session_factory = chat_repository.async_session
+        chat_repository.async_session = session_factory
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+
+            async with session_factory() as session:
+                user = User(
+                    email="repo-test-update-title@example.com",
+                    password_hash="x",
+                    random="y",
+                )
+                session.add(user)
+                await session.commit()
+                await session.refresh(user)
+                user_id = int(user.user_id)
+
+            dialog_id = await chat_repository.create_dialog(user_id, "New chat")
+            result = await chat_repository.update_dialog_title(user_id, dialog_id, "Short summary")
+
+            assert result["dialog_id"] == dialog_id
+            assert result["title"] == "Short summary"
+
+            async with session_factory() as session:
+                title = (
+                    (
+                        await session.execute(
+                            select(Dialog.title).where(Dialog.dialog_id == dialog_id)
+                        )
+                    )
+                    .scalar_one()
+                )
+
+            assert title == "Short summary"
         finally:
             chat_repository.async_session = original_session_factory
             sys.modules.pop("data.config", None)

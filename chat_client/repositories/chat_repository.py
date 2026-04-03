@@ -56,6 +56,29 @@ async def create_dialog(user_id: int, title: str):
         return dialog_id
 
 
+async def update_dialog_title(user_id: int, dialog_id: str, title: str):
+
+    normalized_title = str(title).strip()
+    if not normalized_title:
+        raise exceptions_validation.UserValidate("Dialog title cannot be empty")
+
+    async with async_session() as session:
+        stmt = select(Dialog).where(Dialog.dialog_id == dialog_id, Dialog.user_id == user_id)
+        result = await session.execute(stmt)
+        dialog = result.scalar_one_or_none()
+
+        if not dialog:
+            raise exceptions_validation.UserValidate("Dialog not found or not owned by user")
+
+        dialog.title = normalized_title
+        await session.commit()
+
+        return {
+            "dialog_id": str(dialog.dialog_id),
+            "title": dialog.title,
+        }
+
+
 async def create_message(
     user_id: int,
     dialog_id: str,

@@ -1,7 +1,8 @@
-import { createDialog, getMessages, createMessage, createAssistantTurnEvents, updateMessage, isLoggedInOrRedirect, uploadAttachment } from './app-dialog.js';
+import { createDialog, generateDialogTitle, getMessages, createMessage, createAssistantTurnEvents, updateMessage, isLoggedInOrRedirect, uploadAttachment } from './app-dialog.js';
 
 const storageService = {
     createDialog,
+    generateDialogTitle,
     createMessage,
     createAssistantTurnEvents,
     updateMessage,

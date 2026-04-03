@@ -46,6 +46,7 @@ class ConversationController {
         this.auth = auth;
         this.chat = chat;
         this.config = config;
+        this.isSubmitting = false;
         this.isStreaming = false;
         this.messages = [];
         this.dialogId = null;
@@ -110,7 +111,7 @@ class ConversationController {
         const hasText = messageElem.value.trim().length > 0;
         const hasImages = this.selectedModelSupportsImages() && this.pendingImages.length > 0;
         const hasAttachments = this.selectedModelSupportsAttachments() && this.pendingAttachments.length > 0;
-        const canSend = !this.isStreaming && (hasText || hasImages || hasAttachments);
+        const canSend = !this.isSubmitting && !this.isStreaming && (hasText || hasImages || hasAttachments);
 
         if (canSend) {
             this.view.enableSend();
@@ -494,7 +495,7 @@ class ConversationController {
     validateUserMessage(userMessage) {
         const hasImages = this.selectedModelSupportsImages() && this.pendingImages.length > 0;
         const hasAttachments = this.selectedModelSupportsAttachments() && this.pendingAttachments.length > 0;
-        return !!(this.isStreaming === false && (userMessage || hasImages || hasAttachments));
+        return !!(this.isSubmitting === false && this.isStreaming === false && (userMessage || hasImages || hasAttachments));
     }
 
     getInitialPromptRole() {
@@ -511,6 +512,7 @@ class ConversationController {
     }
 
     async sendUserMessage() {
+        if (this.isSubmitting || this.isStreaming) return;
         try {
             await this.auth.ensure();
             const userMessage = messageElem.value.trim();
@@ -526,6 +528,8 @@ class ConversationController {
                 }))
                 : [];
             if (!this.validateUserMessage(userMessage)) return;
+            this.isSubmitting = true;
+            this.updateSendButtonState();
             const message = { role: 'user', content: userMessage, images: images, attachments };
             const attachmentSummary = attachments.length
                 ? `${attachments.length} file${attachments.length > 1 ? 's' : ''}`
@@ -535,10 +539,12 @@ class ConversationController {
                 : '';
             const summaryParts = [imageSummary, attachmentSummary].filter(Boolean);
             const messageTextForStorage = userMessage || `[${summaryParts.join(', ')} attached]`;
+            let createdNewDialog = false;
 
             if (!this.dialogId) {
-                const title = userMessage || (summaryParts.length ? `Attachment message (${summaryParts.join(', ')})` : 'New chat');
+                const title = 'New chat';
                 this.dialogId = await this.storage.createDialog(title);
+                createdNewDialog = true;
 
                 // If this chat started from a custom prompt, persist that prompt
                 // as the first message only when the user sends their first addition.
@@ -581,11 +587,17 @@ class ConversationController {
 
             await this.view.scrollMessageToTop(userContainer);
 
-            await this.renderAssistantMessage();
+            await this.renderAssistantMessage({
+                shouldGenerateTitle: createdNewDialog && Boolean(userMessage),
+                model: this.view.getSelectedModel(),
+            });
         } catch (error) {
             await logError(error, 'Error in sendUserMessage');
             console.error('Error in sendUserMessage:', error);
             Flash.setMessage('An error occurred. Please try again.', 'error');
+        } finally {
+            this.isSubmitting = false;
+            this.updateSendButtonState();
         }
     }
 
@@ -629,7 +641,9 @@ class ConversationController {
         this.messages.splice(index + 1);
     }
 
-    async renderAssistantMessage() {
+    async renderAssistantMessage(options = {}) {
+        const shouldGenerateTitle = Boolean(options?.shouldGenerateTitle);
+        const modelName = String(options?.model || this.view.getSelectedModel() || '');
         this.view.disableNew();
         this.view.enableAbort();
         this.isStreaming = true;
@@ -733,7 +747,7 @@ class ConversationController {
 
         try {
             for await (const chunk of this.chat.stream({
-                model: this.view.getSelectedModel(),
+                model: modelName,
                 dialog_id: this.dialogId || '',
                 messages: this.messages,
             }, this.abortController.signal)) {
@@ -820,6 +834,13 @@ class ConversationController {
                     turnUi.removeIfEmpty();
                 }
                 turnUi = null;
+            }
+            if (shouldGenerateTitle && this.dialogId) {
+                void this.storage.generateDialogTitle(this.dialogId, {
+                    model: modelName,
+                }).catch((titleError) => {
+                    console.warn('Failed to generate dialog title:', titleError);
+                });
             }
             this.abortController = new AbortController();
         }

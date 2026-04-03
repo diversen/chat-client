@@ -456,6 +456,75 @@ class TestChatEndpoints(BaseTestCase):
         assert messages[2] == {"role": "tool", "tool_call_id": "call_1", "content": "2"}
         assert messages[3] == {"role": "assistant", "content": "A"}
 
+    def test_generate_dialog_title_normalizes_provider_response(self):
+        from chat_client.endpoints.chat_endpoints import _generate_dialog_title
+
+        mock_response = type(
+            "Response",
+            (),
+            {
+                "choices": [
+                    type(
+                        "Choice",
+                        (),
+                        {
+                            "message": type("Message", (), {"content": '  "Summarized title"  '})(),
+                        },
+                    )()
+                ]
+            },
+        )()
+
+        mock_client = type(
+            "Client",
+            (),
+            {
+                "chat": type(
+                    "Chat",
+                    (),
+                    {
+                        "completions": type(
+                            "Completions",
+                            (),
+                            {"create": lambda self, **kwargs: mock_response},
+                        )()
+                    },
+                )()
+            },
+        )()
+
+        with (
+            patch("chat_client.endpoints.chat_endpoints._resolve_provider_info", return_value={"api_key": "key", "base_url": "http://x"}),
+            patch("chat_client.endpoints.chat_endpoints.OpenAI", return_value=mock_client),
+        ):
+            title = _generate_dialog_title(
+                "How do I mount a network drive on Linux?",
+                "Use the mount command with the server path.",
+                "test-model",
+            )
+
+        assert title == "Summarized title"
+
+    def test_extract_dialog_title_context_uses_first_user_and_first_answer(self):
+        from chat_client.endpoints.chat_endpoints import _extract_dialog_title_context
+
+        first_user_message, first_assistant_message = _extract_dialog_title_context(
+            [
+                {"role": "user", "content": "How do I mount a network drive?", "images": [], "attachments": []},
+                {
+                    "role": "assistant_turn",
+                    "events": [
+                        {"event_type": "assistant_segment", "reasoning_text": "thinking", "content_text": ""},
+                        {"event_type": "assistant_segment", "reasoning_text": "", "content_text": "Use mount -t cifs ..."},
+                    ],
+                },
+                {"role": "user", "content": "Thanks", "images": [], "attachments": []},
+            ]
+        )
+
+        assert first_user_message == "How do I mount a network drive?"
+        assert first_assistant_message == "Use mount -t cifs ..."
+
     @patch("chat_client.core.user_session.is_logged_in")
     def test_chat_page_not_authenticated(self, mock_logged_in):
         """Test GET / when not authenticated"""
@@ -911,6 +980,93 @@ class TestChatEndpoints(BaseTestCase):
 
         assert response.status_code == 200
         mock_get_attachments.assert_called_once_with(1, [7])
+
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_generate_dialog_title_not_authenticated(self, mock_logged_in):
+        mock_logged_in.return_value = False
+
+        response = self.client.post(
+            "/chat/generate-dialog-title/test-dialog",
+            json={"model": "test-model"},
+        )
+
+        assert response.status_code == 401
+        data = response.json()
+        assert data["error"] is True
+
+    @patch("chat_client.repositories.chat_repository.update_dialog_title")
+    @patch("chat_client.repositories.chat_repository.get_messages")
+    @patch("chat_client.repositories.chat_repository.get_dialog")
+    @patch("chat_client.endpoints.chat_endpoints._generate_dialog_title")
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_generate_dialog_title_authenticated(
+        self,
+        mock_logged_in,
+        mock_generate_dialog_title,
+        mock_get_dialog,
+        mock_get_messages,
+        mock_update_dialog_title,
+    ):
+        mock_logged_in.return_value = 1
+        mock_get_dialog.return_value = {"dialog_id": "test-dialog", "title": "New chat", "created": "2026-01-01T00:00:00"}
+        mock_get_messages.return_value = [
+            {"role": "user", "content": "How do I mount a network drive on Linux?", "images": [], "attachments": []},
+            {
+                "role": "assistant_turn",
+                "events": [
+                    {"event_type": "assistant_segment", "reasoning_text": "", "content_text": "Use mount -t cifs ..."},
+                ],
+            },
+        ]
+        mock_generate_dialog_title.return_value = "Mounted network drive"
+        mock_update_dialog_title.return_value = {"dialog_id": "test-dialog", "title": "Mounted network drive"}
+
+        response = self.client.post(
+            "/chat/generate-dialog-title/test-dialog",
+            json={"model": "test-model"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["error"] is False
+        assert data["title"] == "Mounted network drive"
+        assert data["generated"] is True
+        mock_generate_dialog_title.assert_called_once_with(
+            "How do I mount a network drive on Linux?",
+            "Use mount -t cifs ...",
+            "test-model",
+        )
+        mock_update_dialog_title.assert_called_once_with(1, "test-dialog", "Mounted network drive")
+
+    @patch("chat_client.repositories.chat_repository.update_dialog_title")
+    @patch("chat_client.repositories.chat_repository.get_messages")
+    @patch("chat_client.repositories.chat_repository.get_dialog")
+    @patch("chat_client.endpoints.chat_endpoints._generate_dialog_title")
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_generate_dialog_title_skips_when_dialog_already_named(
+        self,
+        mock_logged_in,
+        mock_generate_dialog_title,
+        mock_get_dialog,
+        mock_get_messages,
+        mock_update_dialog_title,
+    ):
+        mock_logged_in.return_value = 1
+        mock_get_dialog.return_value = {"dialog_id": "test-dialog", "title": "Mounted network drive", "created": "2026-01-01T00:00:00"}
+        mock_get_messages.return_value = []
+
+        response = self.client.post(
+            "/chat/generate-dialog-title/test-dialog",
+            json={"model": "test-model"},
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["error"] is False
+        assert data["generated"] is False
+        assert data["title"] == "Mounted network drive"
+        mock_generate_dialog_title.assert_not_called()
+        mock_update_dialog_title.assert_not_called()
 
     @patch("chat_client.core.user_session.is_logged_in")
     def test_upload_attachment_not_authenticated(self, mock_logged_in):

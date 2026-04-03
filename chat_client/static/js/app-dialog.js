@@ -6,7 +6,7 @@ async function getConfig() {
 
 /**
  * Send user message to the server
- * Dialog title is based on first user message
+ * Dialog starts with a placeholder title and can be renamed later
  * POST 'title' to '/chat/create-dialog'
  */
 async function createDialog(title) {
@@ -24,6 +24,16 @@ async function createDialog(title) {
     window.history.replaceState({}, "", url);
     return currentDialogID
 
+}
+
+async function generateDialogTitle(dialogID, payload) {
+    const data = await Requests.asyncPostJson(`/chat/generate-dialog-title/${dialogID}`, payload);
+
+    if (data.error) {
+        throw new Error(data.message);
+    }
+
+    return data;
 }
 
 /**
@@ -104,4 +114,4 @@ async function updateMessage(messageId, content) {
     return data;
 }
 
-export { createDialog, getMessages, createMessage, createAssistantTurnEvents, getConfig, isLoggedInOrRedirect, updateMessage, uploadAttachment };
+export { createDialog, generateDialogTitle, getMessages, createMessage, createAssistantTurnEvents, getConfig, isLoggedInOrRedirect, updateMessage, uploadAttachment };
