@@ -87,11 +87,11 @@ MODELS = {
 # Ollama models are discovered automatically from the configured provider at runtime.
 
 # Enable vision models (models that can process both text and images)
-VISION_MODELS: list[str] = ["ministral-3:14b"]
+VISION_MODELS: list[str] = []
 
 # System models are models that are capable of injecting initial system instruction into the model template.
 # Not all models supports this, so we need to specify which models that should receive system instructions.
-SYSTEM_MESSAGE_MODELS: list = ["nemotron-cascade-2:latest", "ministral-3:14b", "gpt-oss:latest"]
+SYSTEM_MESSAGE_MODELS: list = []
 
 # Optional local tool registry (preferred over MCP when configured).
 # Functions must be callables that accept keyword arguments.
