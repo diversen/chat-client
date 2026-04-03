@@ -47,7 +47,7 @@ USE_KATEX = True
 
 # Timeout for the built-in python tools in seconds.
 # Set to 0 for no timeout.
-PYTHON_TOOL_TIMEOUT_SECONDS = 10
+PYTHON_TOOL_TIMEOUT_SECONDS = 60
 
 # Uploaded files available to tools are stored privately here before being mounted into Docker.
 ATTACHMENT_STORAGE_DIR = Path(DATA_DIR) / Path("attachments")
