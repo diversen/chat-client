@@ -55,7 +55,7 @@ PYTHON_TOOL_ATTACHMENT_MOUNT_DIR = "/mnt/data"
 
 # Maximum number of model-response rounds used to produce a single assistant reply.
 # This includes tool-calling rounds and the final no-tool answer round.
-CHAT_MAX_LOOP_ROUNDS = 8
+CHAT_MAX_LOOP_ROUNDS = 50
 
 PROVIDERS = {
     # "openai": {
@@ -80,9 +80,9 @@ MODELS = {
     # "gpt-5-nano": "openai",
     # "gemma-3-27b-it": "gemini",
 }
-# Ollama models are discovered automatically from the configured provider at runtime.
 
 # Enable vision models (models that can process both text and images)
+# Ollama vision models are discovered automatically.
 VISION_MODELS: list[str] = []
 
 # Models listed here are explicitly forced to not receive system messages.
@@ -122,7 +122,7 @@ LOCAL_TOOL_DEFINITIONS = [
         },
     },
 ]
+
 # Models that should receive tool definitions (local + MCP).
-# Use ["*"] to allow tools for any configured model.
+# Ollama tool models are discovered automatically.
 TOOL_MODELS: list[str] = []
-# Use ["*"] to allow tools for any configured model.
