@@ -499,16 +499,58 @@ class TestChatEndpoints(BaseTestCase):
         ):
             title = _generate_dialog_title(
                 "How do I mount a network drive on Linux?",
-                "Use the mount command with the server path.",
                 "test-model",
             )
 
         assert title == "Summarized title"
 
-    def test_extract_dialog_title_context_uses_first_user_and_first_answer(self):
-        from chat_client.endpoints.chat_endpoints import _extract_dialog_title_context
+    def test_generate_dialog_title_uses_fixed_placeholder_when_provider_returns_no_choices(self):
+        from chat_client.endpoints.chat_endpoints import _generate_dialog_title
 
-        first_user_message, first_assistant_message = _extract_dialog_title_context(
+        mock_response = type("Response", (), {"choices": []})()
+
+        mock_client = type(
+            "Client",
+            (),
+            {
+                "chat": type(
+                    "Chat",
+                    (),
+                    {
+                        "completions": type(
+                            "Completions",
+                            (),
+                            {"create": lambda self, **kwargs: mock_response},
+                        )()
+                    },
+                )()
+            },
+        )()
+
+        with (
+            patch("chat_client.endpoints.chat_endpoints._resolve_provider_info", return_value={"api_key": "key", "base_url": "http://x"}),
+            patch("chat_client.endpoints.chat_endpoints.OpenAI", return_value=mock_client),
+        ):
+            title = _generate_dialog_title(
+                "How do I mount a network drive on Linux?",
+                "test-model",
+            )
+
+        assert title == "New Chat"
+
+    def test_derive_dialog_title_from_user_message_strips_markup_and_symbols(self):
+        from chat_client.endpoints.chat_endpoints import _derive_dialog_title_from_user_message
+
+        title = _derive_dialog_title_from_user_message(
+            "<p>By listing the first six prime numbers: $2, 3, 5, 7, 11$, and $13$, we can see</p>"
+        )
+
+        assert title == "By listing the first six prime numbers and we can see"
+
+    def test_extract_first_user_message_uses_first_user_message(self):
+        from chat_client.endpoints.chat_endpoints import _extract_first_user_message
+
+        first_user_message = _extract_first_user_message(
             [
                 {"role": "user", "content": "How do I mount a network drive?", "images": [], "attachments": []},
                 {
@@ -523,7 +565,6 @@ class TestChatEndpoints(BaseTestCase):
         )
 
         assert first_user_message == "How do I mount a network drive?"
-        assert first_assistant_message == "Use mount -t cifs ..."
 
     @patch("chat_client.core.user_session.is_logged_in")
     def test_chat_page_not_authenticated(self, mock_logged_in):
@@ -989,13 +1030,13 @@ class TestChatEndpoints(BaseTestCase):
 
         response = self.client.post(
             "/chat/generate-dialog-title/test-dialog",
-            json={"model": "test-model"},
         )
 
         assert response.status_code == 401
         data = response.json()
         assert data["error"] is True
 
+    @patch("chat_client.endpoints.chat_endpoints.DIALOG_TITLE_MODEL", "title-model")
     @patch("chat_client.repositories.chat_repository.update_dialog_title")
     @patch("chat_client.repositories.chat_repository.get_messages")
     @patch("chat_client.repositories.chat_repository.get_dialog")
@@ -1010,7 +1051,7 @@ class TestChatEndpoints(BaseTestCase):
         mock_update_dialog_title,
     ):
         mock_logged_in.return_value = 1
-        mock_get_dialog.return_value = {"dialog_id": "test-dialog", "title": "New chat", "created": "2026-01-01T00:00:00"}
+        mock_get_dialog.return_value = {"dialog_id": "test-dialog", "title": "New Chat", "created": "2026-01-01T00:00:00"}
         mock_get_messages.return_value = [
             {"role": "user", "content": "How do I mount a network drive on Linux?", "images": [], "attachments": []},
             {
@@ -1025,7 +1066,6 @@ class TestChatEndpoints(BaseTestCase):
 
         response = self.client.post(
             "/chat/generate-dialog-title/test-dialog",
-            json={"model": "test-model"},
         )
 
         assert response.status_code == 200
@@ -1035,10 +1075,42 @@ class TestChatEndpoints(BaseTestCase):
         assert data["generated"] is True
         mock_generate_dialog_title.assert_called_once_with(
             "How do I mount a network drive on Linux?",
-            "Use mount -t cifs ...",
-            "test-model",
+            "title-model",
         )
         mock_update_dialog_title.assert_called_once_with(1, "test-dialog", "Mounted network drive")
+
+    @patch("chat_client.endpoints.chat_endpoints.DIALOG_TITLE_MODEL", "")
+    @patch("chat_client.repositories.chat_repository.update_dialog_title")
+    @patch("chat_client.repositories.chat_repository.get_messages")
+    @patch("chat_client.repositories.chat_repository.get_dialog")
+    @patch("chat_client.endpoints.chat_endpoints._generate_dialog_title")
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_generate_dialog_title_uses_user_message_fallback_when_no_title_model_is_configured(
+        self,
+        mock_logged_in,
+        mock_generate_dialog_title,
+        mock_get_dialog,
+        mock_get_messages,
+        mock_update_dialog_title,
+    ):
+        mock_logged_in.return_value = 1
+        mock_get_dialog.return_value = {"dialog_id": "test-dialog", "title": "New Chat", "created": "2026-01-01T00:00:00"}
+        mock_get_messages.return_value = [
+            {"role": "user", "content": "<p>How do I mount a network drive on Linux?</p>", "images": [], "attachments": []},
+        ]
+        mock_update_dialog_title.return_value = {"dialog_id": "test-dialog", "title": "How do I mount a network drive on Linux"}
+
+        response = self.client.post(
+            "/chat/generate-dialog-title/test-dialog",
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["error"] is False
+        assert data["title"] == "How do I mount a network drive on Linux"
+        assert data["generated"] is True
+        mock_generate_dialog_title.assert_not_called()
+        mock_update_dialog_title.assert_called_once_with(1, "test-dialog", "How do I mount a network drive on Linux")
 
     @patch("chat_client.repositories.chat_repository.update_dialog_title")
     @patch("chat_client.repositories.chat_repository.get_messages")
@@ -1059,7 +1131,6 @@ class TestChatEndpoints(BaseTestCase):
 
         response = self.client.post(
             "/chat/generate-dialog-title/test-dialog",
-            json={"model": "test-model"},
         )
 
         assert response.status_code == 200

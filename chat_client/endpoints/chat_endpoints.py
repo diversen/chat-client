@@ -1,8 +1,9 @@
 import asyncio
-from html import escape
+from html import escape, unescape
 import time
 import json
 import logging
+import re
 import uuid
 from pathlib import Path
 from typing import Any
@@ -34,7 +35,6 @@ from chat_client.schemas.chat import (
     CreateAssistantTurnEventsRequest,
     CreateDialogRequest,
     CreateMessageRequest,
-    GenerateDialogTitleRequest,
     UpdateMessageRequest,
 )
 # Logger
@@ -53,6 +53,7 @@ CONFIGURED_VISION_MODELS = getattr(config, "VISION_MODELS", [])
 CONFIGURED_TOOL_REGISTRY = getattr(config, "TOOL_REGISTRY", {})
 CONFIGURED_LOCAL_TOOL_DEFINITIONS = getattr(config, "LOCAL_TOOL_DEFINITIONS", [])
 CONFIGURED_TOOL_MODELS = getattr(config, "TOOL_MODELS", [])
+CONFIGURED_DIALOG_TITLE_MODEL = getattr(config, "DIALOG_TITLE_MODEL", "")
 RESOLVED_CHAT_MAX_LOOP_ROUNDS = getattr(config, "CHAT_MAX_LOOP_ROUNDS", chat_service.DEFAULT_CHAT_MAX_LOOP_ROUNDS)
 RESOLVED_CHAT_EMPTY_ANSWER_RETRY_COUNT = getattr(config, "CHAT_EMPTY_ANSWER_RETRY_COUNT", 1)
 RESOLVED_CHAT_RETRY_ON_EMPTY_ANSWER_STOP = bool(getattr(config, "CHAT_RETRY_ON_EMPTY_ANSWER_STOP", False))
@@ -69,6 +70,7 @@ VISION_MODELS = CONFIGURED_VISION_MODELS
 TOOL_REGISTRY = CONFIGURED_TOOL_REGISTRY
 LOCAL_TOOL_DEFINITIONS = CONFIGURED_LOCAL_TOOL_DEFINITIONS
 TOOL_MODELS = CONFIGURED_TOOL_MODELS
+DIALOG_TITLE_MODEL = str(CONFIGURED_DIALOG_TITLE_MODEL or "").strip()
 CHAT_MAX_LOOP_ROUNDS = RESOLVED_CHAT_MAX_LOOP_ROUNDS
 
 _mcp_tools_cache: list[dict] = []
@@ -530,28 +532,40 @@ def _strip_images_from_messages(messages: list[dict]) -> list[dict]:
 
 TITLE_GENERATION_MAX_TOKENS = 24
 TITLE_FALLBACK_MAX_LENGTH = 80
-PENDING_DIALOG_TITLES = {"New chat"}
+PENDING_DIALOG_TITLES = {"New Chat"}
+TITLE_FALLBACK_WORD_LIMIT = 25
 
 
-def _normalize_generated_dialog_title(value: str, fallback: str) -> str:
+def _normalize_generated_dialog_title(value: str) -> str:
     normalized = str(value or "").strip()
     normalized = normalized.strip(" \t\r\n\"'`")
     normalized = " ".join(normalized.split())
-    if not normalized:
-        normalized = str(fallback or "").strip()
     if len(normalized) > TITLE_FALLBACK_MAX_LENGTH:
         normalized = normalized[:TITLE_FALLBACK_MAX_LENGTH].rstrip(" ,.;:-")
-    return normalized or "New chat"
+    return normalized or "New Chat"
+
+
+def _derive_dialog_title_from_user_message(user_content: str) -> str:
+    normalized = unescape(str(user_content or "").strip())
+    normalized = re.sub(r"<[^>]+>", " ", normalized)
+    normalized = re.sub(r"[^\w\s]", " ", normalized, flags=re.UNICODE)
+    normalized = re.sub(r"[_\d]+", " ", normalized)
+    words = [word for word in normalized.split() if any(char.isalpha() for char in word)]
+    if TITLE_FALLBACK_WORD_LIMIT > 0:
+        words = words[:TITLE_FALLBACK_WORD_LIMIT]
+    fallback_title = " ".join(words)
+    if fallback_title:
+        fallback_title = fallback_title[0].upper() + fallback_title[1:]
+    return _normalize_generated_dialog_title(fallback_title)
 
 
 def _is_pending_dialog_title(title: str) -> bool:
     normalized_title = str(title or "").strip()
-    return normalized_title in PENDING_DIALOG_TITLES or normalized_title.startswith("Attachment message (")
+    return normalized_title in PENDING_DIALOG_TITLES
 
 
-def _extract_dialog_title_context(messages: list[dict[str, Any]]) -> tuple[str, str]:
+def _extract_first_user_message(messages: list[dict[str, Any]]) -> str:
     first_user_message = ""
-    first_assistant_message = ""
 
     for message in messages:
         if not isinstance(message, dict):
@@ -560,66 +574,37 @@ def _extract_dialog_title_context(messages: list[dict[str, Any]]) -> tuple[str, 
         role = str(message.get("role", "")).strip()
         if not first_user_message and role == "user":
             first_user_message = str(message.get("content", "")).strip()
-            continue
+            break
 
-        if first_assistant_message:
-            continue
-
-        if role == "assistant":
-            content = str(message.get("content", "")).strip()
-            if content:
-                first_assistant_message = content
-            continue
-
-        if role != "assistant_turn":
-            continue
-
-        events = message.get("events", [])
-        if not isinstance(events, list):
-            continue
-        for event in events:
-            if not isinstance(event, dict):
-                continue
-            if str(event.get("event_type", "")).strip() != "assistant_segment":
-                continue
-            content = str(event.get("content_text", "")).strip()
-            if content:
-                first_assistant_message = content
-                break
-
-    return first_user_message, first_assistant_message
+    return first_user_message
 
 
-def _build_dialog_title_prompt(user_content: str, assistant_content: str) -> list[dict[str, str]]:
+def _build_dialog_title_prompt(user_content: str) -> list[dict[str, str]]:
     normalized_user_content = str(user_content or "").strip()
-    normalized_assistant_content = str(assistant_content or "").strip()
     return [
         {
             "role": "system",
             "content": (
-                "Generate a short title for a chat based on the opening exchange. "
-                "Return only the title. Use 3 to 7 words when possible. "
-                "Do not use quotes. Do not add labels or explanations."
+                "Generate a short title for a chat based on the first user message. "
+                "Return only the title as plain text. Keep it short, typically under 10 words. "
+                "Write it as a very short summary of the main topic or task. "
+                "Do not use quotes. Do not add labels or explanations. "
+                "Do not use HTML, XML, Markdown, code formatting, or any markup. "
+                "Do not use math symbols or equations."
             ),
         },
         {
             "role": "user",
-            "content": (
-                f"First user message:\n{normalized_user_content}\n\n"
-                f"First assistant response:\n{normalized_assistant_content}"
-            ),
+            "content": f"First user message:\n{normalized_user_content}",
         },
     ]
 
 
-def _generate_dialog_title(user_content: str, assistant_content: str, model: str) -> str:
+def _generate_dialog_title(user_content: str, model: str) -> str:
     normalized_user_content = str(user_content or "").strip()
-    normalized_assistant_content = str(assistant_content or "").strip()
     selected_model = str(model or "").strip()
     if not normalized_user_content:
         raise exceptions_validation.UserValidate("User content is required to generate a dialog title")
-    if not normalized_assistant_content:
-        raise exceptions_validation.UserValidate("Assistant content is required to generate a dialog title")
     if not selected_model:
         raise exceptions_validation.UserValidate("Model is required to generate a dialog title")
 
@@ -630,17 +615,29 @@ def _generate_dialog_title(user_content: str, assistant_content: str, model: str
     )
     response = client.chat.completions.create(
         model=selected_model,
-        messages=_build_dialog_title_prompt(normalized_user_content, normalized_assistant_content),
+        messages=_build_dialog_title_prompt(normalized_user_content),
         stream=False,
         max_tokens=TITLE_GENERATION_MAX_TOKENS,
     )
     choices = getattr(response, "choices", None)
     if not isinstance(choices, list) or not choices:
-        return _normalize_generated_dialog_title("", normalized_user_content)
+        _log_chat_event(
+            logging.INFO,
+            "chat.dialog_title.raw",
+            model=selected_model,
+            raw_title="",
+        )
+        return _normalize_generated_dialog_title("")
     first_choice = choices[0]
     message = getattr(first_choice, "message", None)
     raw_content = getattr(message, "content", "") if message is not None else ""
-    return _normalize_generated_dialog_title(str(raw_content or ""), normalized_user_content)
+    _log_chat_event(
+        logging.INFO,
+        "chat.dialog_title.raw",
+        model=selected_model,
+        raw_title=str(raw_content or ""),
+    )
+    return _normalize_generated_dialog_title(str(raw_content or ""))
 
 
 async def _chat_response_stream(
@@ -973,35 +970,42 @@ async def generate_dialog_title(request: Request):
     """
     Generate and persist a dialog title using the selected model.
     """
+    dialog_id = ""
     try:
         user_id = await require_user_id_json(request, message="You must be logged in to update a dialog title")
         dialog_id = str(request.path_params.get("dialog_id", "")).strip()
         if not dialog_id:
             raise exceptions_validation.UserValidate("Dialog id is required")
 
-        payload = await parse_json_payload(request, GenerateDialogTitleRequest)
         dialog = await chat_repository.get_dialog(user_id, dialog_id)
         existing_title = str(dialog.get("title", "")).strip()
         if not _is_pending_dialog_title(existing_title):
             return json_success(dialog_id=dialog_id, title=existing_title, generated=False)
 
         messages = await chat_repository.get_messages(user_id, dialog_id)
-        first_user_message, first_assistant_message = _extract_dialog_title_context(messages)
-        if not first_user_message or not first_assistant_message:
+        first_user_message = _extract_first_user_message(messages)
+        if not first_user_message:
             return json_success(dialog_id=dialog_id, title=existing_title, generated=False)
 
-        generated_title = await asyncio.to_thread(
-            _generate_dialog_title,
-            first_user_message,
-            first_assistant_message,
-            payload.model,
-        )
+        title_source = "derived"
+        title_model = ""
+        if DIALOG_TITLE_MODEL:
+            title_source = "model"
+            title_model = DIALOG_TITLE_MODEL
+            generated_title = await asyncio.to_thread(
+                _generate_dialog_title,
+                first_user_message,
+                DIALOG_TITLE_MODEL,
+            )
+        else:
+            generated_title = _derive_dialog_title_from_user_message(first_user_message)
         _log_chat_event(
             logging.INFO,
             "chat.dialog_title.generated",
             user_id=user_id,
             dialog_id=dialog_id,
-            model=payload.model,
+            source=title_source,
+            model=title_model,
             generated_title=generated_title,
         )
         result = await chat_repository.update_dialog_title(user_id, dialog_id, generated_title)
@@ -1011,7 +1015,13 @@ async def generate_dialog_title(request: Request):
     except exceptions_validation.UserValidate as e:
         return json_error(str(e), status_code=400)
     except Exception:
-        logger.exception("Error generating dialog title")
+        logger.exception(
+            "Error generating dialog title",
+            extra={
+                "dialog_id": dialog_id,
+                "model": DIALOG_TITLE_MODEL or "",
+            },
+        )
         return json_error("Error generating dialog title", status_code=500)
 
 

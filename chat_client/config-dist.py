@@ -15,6 +15,10 @@ class ConfigSMTP:
 # Set a Default model
 # DEFAULT_MODEL = "deepseek-r1:14b"
 
+# Optional dedicated model used only for dialog title generation.
+# When unset, titles are derived from the first user message instead.
+DIALOG_TITLE_MODEL = ""
+
 # Logging
 LOG_LEVEL = logging.INFO
 

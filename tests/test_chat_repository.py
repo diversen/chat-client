@@ -234,7 +234,7 @@ def test_update_dialog_title_updates_existing_dialog():
                 await session.refresh(user)
                 user_id = int(user.user_id)
 
-            dialog_id = await chat_repository.create_dialog(user_id, "New chat")
+            dialog_id = await chat_repository.create_dialog(user_id, "New Chat")
             result = await chat_repository.update_dialog_title(user_id, dialog_id, "Short summary")
 
             assert result["dialog_id"] == dialog_id

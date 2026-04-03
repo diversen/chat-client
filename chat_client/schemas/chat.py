@@ -34,11 +34,6 @@ class CreateDialogRequest(BaseModel):
     title: str
 
 
-class GenerateDialogTitleRequest(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    model: str
-
-
 class CreateMessageRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
     role: str

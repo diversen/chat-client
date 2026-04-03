@@ -541,7 +541,7 @@ class ConversationController {
             let createdNewDialog = false;
 
             if (!this.dialogId) {
-                const title = 'New chat';
+                const title = 'New Chat';
                 this.dialogId = await this.storage.createDialog(title);
                 createdNewDialog = true;
 
@@ -835,9 +835,7 @@ class ConversationController {
                 turnUi = null;
             }
             if (shouldGenerateTitle && this.dialogId) {
-                void this.storage.generateDialogTitle(this.dialogId, {
-                    model: modelName,
-                }).catch((titleError) => {
+                void this.storage.generateDialogTitle(this.dialogId).catch((titleError) => {
                     console.warn('Failed to generate dialog title:', titleError);
                 });
             }

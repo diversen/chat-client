@@ -26,8 +26,8 @@ async function createDialog(title) {
 
 }
 
-async function generateDialogTitle(dialogID, payload) {
-    const data = await Requests.asyncPostJson(`/chat/generate-dialog-title/${dialogID}`, payload);
+async function generateDialogTitle(dialogID) {
+    const data = await Requests.asyncPostJson(`/chat/generate-dialog-title/${dialogID}`, {});
 
     if (data.error) {
         throw new Error(data.message);
