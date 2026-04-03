@@ -567,7 +567,6 @@ class TestChatEndpoints(BaseTestCase):
         data = response.json()
         assert "default_model" in data
         assert "use_katex" in data
-        assert "tool_calls_collapsed_by_default" in data
         assert "system_message_denylist" in data
         assert "vision_models" in data
         assert "model_capabilities" in data

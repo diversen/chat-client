@@ -31,7 +31,6 @@ def _install_test_config() -> None:
     config_module.TOOL_REGISTRY = {}
     config_module.LOCAL_TOOL_DEFINITIONS = []
     config_module.TOOL_MODELS = []
-    config_module.TOOL_CALLS_COLLAPSED_BY_DEFAULT = True
     config_module.MCP_SERVER_URL = ""
     config_module.MCP_AUTH_TOKEN = ""
     config_module.MCP_TIMEOUT_SECONDS = 5.0

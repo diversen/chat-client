@@ -626,8 +626,7 @@ function createAssistantSegmentShell(messageId = null, initialKind = 'Thinking',
 }
 
 function createChatView({ config, renderStreamedResponseText, updateContentDiff }) {
-    const toolCallsCollapsedByDefault = Boolean(config?.tool_calls_collapsed_by_default ?? true);
-    const toolCallsOpenByDefault = !toolCallsCollapsedByDefault;
+    const toolCallsOpenByDefault = false;
     const getSegmentKindKey = (kind) => String(kind || '').toLowerCase();
     const getSegmentBehavior = (kind) => {
         const segmentKind = getSegmentKindKey(kind);

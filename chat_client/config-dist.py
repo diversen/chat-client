@@ -122,11 +122,7 @@ LOCAL_TOOL_DEFINITIONS = [
         },
     },
 ]
-
-TOOL_CALLS_COLLAPSED_BY_DEFAULT = True
-
 # Models that should receive tool definitions (local + MCP).
 # Use ["*"] to allow tools for any configured model.
-TOOL_MODELS = ["nemotron-cascade-2:latest", "gpt-oss:latest"]
-# Leave empty to disable tool use for all models.
-# TOOL_MODELS: list[str] = []
+TOOL_MODELS: list[str] = []
+# Use ["*"] to allow tools for any configured model.
