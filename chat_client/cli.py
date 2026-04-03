@@ -1,45 +1,35 @@
-import os
-import sys
-import click
-import subprocess
-import logging
 import asyncio
-import chat_client.core.set_system_path  # noqa
-from chat_client.repositories import user_repository
-from chat_client.database.migration import Migration
-from data.config import DATA_DIR, LOG_LEVEL
-from chat_client import __version__, __program__
-from chat_client.core.logging import setup_logging
-from pathlib import Path
+import logging
+import os
+import subprocess
+import sys
 
-setup_logging(LOG_LEVEL)
-logging.basicConfig(level=logging.DEBUG)
+import click
+
+from chat_client import __program__, __version__
+from chat_client.core.bootstrap import bootstrap_runtime, create_local_user
+from chat_client.core.logging import setup_logging
+
+setup_logging(logging.INFO)
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-@click.group()
+def _emit_bootstrap_messages(*, prompt_for_initial_user: bool) -> None:
+    result = bootstrap_runtime(prompt_for_initial_user=prompt_for_initial_user)
+    for message in result.messages():
+        click.echo(message)
+
+
+@click.group(invoke_without_command=True)
 @click.version_option(version=__version__, prog_name=__program__)
-def cli():
+@click.pass_context
+def cli(ctx):
     """
     Simple http server for serving LLM models
     """
-    pass
-
-
-def _before_server_start():
-    # Setup data directory
-    logger.info(f"Data directory: {DATA_DIR}")
-    os.makedirs(DATA_DIR, exist_ok=True)
-
-    # Setup database path
-    database_path = os.path.join(DATA_DIR, "database.db")
-    logger.info(f"Database path: {database_path}")
-
-    # Setup migrations
-    migrations_path = str(Path(__file__).resolve().parent / "migrations")
-    migration_manager = Migration(database_path, migrations_path)
-    migration_manager.run_migrations()
-    migration_manager.close()
+    if ctx.invoked_subcommand is None:
+        _emit_bootstrap_messages(prompt_for_initial_user=True)
+        click.echo("Run `chat-client server-dev` to start the server.")
 
 
 @cli.command(help="Start the running Uvicorn dev-server. Notice: By default it watches for changes in current dir.")
@@ -48,10 +38,9 @@ def _before_server_start():
 @click.option("--host", default="0.0.0.0", help="Server host.")
 @click.option("--log-level", default="info", help="Log level.")
 def server_dev(port: int, workers: int, host: str, log_level: str):
-    _before_server_start()
+    _emit_bootstrap_messages(prompt_for_initial_user=True)
 
     reload_dirs = ["."]
-
     cmd = [
         sys.executable,
         "-m",
@@ -71,8 +60,8 @@ def server_dev(port: int, workers: int, host: str, log_level: str):
         logger.info("Started Uvicorn in the foreground")
         subprocess.run(cmd, check=True)
     except subprocess.CalledProcessError as e:
-        logger.error(f"Uvicorn failed to start: {e}")
-        exit(1)
+        logger.error("Uvicorn failed to start: %s", e)
+        raise SystemExit(1) from e
 
 
 @cli.command(help="Start the production gunicorn server.")
@@ -80,14 +69,13 @@ def server_dev(port: int, workers: int, host: str, log_level: str):
 @click.option("--workers", default=3, help="Number of workers.")
 @click.option("--host", default="0.0.0.0", help="Server host.")
 def server_prod(port: int, workers: int, host: str):
-    _before_server_start()
+    _emit_bootstrap_messages(prompt_for_initial_user=True)
 
     if os.name == "nt":
         logger.info("Gunicorn does not work on Windows. Use server-dev instead.")
-        exit(1)
+        raise SystemExit(1)
 
     cmd = [
-        # Notice that this can not just be "gunicorn" as it is a new subprocess being started
         sys.executable,
         "-m",
         "gunicorn",
@@ -102,33 +90,20 @@ def server_prod(port: int, workers: int, host: str):
         logger.info("Started Gunicorn in the foreground")
         subprocess.run(cmd, check=True)
     except subprocess.CalledProcessError as e:
-        logger.error(f"Gunicorn failed to start: {e}")
-        exit(1)
+        logger.error("Gunicorn failed to start: %s", e)
+        raise SystemExit(1) from e
 
 
-# Command for generating a user
 @cli.command(help="Create a user")
 @click.option("--email", prompt="Email", help="Email")
-@click.option("--password", prompt="Password", help="Password")
+@click.option("--password", prompt="Password", hide_input=True, confirmation_prompt=True, help="Password")
 def create_user(email: str, password: str):
-    asyncio.run(_create_user(email, password))
-
-
-async def _create_user(email: str, password: str):
-    result = await user_repository.create_local_user(email, password, verified=1)
-    if result.created:
-        logger.info("Created user: %s", result.email)
-        return
-
-    logger.info("User already exists. Please login or reset your password.")
+    _emit_bootstrap_messages(prompt_for_initial_user=False)
+    asyncio.run(create_local_user(email, password))
 
 
 @cli.command(help="Init the system")
 def init_system():
-
-    # run migrations
-    _before_server_start()
-    user_message = """Migrations have been run. You may now run the server with the command"""
-    logger.info(user_message)
-
-    exit(0)
+    _emit_bootstrap_messages(prompt_for_initial_user=True)
+    click.echo("Migrations have been run. You may now run the server with `chat-client server-dev`.")
+    raise SystemExit(0)

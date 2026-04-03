@@ -68,13 +68,14 @@ Install latest version of chat-client:
 Initialize the configuration and data dir:
 
 ```bash
-# Generate data dir with data/config.py file
+# On first run, `chat-client` creates `data/config.py`, initializes the
+# database, and can prompt for an initial user when run interactively.
 chat-client
 
-# Run initial migrations
+# Optional manual setup command. Safe to run again.
 chat-client init-system
 
-# create a user
+# Optional manual user creation
 chat-client create-user
 ```
 
