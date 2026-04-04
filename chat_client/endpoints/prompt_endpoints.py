@@ -8,7 +8,6 @@ from chat_client.core.base_context import get_context
 # from chat_client.core.exceptions import UserValidate
 from chat_client.core import exceptions_validation
 from chat_client.repositories import prompt_repository
-from chat_client.core import flash
 from chat_client.core.http import (
     get_user_id_or_redirect,
     json_error,
@@ -77,8 +76,7 @@ async def prompt_create_post(request: Request):
         user_id = await require_user_id_json(request, message="Not authenticated")
         payload = await parse_json_payload(request, PromptUpsertRequest)
         result = await prompt_repository.create_prompt(user_id, payload.title, payload.prompt)
-        flash.set_success(request, "Prompt created successfully")
-        return json_success(prompt_id=result["prompt_id"])
+        return json_success(prompt_id=result["prompt_id"], message="Prompt created successfully")
     except exceptions_validation.JSONError as e:
         return _prompt_auth_json_error(request, e)
     except exceptions_validation.UserValidate as e:
@@ -151,8 +149,7 @@ async def prompt_edit_post(request: Request):
             return json_error("Prompt not found", status_code=404)
         payload = await parse_json_payload(request, PromptUpsertRequest)
         await prompt_repository.update_prompt(user_id, prompt_id, payload.title, payload.prompt)
-        flash.set_success(request, "Prompt updated successfully")
-        return json_success()
+        return json_success(message="Prompt updated successfully")
     except ValueError:
         return json_error("Prompt not found", status_code=404)
     except exceptions_validation.JSONError as e:
@@ -169,8 +166,7 @@ async def prompt_delete_post(request: Request):
         if not prompt:
             return json_error("Prompt not found", status_code=404)
         await prompt_repository.delete_prompt(user_id, prompt_id)
-        flash.set_success(request, "Prompt deleted successfully")
-        return json_success()
+        return json_success(message="Prompt deleted successfully")
     except ValueError:
         return json_error("Prompt not found", status_code=404)
     except exceptions_validation.JSONError as e:

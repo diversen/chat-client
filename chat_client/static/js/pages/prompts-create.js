@@ -31,7 +31,8 @@ function initPromptsCreatePage() {
         };
 
         try {
-            await Requests.asyncPostJson('/prompt/create', data);
+            const response = await Requests.asyncPostJson('/prompt/create', data);
+            Flash.storeMessageForNextPage(response.message, 'success');
             window.location.href = '/prompt';
         } catch (error) {
             console.error(error);

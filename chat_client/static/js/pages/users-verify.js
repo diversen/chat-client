@@ -16,7 +16,8 @@ function initUsersVerifyPage() {
         try {
             const form = document.getElementById('signup-form');
             const formData = new FormData(form);
-            await Requests.asyncPost('/user/verify', formData);
+            const response = await Requests.asyncPost('/user/verify', formData);
+            Flash.storeMessageForNextPage(response.message, 'success');
             window.location.href = '/user/login';
         } catch (error) {
             console.error(error);

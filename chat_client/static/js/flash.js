@@ -39,6 +39,7 @@ Very basic flash messages for server-side and javascript.
 */
 
 class Flash {
+    static storageKey = 'flash_message';
 
 	/**
 	 * If true, clear the message element before adding a new message
@@ -91,6 +92,38 @@ class Flash {
             ? error.message.trim()
             : fallbackMessage;
         this.setMessage(message, type);
+    }
+
+    static storeMessageForNextPage(message, type = 'notice') {
+        if (typeof window === 'undefined' || !window.sessionStorage) {
+            return;
+        }
+
+        window.sessionStorage.setItem(this.storageKey, JSON.stringify({ message, type }));
+    }
+
+    static showStoredMessage() {
+        if (typeof window === 'undefined' || !window.sessionStorage) {
+            return;
+        }
+
+        const rawValue = window.sessionStorage.getItem(this.storageKey);
+        if (!rawValue) {
+            return;
+        }
+
+        window.sessionStorage.removeItem(this.storageKey);
+
+        try {
+            const stored = JSON.parse(rawValue);
+            const message = typeof stored?.message === 'string' ? stored.message.trim() : '';
+            const type = typeof stored?.type === 'string' ? stored.type : 'notice';
+            if (message) {
+                this.setMessage(message, type);
+            }
+        } catch (_) {
+            // Ignore malformed client-side flash payloads.
+        }
     }
 
     /**

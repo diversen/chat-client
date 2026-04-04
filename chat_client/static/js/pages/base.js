@@ -7,6 +7,7 @@ function initBasePage() {
     initShortcuts();
 
     Flash.removeAfterSecs = 10;
+    Flash.showStoredMessage();
     Flash.clearMessages();
 }
 

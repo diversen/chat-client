@@ -34,7 +34,7 @@ class TestUserEndpoints(BaseTestCase):
         assert response.status_code == 200
         data = response.json()
         assert data["error"] is False
-        assert "account has been created" in data["message"]
+        assert "account was created successfully" in data["message"]
 
     @patch("chat_client.repositories.user_repository.create_user")
     @patch("starlette.requests.Request.session", new_callable=lambda: {"captcha": "TEST"})
@@ -75,6 +75,7 @@ class TestUserEndpoints(BaseTestCase):
         data = response.json()
         assert data["error"] is False
         assert data["redirect"] == "/chat/test-dialog-id"
+        assert data["message"] == "You are now logged in"
 
     def test_login_get_with_auth_required_reason_shows_flash_and_next(self, monkeypatch):
         from chat_client.core import flash
@@ -139,6 +140,7 @@ class TestUserEndpoints(BaseTestCase):
         assert response.status_code == 200
         data = response.json()
         assert data["error"] is False
+        assert data["message"] == "Your account has been verified successfully"
 
     @patch("chat_client.repositories.user_repository.verify_user")
     def test_verify_post_invalid_token(self, mock_verify):
@@ -196,6 +198,7 @@ class TestUserEndpoints(BaseTestCase):
         assert response.status_code == 200
         data = response.json()
         assert data["error"] is False
+        assert "password reset email has been sent" in data["message"].lower()
         assert "password reset email has been sent" in data["message"]
 
     @patch("chat_client.repositories.user_repository.reset_password")
@@ -244,6 +247,7 @@ class TestUserEndpoints(BaseTestCase):
         assert response.status_code == 200
         data = response.json()
         assert data["error"] is False
+        assert data["message"] == "Password has been updated. You can now login."
 
     @patch("chat_client.core.user_session.is_logged_in")
     def test_profile_get_not_authenticated(self, mock_logged_in):
@@ -301,7 +305,7 @@ class TestUserEndpoints(BaseTestCase):
 
         assert response.status_code == 200
         set_cookie_headers = response.headers.get_list("set-cookie")
-        assert any(header.startswith(f"{config.FLASH_COOKIE}=") for header in set_cookie_headers)
+        assert not any(header.startswith(f"{config.FLASH_COOKIE}=") for header in set_cookie_headers)
         assert not any(header.startswith(f"{config.SESSION_COOKIE}=") for header in set_cookie_headers)
 
     @patch("chat_client.core.user_session.is_logged_in")

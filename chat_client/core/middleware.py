@@ -61,10 +61,10 @@ class LimitRequestSizeMiddleware(BaseHTTPMiddleware):
         return await call_next(request)
 
 
-class SessionMiddlewareNoResignUnlessChanged:
+class SignedCookieStateMiddleware:
     """
-    Session middleware that only emits Set-Cookie when session content changes.
-    This avoids stale concurrent responses overwriting a fresher auth session cookie.
+    Signed cookie-backed state middleware that only emits Set-Cookie when state changes.
+    This avoids stale concurrent responses overwriting a fresher cookie state.
     """
 
     def __init__(
@@ -146,7 +146,7 @@ class SessionMiddlewareNoResignUnlessChanged:
 max_age = getattr(config, "SESSION_MAX_AGE", 14 * 24 * 60 * 60)  # 14 days default
 session_cookie = getattr(config, "SESSION_COOKIE", "chat_client_session")
 session_middleware = Middleware(
-    SessionMiddlewareNoResignUnlessChanged,
+    SignedCookieStateMiddleware,
     secret_key=getattr(config, "SESSION_SECRET_KEY", "SECRET_KEY"),
     scope_key="session",
     session_cookie=session_cookie,
@@ -158,7 +158,7 @@ session_middleware = Middleware(
 flash_max_age = getattr(config, "FLASH_MAX_AGE", 120)
 flash_cookie = getattr(config, "FLASH_COOKIE", "chat_client_flash")
 flash_middleware = Middleware(
-    SessionMiddlewareNoResignUnlessChanged,
+    SignedCookieStateMiddleware,
     secret_key=getattr(config, "FLASH_SECRET_KEY", getattr(config, "SESSION_SECRET_KEY", "SECRET_KEY")),
     scope_key="flash_session",
     session_cookie=flash_cookie,

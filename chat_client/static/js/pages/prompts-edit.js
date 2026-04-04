@@ -38,7 +38,8 @@ function initPromptsEditPage() {
         };
 
         try {
-            await Requests.asyncPostJson(`/prompt/${promptId}/edit`, data);
+            const response = await Requests.asyncPostJson(`/prompt/${promptId}/edit`, data);
+            Flash.storeMessageForNextPage(response.message, 'success');
             window.location.href = '/prompt';
         } catch (error) {
             console.error(error);

@@ -17,7 +17,8 @@ function initUsersResetPasswordPage() {
             try {
                 const form = document.getElementById('reset-form');
                 const formData = new FormData(form);
-                await Requests.asyncPost('/user/reset', formData);
+                const response = await Requests.asyncPost('/user/reset', formData);
+                Flash.storeMessageForNextPage(response.message, 'success');
                 window.location.replace('/user/login');
             } catch (error) {
                 console.error(error);

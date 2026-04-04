@@ -56,12 +56,12 @@ async def signup_post(request: Request):
     try:
         user_row = await user_repository.create_user(request)
         user_session.set_session_variable(request, "user_id", user_row["user_id"])
-        flash.set_success(
-            request,
-            "Your account was created successfully. " "Check your email in order to verify your account. After verification you may login.",
+        return json_success(
+            message=(
+                "Your account was created successfully. "
+                "Check your email in order to verify your account. After verification you may login."
+            )
         )
-
-        return json_success(message="Your account has been created")
     except exceptions_validation.UserValidate as e:
         return json_error(str(e), status_code=400)
     except Exception as e:
@@ -84,8 +84,7 @@ async def verify_get(request: Request):
 async def verify_post(request: Request):
     try:
         await user_repository.verify_user(request)
-        flash.set_success(request, "Your account has been verified successfully")
-        return json_success()
+        return json_success(message="Your account has been verified successfully")
     except exceptions_validation.UserValidate as e:
         return json_error(str(e), status_code=400)
     except Exception as e:
@@ -113,9 +112,8 @@ async def login_post(request: Request):
         payload = await request.json()
         login_user = await user_repository.login_user(request)
         user_session.set_session_variable(request, "user_id", login_user["user_id"])
-        flash.set_success(request, "You are now logged in")
         next_path = _get_safe_next_path(payload.get("next"))
-        return json_success(redirect=next_path)
+        return json_success(redirect=next_path, message="You are now logged in")
     except exceptions_validation.UserValidate as e:
         return json_error(str(e), status_code=400)
     except Exception as e:
@@ -174,13 +172,13 @@ async def reset_password_get(request: Request):
 async def reset_password_post(request: Request):
     try:
         await user_repository.reset_password(request)
-        flash.set_success(
-            request,
-            "A password reset email has been sent. "
-            "Check your email and click the link in the email to reset your password. "
-            "Then you can login with your new password.",
+        return json_success(
+            message=(
+                "A password reset email has been sent. "
+                "Check your email and click the link in the email to reset your password. "
+                "Then you can login with your new password."
+            )
         )
-        return json_success(message="A password reset email has been sent.")
     except exceptions_validation.UserValidate as e:
         return json_error(str(e), status_code=400)
     except Exception as e:
@@ -203,8 +201,7 @@ async def new_password_get(request: Request):
 async def new_password_post(request: Request):
     try:
         await user_repository.new_password(request)
-        flash.set_success(request, "Password has been updated. You can now login.")
-        return json_success(message="Password reset email sent")
+        return json_success(message="Password has been updated. You can now login.")
     except exceptions_validation.UserValidate as e:
         return json_error(str(e), status_code=400)
     except Exception as e:
@@ -281,8 +278,7 @@ async def profile_post(request: Request):
     try:
         await require_user_id_json(request, message="You must be logged in to update your profile")
         await user_repository.update_profile(request)
-        flash.set_success(request, "Profile updated successfully")
-        return json_success()
+        return json_success(message="Profile updated successfully")
     except exceptions_validation.JSONError as e:
         return json_error_with_login_redirect(e, redirect_to="/user/profile")
     except exceptions_validation.UserValidate as e:

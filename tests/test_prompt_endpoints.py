@@ -106,6 +106,7 @@ class TestPromptEndpoints(BaseTestCase):
         data = response.json()
         assert data["error"] is False
         assert data["prompt_id"] == 1
+        assert data["message"] == "Prompt created successfully"
 
     @patch("chat_client.repositories.prompt_repository.create_prompt")
     @patch("chat_client.core.user_session.is_logged_in")
@@ -265,6 +266,7 @@ class TestPromptEndpoints(BaseTestCase):
         assert response.status_code == 200
         data = response.json()
         assert data["error"] is False
+        assert data["message"] == "Prompt updated successfully"
 
     @patch("chat_client.repositories.prompt_repository.get_prompt")
     @patch("chat_client.core.user_session.is_logged_in")

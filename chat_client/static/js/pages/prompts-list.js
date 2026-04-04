@@ -21,7 +21,8 @@ function initPromptsListPage() {
             }
 
             try {
-                await Requests.asyncPostJson(`/prompt/${promptId}/delete`, {});
+                const response = await Requests.asyncPostJson(`/prompt/${promptId}/delete`, {});
+                Flash.storeMessageForNextPage(response.message, 'success');
                 window.location.href = '/prompt';
             } catch (error) {
                 console.error(error);

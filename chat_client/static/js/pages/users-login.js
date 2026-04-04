@@ -22,6 +22,7 @@ function initUsersLoginPage() {
 
         try {
             const response = await Requests.asyncPostJson('/user/login', jsonData);
+            Flash.storeMessageForNextPage(response.message, 'success');
             window.location.href = response?.redirect || '/';
         } catch (error) {
             console.error(error);
