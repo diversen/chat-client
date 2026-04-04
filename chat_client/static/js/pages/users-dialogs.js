@@ -68,7 +68,7 @@ function initUsersDialogsPage() {
             }
         } catch (error) {
             console.error(error);
-            Flash.setMessage(Requests.getErrorMessage(error, 'An error occurred while loading dialogs.'), 'error');
+            Flash.setMessageFromError(error, 'An error occurred while loading dialogs.');
         } finally {
             isLoading = false;
             loadMoreButton.disabled = false;
@@ -128,7 +128,7 @@ function initUsersDialogsPage() {
             Flash.setMessage('Dialog deleted successfully', 'success');
         } catch (error) {
             console.error(error);
-            Flash.setMessage(Requests.getErrorMessage(error, 'An error occurred while deleting the dialog.'), 'error');
+            Flash.setMessageFromError(error, 'An error occurred while deleting the dialog.');
         } finally {
             loading.classList.add('hidden');
         }

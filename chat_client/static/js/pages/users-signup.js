@@ -21,10 +21,7 @@ function initUsersSignupPage() {
                 window.location.replace('/user/login');
             } catch (error) {
                 console.error(error);
-                Flash.setMessage(
-                    Requests.getErrorMessage(error, 'An error occurred while creating your account. Try again later.'),
-                    'error',
-                );
+                Flash.setMessageFromError(error, 'An error occurred while creating your account. Try again later.');
             }
         });
     });

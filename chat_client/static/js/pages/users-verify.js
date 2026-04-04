@@ -20,10 +20,7 @@ function initUsersVerifyPage() {
             window.location.href = '/user/login';
         } catch (error) {
             console.error(error);
-            Flash.setMessage(
-                Requests.getErrorMessage(error, 'An error occurred while verifying your account. Try again later.'),
-                'error',
-            );
+            Flash.setMessageFromError(error, 'An error occurred while verifying your account. Try again later.');
         } finally {
             spinner.classList.add('hidden');
         }

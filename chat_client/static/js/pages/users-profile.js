@@ -15,18 +15,15 @@ function initUsersProfilePage() {
 
         try {
             const jsonData = {
-                username: document.getElementById('username')?.value,
-                theme_preference: document.getElementById('theme_preference')?.value,
+                username: document.getElementById('username').value,
+                theme_preference: document.getElementById('theme_preference').value,
             };
 
             await Requests.asyncPostJson('/user/profile', jsonData);
             window.location.reload();
         } catch (error) {
             console.error(error);
-            Flash.setMessage(
-                Requests.getErrorMessage(error, 'An error occurred while saving your profile.'),
-                'error',
-            );
+            Flash.setMessageFromError(error, 'An error occurred while saving your profile.');
         } finally {
             spinner.classList.add('hidden');
         }

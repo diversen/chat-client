@@ -82,6 +82,17 @@ class Flash {
         messageElem.insertAdjacentHTML('afterbegin', html);
     }
 
+    static setMessageFromError(error, fallbackMessage = 'An error occurred. Try again later.', type = 'error') {
+        if (error?.redirecting === true) {
+            return;
+        }
+
+        const message = (typeof error?.message === 'string' && error.message.trim())
+            ? error.message.trim()
+            : fallbackMessage;
+        this.setMessage(message, type);
+    }
+
     /**
      * Remove all flash messages
 	 * This is meant for removing messages on page load, set by server-side languages 

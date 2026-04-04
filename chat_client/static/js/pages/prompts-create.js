@@ -35,7 +35,7 @@ function initPromptsCreatePage() {
             window.location.href = '/prompt';
         } catch (error) {
             console.error(error);
-            Flash.setMessage(Requests.getErrorMessage(error), 'error');
+            Flash.setMessageFromError(error);
         }
     });
 }

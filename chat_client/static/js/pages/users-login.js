@@ -25,10 +25,7 @@ function initUsersLoginPage() {
             window.location.href = response?.redirect || '/';
         } catch (error) {
             console.error(error);
-            Flash.setMessage(
-                Requests.getErrorMessage(error, 'An error occurred while trying to log in. Try again later.'),
-                'error',
-            );
+            Flash.setMessageFromError(error, 'An error occurred while trying to log in. Try again later.');
         } finally {
             spinner.classList.add('hidden');
         }
