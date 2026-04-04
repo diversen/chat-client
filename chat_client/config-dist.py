@@ -42,6 +42,9 @@ SESSION_COOKIE = "chat_client_session"
 # Session HTTPS only
 SESSION_HTTPS_ONLY = True  # Set to True if using HTTPS
 
+# Session Max Age
+SESSION_MAX_AGE = 14 * 24 * 60 * 60  # 14 days
+
 # Maximum accepted HTTP request body size in bytes (default 10 MB)
 REQUEST_MAX_SIZE = 10 * 1024 * 1024
 
