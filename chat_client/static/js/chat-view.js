@@ -726,7 +726,15 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
 
     return {
         createMessageAttachments,
-        renderStaticUserMessage(message, messageId = null, onEdit, images = [], attachments = [], displayRole = 'User') {
+        renderStaticUserMessage(
+            message,
+            messageId = null,
+            onEdit,
+            images = [],
+            attachments = [],
+            displayRole = 'User',
+            editable = Boolean(messageId),
+        ) {
             const safeDisplayRole = String(displayRole || 'User');
             const { container, contentElement } = createMessageElement(safeDisplayRole, messageId, 'User');
             const imagePreview = createMessageImages(images);
@@ -741,7 +749,7 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
             contentElement.innerText = message;
             renderCopyMessageButton(container, message);
 
-            if (messageId) {
+            if (editable && messageId) {
                 renderEditMessageButton(container, onEdit);
             }
             appendBeforeAnchorSpacer(container);

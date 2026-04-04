@@ -873,6 +873,7 @@ class ConversationController {
                     msg.images || [],
                     msg.attachments || [],
                     displayRole,
+                    msg.role !== 'system',
                 );
                 continue;
             }
