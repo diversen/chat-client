@@ -14,7 +14,15 @@ from chat_client.core import exceptions_validation
 from chat_client.core import user_session
 from chat_client.core.templates import get_templates
 from chat_client.core.base_context import get_context
-from chat_client.core.http import get_user_id_or_redirect, require_user_id_json, json_error, json_success
+from chat_client.core.http import (
+    build_login_redirect_target,
+    get_user_id_or_redirect,
+    json_auth_error,
+    json_error,
+    json_error_with_login_redirect,
+    json_success,
+    require_user_id_json,
+)
 
 logger: logging.Logger = logging.getLogger(__name__)
 templates = get_templates()
@@ -22,6 +30,13 @@ templates = get_templates()
 
 # set max unix time for verification
 TIME_TO_VERIFY = 60 * 10
+
+
+def _get_safe_next_path(value: str | None, default: str = "/") -> str:
+    candidate = str(value or "").strip()
+    if not candidate.startswith("/") or candidate.startswith("//"):
+        return default
+    return candidate
 
 
 def _generate_captcha_text(length=4):
@@ -81,9 +96,14 @@ async def verify_post(request: Request):
 
 
 async def login_get(request: Request):
+    next_path = _get_safe_next_path(request.query_params.get("next"))
+    if request.query_params.get("reason") == "auth_required" and not await user_session.is_logged_in(request):
+        flash.set_notice(request, "You are not logged in. Please log in.")
+
     context = {
         "request": request,
         "title": "Login",
+        "next_path": next_path,
     }
 
     context = await get_context(request, context)
@@ -92,10 +112,12 @@ async def login_get(request: Request):
 
 async def login_post(request: Request):
     try:
+        payload = await request.json()
         login_user = await user_repository.login_user(request)
         user_session.set_session_variable(request, "user_id", login_user["user_id"])
         flash.set_success(request, "You are now logged in")
-        return json_success()
+        next_path = _get_safe_next_path(payload.get("next"))
+        return json_success(redirect=next_path)
     except exceptions_validation.UserValidate as e:
         return json_error(str(e), status_code=400)
     except Exception as e:
@@ -259,9 +281,12 @@ async def profile(request: Request):
 
 async def profile_post(request: Request):
     try:
+        await require_user_id_json(request, message="You must be logged in to update your profile")
         await user_repository.update_profile(request)
         flash.set_success(request, "Profile updated successfully")
         return json_success()
+    except exceptions_validation.JSONError as e:
+        return json_error_with_login_redirect(e, redirect_to="/user/profile")
     except exceptions_validation.UserValidate as e:
         return json_error(str(e), status_code=400)
     except Exception as e:
@@ -272,7 +297,12 @@ async def profile_post(request: Request):
 async def is_logged_in(request: Request):
     user_id = await user_session.is_logged_in(request)
     if not user_id:
-        flash.set_notice(request, "You are logged out. Please login again.")
-        return json_error("You are logged out. Please login again.", redirect="/user/login")
+        next_path = _get_safe_next_path(request.query_params.get("next"))
+        flash.set_notice(request, "You are not logged in. Please log in.")
+        return json_auth_error(
+            "You are not logged in. Please log in.",
+            redirect_to=next_path,
+            status_code=400,
+        )
 
     return json_success(message="You are logged in")

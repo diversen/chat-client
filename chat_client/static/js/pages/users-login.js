@@ -17,11 +17,12 @@ function initUsersLoginPage() {
             email: document.getElementById('email')?.value,
             password: document.getElementById('password')?.value,
             remember: document.getElementById('remember')?.checked,
+            next: new URL(window.location.href).searchParams.get('next') || '/',
         };
 
         try {
-            await Requests.asyncPostJson('/user/login', jsonData);
-            window.location.href = '/';
+            const response = await Requests.asyncPostJson('/user/login', jsonData);
+            window.location.href = response?.redirect || '/';
         } catch (error) {
             console.error(error);
             Flash.setMessage(

@@ -10,15 +10,20 @@ from chat_client.core import exceptions_validation
 from chat_client.repositories import prompt_repository
 from chat_client.core import flash
 from chat_client.core.http import (
-    require_user_id_json,
     get_user_id_or_redirect,
-    parse_json_payload,
     json_error,
+    json_error_with_login_redirect,
     json_success,
+    parse_json_payload,
+    require_user_id_json,
 )
 from chat_client.schemas.prompt import PromptUpsertRequest
 
 templates = get_templates()
+
+
+def _prompt_auth_json_error(request: Request, error: exceptions_validation.JSONError):
+    return json_error_with_login_redirect(error, redirect_to="/prompt")
 
 
 async def prompt_list_get(request: Request):
@@ -51,7 +56,7 @@ async def prompt_list_json(request: Request):
         ]
         return json_success(prompts=data)
     except exceptions_validation.JSONError as e:
-        return json_error(str(e), status_code=e.status_code)
+        return _prompt_auth_json_error(request, e)
 
 
 async def prompt_create_get(request: Request):
@@ -75,7 +80,7 @@ async def prompt_create_post(request: Request):
         flash.set_success(request, "Prompt created successfully")
         return json_success(prompt_id=result["prompt_id"])
     except exceptions_validation.JSONError as e:
-        return json_error(str(e), status_code=e.status_code)
+        return _prompt_auth_json_error(request, e)
     except exceptions_validation.UserValidate as e:
         return json_error(str(e), status_code=400)
 
@@ -108,7 +113,7 @@ async def prompt_detail_json(request: Request):
     except exceptions_validation.UserValidate:
         return json_error("Prompt not found", status_code=404)
     except exceptions_validation.JSONError as e:
-        return json_error(str(e), status_code=e.status_code)
+        return _prompt_auth_json_error(request, e)
     data = {
         "prompt_id": prompt.prompt_id,
         "title": prompt.title,
@@ -138,41 +143,37 @@ async def prompt_edit_get(request: Request):
 
 
 async def prompt_edit_post(request: Request):
-
-    prompt_id = int(request.path_params["prompt_id"])
-    user_id_or_response = await get_user_id_or_redirect(request)
-    if isinstance(user_id_or_response, RedirectResponse):
-        return user_id_or_response
-    user_id = user_id_or_response
-
-    prompt = await prompt_repository.get_prompt(user_id, prompt_id)
-    if not prompt:
-        return json_error("Prompt not found", status_code=404)
-
     try:
+        prompt_id = int(request.path_params["prompt_id"])
+        user_id = await require_user_id_json(request, message="Not authenticated")
+        prompt = await prompt_repository.get_prompt(user_id, prompt_id)
+        if not prompt:
+            return json_error("Prompt not found", status_code=404)
         payload = await parse_json_payload(request, PromptUpsertRequest)
         await prompt_repository.update_prompt(user_id, prompt_id, payload.title, payload.prompt)
         flash.set_success(request, "Prompt updated successfully")
         return json_success()
+    except ValueError:
+        return json_error("Prompt not found", status_code=404)
     except exceptions_validation.JSONError as e:
-        return json_error(str(e), status_code=e.status_code)
+        return _prompt_auth_json_error(request, e)
     except exceptions_validation.UserValidate as e:
         return json_error(str(e), status_code=400)
 
 
 async def prompt_delete_post(request: Request):
-    prompt_id = int(request.path_params["prompt_id"])
-    user_id_or_response = await get_user_id_or_redirect(request)
-    if isinstance(user_id_or_response, RedirectResponse):
-        return user_id_or_response
-    user_id = user_id_or_response
-    prompt = await prompt_repository.get_prompt(user_id, prompt_id)
-
-    if not prompt:
-        return json_error("Prompt not found", status_code=404)
     try:
+        prompt_id = int(request.path_params["prompt_id"])
+        user_id = await require_user_id_json(request, message="Not authenticated")
+        prompt = await prompt_repository.get_prompt(user_id, prompt_id)
+        if not prompt:
+            return json_error("Prompt not found", status_code=404)
         await prompt_repository.delete_prompt(user_id, prompt_id)
         flash.set_success(request, "Prompt deleted successfully")
         return json_success()
+    except ValueError:
+        return json_error("Prompt not found", status_code=404)
+    except exceptions_validation.JSONError as e:
+        return _prompt_auth_json_error(request, e)
     except exceptions_validation.UserValidate as e:
         return json_error(str(e), status_code=400)

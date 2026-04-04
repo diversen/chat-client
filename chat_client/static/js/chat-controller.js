@@ -530,7 +530,8 @@ class ConversationController {
     async sendUserMessage() {
         if (this.isSubmitting || this.isStreaming) return;
         try {
-            await this.auth.ensure();
+            const authenticated = await this.auth.ensure();
+            if (authenticated === false) return;
             const userMessage = messageElem.value.trim();
             const images = this.selectedModelSupportsImages()
                 ? this.pendingImages.map((img) => ({ data_url: img.dataUrl }))
@@ -610,6 +611,10 @@ class ConversationController {
         } catch (error) {
             await logError(error, 'Error in sendUserMessage');
             console.error('Error in sendUserMessage:', error);
+            if (typeof error?.redirect === 'string' && error.redirect.trim()) {
+                window.location.href = error.redirect;
+                return;
+            }
             Flash.setMessage('An error occurred. Please try again.', 'error');
         } finally {
             this.isSubmitting = false;
@@ -813,6 +818,9 @@ class ConversationController {
             }
             if (error.name === 'AbortError') {
                 Flash.setMessage('Request was aborted', 'notice');
+            } else if (error?.status === 401 && typeof error?.redirect === 'string' && error.redirect.trim()) {
+                window.location.href = error.redirect;
+                return;
             } else {
                 const message = (typeof error?.message === 'string' && error.message.trim())
                     ? error.message.trim()

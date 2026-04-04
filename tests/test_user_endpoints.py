@@ -63,11 +63,39 @@ class TestUserEndpoints(BaseTestCase):
         """Test successful login"""
         mock_login.return_value = {"user_id": 1}
 
-        response = self.client.post("/user/login", json={"email": "test@example.com", "password": "testpassword123"})
+        response = self.client.post(
+            "/user/login",
+            json={"email": "test@example.com", "password": "testpassword123", "next": "/chat/test-dialog-id"},
+        )
 
         assert response.status_code == 200
         data = response.json()
         assert data["error"] is False
+        assert data["redirect"] == "/chat/test-dialog-id"
+
+    def test_login_get_with_auth_required_reason_shows_flash_and_next(self, monkeypatch):
+        from chat_client.core import flash
+
+        async def fake_get_context(request, variables):
+            base = {
+                "request": request,
+                "logged_in": False,
+                "user_id": False,
+                "profile": {},
+                "version": "test-version",
+                "use_katex": False,
+                "prompts": [],
+                "flash_messages": flash.get_messages(request),
+            }
+            return {**base, **variables}
+
+        monkeypatch.setattr("chat_client.endpoints.user_endpoints.get_context", fake_get_context)
+
+        response = self.client.get("/user/login?next=/chat/test-dialog-id&reason=auth_required")
+
+        assert response.status_code == 200
+        assert 'value="/chat/test-dialog-id"' in response.text
+        assert "You are not logged in. Please log in." in response.text
 
     @patch("chat_client.repositories.user_repository.login_user")
     def test_login_post_invalid_credentials(self, mock_login):
@@ -219,11 +247,12 @@ class TestUserEndpoints(BaseTestCase):
         """Test /user/is-logged-in when not authenticated"""
         mock_logged_in.return_value = False
 
-        response = self.client.get("/user/is-logged-in")
+        response = self.client.get("/user/is-logged-in?next=/chat/test-dialog-id")
         assert response.status_code == 400
         data = response.json()
         assert data["error"] is True
-        assert data["redirect"] == "/user/login"
+        assert data["redirect"] == "/user/login?next=/chat/test-dialog-id&reason=auth_required"
+        assert "not logged in" in data["message"].lower()
 
     @patch("chat_client.core.user_session.is_logged_in")
     def test_is_logged_in_authenticated(self, mock_logged_in):
@@ -268,6 +297,17 @@ class TestUserEndpoints(BaseTestCase):
         assert response.status_code == 200
         data = response.json()
         assert data["error"] is False
+
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_profile_post_not_authenticated(self, mock_logged_in):
+        mock_logged_in.return_value = False
+
+        response = self.client.post("/user/profile", json={"username": "Updated user"})
+
+        assert response.status_code == 401
+        data = response.json()
+        assert data["error"] is True
+        assert data["redirect"] == "/user/login?next=/user/profile&reason=auth_required"
 
     @patch("chat_client.core.user_session.is_logged_in")
     def test_list_dialogs_not_authenticated(self, mock_logged_in):

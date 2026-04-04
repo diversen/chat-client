@@ -91,6 +91,7 @@ class TestPromptEndpoints(BaseTestCase):
         data = response.json()
         assert data["error"] is True
         assert "Not authenticated" in data["message"]
+        assert data["redirect"] == "/user/login?next=/prompt&reason=auth_required"
 
     @patch("chat_client.repositories.prompt_repository.create_prompt")
     @patch("chat_client.core.user_session.is_logged_in")
@@ -167,6 +168,7 @@ class TestPromptEndpoints(BaseTestCase):
         assert response.status_code == 401
         data = response.json()
         assert data["error"] is True
+        assert data["redirect"] == "/user/login?next=/prompt&reason=auth_required"
 
     @patch("chat_client.repositories.prompt_repository.get_prompt")
     @patch("chat_client.core.user_session.is_logged_in")
@@ -243,8 +245,10 @@ class TestPromptEndpoints(BaseTestCase):
 
         response = self.client.post("/prompt/1/edit", json={"title": "Updated Prompt", "prompt": "Updated content"})
 
-        assert response.status_code == 307  # Redirect
-        assert response.headers["location"] == "/user/login"
+        assert response.status_code == 401
+        data = response.json()
+        assert data["error"] is True
+        assert data["redirect"] == "/user/login?next=/prompt&reason=auth_required"
 
     @patch("chat_client.repositories.prompt_repository.update_prompt")
     @patch("chat_client.repositories.prompt_repository.get_prompt")
@@ -301,8 +305,10 @@ class TestPromptEndpoints(BaseTestCase):
         mock_logged_in.return_value = False
 
         response = self.client.post("/prompt/1/delete")
-        assert response.status_code == 307  # Redirect
-        assert response.headers["location"] == "/user/login"
+        assert response.status_code == 401
+        data = response.json()
+        assert data["error"] is True
+        assert data["redirect"] == "/user/login?next=/prompt&reason=auth_required"
 
     @patch("chat_client.repositories.prompt_repository.delete_prompt")
     @patch("chat_client.repositories.prompt_repository.get_prompt")

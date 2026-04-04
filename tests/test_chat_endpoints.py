@@ -661,12 +661,20 @@ class TestChatEndpoints(BaseTestCase):
         """Test POST /chat when not authenticated"""
         mock_logged_in.return_value = False
 
-        response = self.client.post("/chat", json={"messages": [{"role": "user", "content": "Hello"}], "model": "test-model"})
+        response = self.client.post(
+            "/chat",
+            json={
+                "messages": [{"role": "user", "content": "Hello"}],
+                "model": "test-model",
+                "dialog_id": "077fc48f-9954-4eaf-942e-2a734770cc3b",
+            },
+        )
 
         assert response.status_code == 401
         data = response.json()
         assert data["error"] is True
         assert "must be logged in" in data["message"]
+        assert data["redirect"] == "/user/login?next=/chat/077fc48f-9954-4eaf-942e-2a734770cc3b&reason=auth_required"
 
     @patch("chat_client.core.user_session.is_logged_in")
     def test_chat_response_stream_validation_error(self, mock_logged_in):
@@ -907,6 +915,7 @@ class TestChatEndpoints(BaseTestCase):
         data = response.json()
         assert data["error"] is True
         assert "must be logged in" in data["message"]
+        assert data["redirect"] == "/user/login?reason=auth_required"
 
     @patch("chat_client.repositories.chat_repository.create_dialog")
     @patch("chat_client.core.user_session.is_logged_in")
@@ -948,6 +957,7 @@ class TestChatEndpoints(BaseTestCase):
         assert response.status_code == 401
         data = response.json()
         assert data["error"] is True
+        assert data["redirect"] == "/user/login?next=/chat/test-dialog&reason=auth_required"
 
     @patch("chat_client.endpoints.chat_endpoints.VISION_MODELS", ["test-model"])
     @patch("chat_client.endpoints.chat_endpoints.TOOL_MODELS", ["test-model"])
@@ -1035,6 +1045,21 @@ class TestChatEndpoints(BaseTestCase):
         assert response.status_code == 401
         data = response.json()
         assert data["error"] is True
+        assert data["redirect"] == "/user/login?next=/chat/test-dialog&reason=auth_required"
+
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_create_assistant_turn_events_not_authenticated(self, mock_logged_in):
+        mock_logged_in.return_value = False
+
+        response = self.client.post(
+            "/chat/create-assistant-turn-events/test-dialog",
+            json={"turn_id": "turn-1", "events": []},
+        )
+
+        assert response.status_code == 401
+        data = response.json()
+        assert data["error"] is True
+        assert data["redirect"] == "/user/login?next=/chat/test-dialog&reason=auth_required"
 
     @patch("chat_client.endpoints.chat_endpoints.DIALOG_TITLE_MODEL", "title-model")
     @patch("chat_client.repositories.chat_repository.update_dialog_title")
@@ -1290,6 +1315,7 @@ class TestChatEndpoints(BaseTestCase):
         assert response.status_code == 401
         data = response.json()
         assert data["error"] is True
+        assert data["redirect"] == "/user/login?next=/chat/test-dialog&reason=auth_required"
 
     @patch("chat_client.repositories.chat_repository.get_dialog")
     @patch("chat_client.core.user_session.is_logged_in")
@@ -1315,6 +1341,7 @@ class TestChatEndpoints(BaseTestCase):
         assert response.status_code == 401
         data = response.json()
         assert data["error"] is True
+        assert data["redirect"] == "/user/login?next=/chat/test-dialog&reason=auth_required"
 
     @patch("chat_client.repositories.chat_repository.get_messages")
     @patch("chat_client.core.user_session.is_logged_in")
@@ -1335,11 +1362,12 @@ class TestChatEndpoints(BaseTestCase):
         """Test POST /chat/update-message/{message_id} when not authenticated"""
         mock_logged_in.return_value = False
 
-        response = self.client.post("/chat/update-message/1", json={"content": "Updated message"})
+        response = self.client.post("/chat/update-message/1?next=/chat/test-dialog", json={"content": "Updated message"})
 
         assert response.status_code == 401
         data = response.json()
         assert data["error"] is True
+        assert data["redirect"] == "/user/login?next=/chat/test-dialog&reason=auth_required"
 
     @patch("chat_client.repositories.chat_repository.update_message")
     @patch("chat_client.core.user_session.is_logged_in")
@@ -1365,6 +1393,7 @@ class TestChatEndpoints(BaseTestCase):
         assert response.status_code == 401
         data = response.json()
         assert data["error"] is True
+        assert data["redirect"] == "/user/login?next=/chat/test-dialog&reason=auth_required"
 
     @patch("chat_client.repositories.chat_repository.delete_dialog")
     @patch("chat_client.core.user_session.is_logged_in")

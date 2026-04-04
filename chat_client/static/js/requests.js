@@ -45,7 +45,16 @@ class Requests {
                 const message =
                     responseJson?.message ||
                     `${options.method} request failed: ${response.status} ${response.statusText}`;
-                throw new Error(message);
+                const error = new Error(message);
+                error.status = response.status;
+                if (responseJson?.redirect) {
+                    error.redirect = responseJson.redirect;
+                    if (response.status === 401 && typeof window !== 'undefined') {
+                        window.location.href = responseJson.redirect;
+                        error.redirecting = true;
+                    }
+                }
+                throw error;
             }
 
             if (!responseText) {

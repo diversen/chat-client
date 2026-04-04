@@ -21,6 +21,7 @@
     <h3>Login</h3>
 
     <form action="/user/login" method="post">
+        <input id="next" type="hidden" name="next" value="{{ next_path }}">
 
         <label for="email">E-mail</label>
         <input id="email" type="text" name="email">

@@ -23,7 +23,20 @@ const chatService = {
             signal,
         });
         if (!response.ok) {
-            throw new Error(`Server returned error: ${response.status} ${response.statusText}`);
+            let responseJson = null;
+            try {
+                responseJson = await response.json();
+            } catch (_) {
+                responseJson = null;
+            }
+            const error = new Error(
+                responseJson?.message || `Server returned error: ${response.status} ${response.statusText}`,
+            );
+            if (responseJson?.redirect) {
+                error.redirect = responseJson.redirect;
+            }
+            error.status = response.status;
+            throw error;
         }
         if (!response.body) {
             throw new Error('Response body is empty. Try again later.');

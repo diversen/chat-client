@@ -24,11 +24,12 @@ from chat_client.core.templates import get_templates
 from chat_client.repositories import attachment_repository, chat_repository, prompt_repository
 from chat_client.core import exceptions_validation
 from chat_client.core.http import (
+    json_error,
+    json_error_with_login_redirect,
+    json_success,
+    get_user_id_or_redirect,
     parse_json_payload,
     require_user_id_json,
-    get_user_id_or_redirect,
-    json_error,
-    json_success,
 )
 from chat_client.schemas.chat import (
     ChatStreamRequest,
@@ -75,6 +76,32 @@ CHAT_MAX_LOOP_ROUNDS = RESOLVED_CHAT_MAX_LOOP_ROUNDS
 
 _mcp_tools_cache: list[dict] = []
 _mcp_tools_cache_at: float = 0.0
+
+
+def _chat_login_redirect_path(request: Request, fallback: str = "/") -> str:
+    next_path = str(request.query_params.get("next", "") or "").strip()
+    if next_path.startswith("/") and not next_path.startswith("//"):
+        return next_path
+
+    dialog_id = str(request.path_params.get("dialog_id", "") or "").strip()
+    if not dialog_id:
+        try:
+            payload = request._json  # type: ignore[attr-defined]
+        except AttributeError:
+            payload = None
+        if isinstance(payload, dict):
+            dialog_id = str(payload.get("dialog_id", "") or "").strip()
+
+    if dialog_id:
+        return f"/chat/{dialog_id}"
+    return fallback
+
+
+def _json_error_with_auth_redirect(request: Request, error: exceptions_validation.JSONError, fallback: str = "/"):
+    return json_error_with_login_redirect(
+        error,
+        redirect_to=_chat_login_redirect_path(request, fallback=fallback),
+    )
 
 
 def _resolve_provider_info(model: str) -> dict:
@@ -783,6 +810,15 @@ async def chat_response_stream(request: Request):
             media_type="text/event-stream",
         )
     except exceptions_validation.JSONError as e:
+        if e.status_code == 401:
+            try:
+                await request.json()
+            except Exception:
+                pass
+            return json_error_with_login_redirect(
+                e,
+                redirect_to=_chat_login_redirect_path(request),
+            )
         return json_error(str(e), status_code=e.status_code)
 
 
@@ -822,7 +858,7 @@ async def upload_attachment(request: Request):
     except attachment_service.AttachmentValidationError as e:
         return json_error(str(e), status_code=400)
     except exceptions_validation.JSONError as e:
-        return json_error(str(e), status_code=e.status_code)
+        return _json_error_with_auth_redirect(request, e)
     except exceptions_validation.UserValidate as e:
         return json_error(str(e), status_code=400)
     except Exception:
@@ -912,7 +948,7 @@ async def create_dialog(request: Request):
         dialog_id = await chat_repository.create_dialog(user_id, payload.title)
         return json_success(dialog_id=dialog_id, message="Dialog saved")
     except exceptions_validation.JSONError as e:
-        return json_error(str(e), status_code=e.status_code)
+        return _json_error_with_auth_redirect(request, e)
     except exceptions_validation.UserValidate as e:
         return json_error(str(e), status_code=400)
     except Exception:
@@ -958,7 +994,7 @@ async def create_message(request: Request):
         )
         return JSONResponse({"message_id": message_id})
     except exceptions_validation.JSONError as e:
-        return json_error(str(e), status_code=e.status_code)
+        return _json_error_with_auth_redirect(request, e)
     except exceptions_validation.UserValidate as e:
         return json_error(str(e), status_code=400)
     except Exception:
@@ -1011,7 +1047,7 @@ async def generate_dialog_title(request: Request):
         result = await chat_repository.update_dialog_title(user_id, dialog_id, generated_title)
         return json_success(**result, generated=True)
     except exceptions_validation.JSONError as e:
-        return json_error(str(e), status_code=e.status_code)
+        return _json_error_with_auth_redirect(request, e)
     except exceptions_validation.UserValidate as e:
         return json_error(str(e), status_code=400)
     except Exception:
@@ -1044,7 +1080,7 @@ async def create_assistant_turn_events(request: Request):
         )
         return json_success()
     except exceptions_validation.JSONError as e:
-        return json_error(str(e), status_code=e.status_code)
+        return _json_error_with_auth_redirect(request, e)
     except exceptions_validation.UserValidate as e:
         return json_error(str(e), status_code=400)
     except Exception:
@@ -1064,7 +1100,7 @@ async def get_dialog(request: Request):
         dialog = await chat_repository.get_dialog(user_id, dialog_id)
         return JSONResponse(dialog)
     except exceptions_validation.JSONError as e:
-        return json_error(str(e), status_code=e.status_code)
+        return _json_error_with_auth_redirect(request, e)
     except exceptions_validation.UserValidate as e:
         return json_error(str(e), status_code=400)
     except Exception:
@@ -1084,7 +1120,7 @@ async def get_messages(request: Request):
         messages = await chat_repository.get_messages(user_id, dialog_id)
         return JSONResponse(messages)
     except exceptions_validation.JSONError as e:
-        return json_error(str(e), status_code=e.status_code)
+        return _json_error_with_auth_redirect(request, e)
     except exceptions_validation.UserValidate as e:
         return json_error(str(e), status_code=400)
     except Exception:
@@ -1104,7 +1140,7 @@ async def delete_dialog(request: Request):
         await chat_repository.delete_dialog(user_id, dialog_id)
         return json_success()
     except exceptions_validation.JSONError as e:
-        return json_error(str(e), status_code=e.status_code)
+        return _json_error_with_auth_redirect(request, e)
     except exceptions_validation.UserValidate as e:
         return json_error(str(e), status_code=400)
     except Exception:
@@ -1130,7 +1166,7 @@ async def update_message(request: Request):
         result = await chat_repository.update_message(user_id, message_id, payload.content)
         return json_success(**result)
     except exceptions_validation.JSONError as e:
-        return json_error(str(e), status_code=e.status_code)
+        return _json_error_with_auth_redirect(request, e)
     except (TypeError, ValueError):
         return json_error("Invalid message id", status_code=400)
     except exceptions_validation.UserValidate as e:

@@ -92,10 +92,22 @@ async function uploadAttachment(file) {
 }
 
 async function isLoggedInOrRedirect() {
-    
-    const data = await Requests.asyncGetJson('/user/is-logged-in');
-    if (data.error) {
-        window.location.href = data.redirect;
+    const currentUrl = new URL(window.location.href);
+    const nextPath = `${currentUrl.pathname}${currentUrl.search}`;
+
+    try {
+        const data = await Requests.asyncGetJson(`/user/is-logged-in?next=${encodeURIComponent(nextPath)}`);
+        if (data.error) {
+            window.location.href = data.redirect;
+            return false;
+        }
+        return true;
+    } catch (error) {
+        if (error?.status === 400 && typeof error?.redirect === 'string' && error.redirect.trim()) {
+            window.location.href = error.redirect;
+            return false;
+        }
+        throw error;
     }
 }
 

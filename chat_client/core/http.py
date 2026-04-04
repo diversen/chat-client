@@ -1,5 +1,6 @@
 import json
 from typing import TypeVar
+from urllib.parse import quote
 
 from pydantic import BaseModel, ValidationError
 from starlette.requests import Request
@@ -60,6 +61,51 @@ async def get_user_id_or_redirect(
             flash.set_notice(request, notice)
         return RedirectResponse(url=login_path)
     return user_id
+
+
+def build_login_redirect_target(next_path: str, *, reason: str | None = None) -> str:
+    query_parts: list[str] = []
+    if next_path and next_path != "/":
+        query_parts.append(f"next={quote(next_path, safe='/?=&')}")
+    if reason:
+        query_parts.append(f"reason={quote(reason, safe='')}")
+    if not query_parts:
+        return "/user/login"
+    return f"/user/login?{'&'.join(query_parts)}"
+
+
+def json_auth_error(
+    message: str,
+    *,
+    redirect_to: str,
+    status_code: int = 401,
+    reason: str = "auth_required",
+    **extra,
+):
+    return json_error(
+        message,
+        status_code=status_code,
+        redirect=build_login_redirect_target(redirect_to, reason=reason),
+        **extra,
+    )
+
+
+def json_error_with_login_redirect(
+    error: exceptions_validation.JSONError,
+    *,
+    redirect_to: str,
+    reason: str = "auth_required",
+    **extra,
+):
+    if error.status_code != 401:
+        return json_error(str(error), status_code=error.status_code, **extra)
+    return json_auth_error(
+        str(error),
+        redirect_to=redirect_to,
+        status_code=error.status_code,
+        reason=reason,
+        **extra,
+    )
 
 
 def json_error(message: str, status_code: int = 400, **extra):
