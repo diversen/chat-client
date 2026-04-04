@@ -44,13 +44,20 @@ class RuntimeBootstrapResult:
         return items
 
 
-def ensure_runtime_config() -> ConfigBootstrapResult:
+def ensure_runtime_config(*, prompt_before_create: bool = False, allow_create: bool = True) -> ConfigBootstrapResult:
     data_dir = Path("data")
-    data_dir.mkdir(parents=True, exist_ok=True)
-
     config_path = data_dir / "config.py"
     created = False
     if not config_path.exists():
+        if not allow_create:
+            raise click.ClickException("System is not initialized. Run `chat-client init-system` first.")
+        if prompt_before_create and can_prompt_for_user():
+            click.echo(f"No runtime config found at {config_path}.")
+            create_now = click.confirm("Create data/config.py now?", default=True)
+            if not create_now:
+                raise click.ClickException("Aborted before creating runtime config.")
+
+        data_dir.mkdir(parents=True, exist_ok=True)
         config_dist_path = Path(__file__).resolve().parent.parent / "config-dist.py"
         config_path.write_text(config_dist_path.read_text())
         created = True
@@ -62,8 +69,8 @@ def ensure_runtime_config() -> ConfigBootstrapResult:
     )
 
 
-def load_runtime_config():
-    ensure_runtime_config()
+def load_runtime_config(*, prompt_before_create: bool = False, allow_create: bool = True):
+    ensure_runtime_config(prompt_before_create=prompt_before_create, allow_create=allow_create)
     if "data.config" in sys.modules:
         config = importlib.reload(sys.modules["data.config"])
     else:
@@ -133,8 +140,8 @@ def maybe_prompt_for_initial_user() -> str | None:
     return f"Created initial user: {email}"
 
 
-def bootstrap_runtime(*, prompt_for_initial_user: bool) -> RuntimeBootstrapResult:
-    config_bootstrap = ensure_runtime_config()
+def bootstrap_runtime(*, prompt_for_initial_user: bool, prompt_for_config_creation: bool = False) -> RuntimeBootstrapResult:
+    config_bootstrap = ensure_runtime_config(prompt_before_create=prompt_for_config_creation)
     config = load_runtime_config()
     database_path = Path(config.DATABASE)
     database_created = not database_path.exists()

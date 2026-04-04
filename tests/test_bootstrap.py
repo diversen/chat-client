@@ -16,6 +16,49 @@ def test_ensure_runtime_config_creates_data_config(tmp_path, monkeypatch):
     assert second_result.created is False
 
 
+def test_ensure_runtime_config_prompts_before_creating(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(bootstrap, "can_prompt_for_user", lambda: True)
+
+    prompts = []
+    monkeypatch.setattr(bootstrap.click, "echo", prompts.append)
+    monkeypatch.setattr(bootstrap.click, "confirm", lambda text, default=True: True)
+
+    result = bootstrap.ensure_runtime_config(prompt_before_create=True)
+
+    assert result.created is True
+    assert prompts == ["No runtime config found at data/config.py."]
+
+
+def test_ensure_runtime_config_aborts_when_creation_is_declined(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(bootstrap, "can_prompt_for_user", lambda: True)
+    monkeypatch.setattr(bootstrap.click, "echo", lambda text: None)
+    monkeypatch.setattr(bootstrap.click, "confirm", lambda text, default=True: False)
+
+    try:
+        bootstrap.ensure_runtime_config(prompt_before_create=True)
+    except bootstrap.click.ClickException as exc:
+        assert str(exc) == "Aborted before creating runtime config."
+    else:
+        raise AssertionError("Expected runtime config creation to abort.")
+
+    assert not (tmp_path / "data").exists()
+
+
+def test_ensure_runtime_config_requires_init_when_creation_is_disallowed(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+
+    try:
+        bootstrap.ensure_runtime_config(allow_create=False)
+    except bootstrap.click.ClickException as exc:
+        assert str(exc) == "System is not initialized. Run `chat-client init-system` first."
+    else:
+        raise AssertionError("Expected runtime config creation to be blocked.")
+
+    assert not (tmp_path / "data").exists()
+
+
 def test_maybe_prompt_for_initial_user_creates_user(monkeypatch):
     monkeypatch.setattr(bootstrap, "can_prompt_for_user", lambda: True)
 

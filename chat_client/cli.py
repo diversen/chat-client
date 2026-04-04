@@ -15,7 +15,10 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 def _emit_bootstrap_messages(*, prompt_for_initial_user: bool) -> None:
-    result = bootstrap_runtime(prompt_for_initial_user=prompt_for_initial_user)
+    result = bootstrap_runtime(
+        prompt_for_initial_user=prompt_for_initial_user,
+        prompt_for_config_creation=True,
+    )
     for message in result.messages():
         click.echo(message)
 
@@ -95,10 +98,14 @@ def server_prod(port: int, workers: int, host: str):
 
 
 @cli.command(help="Create a user")
-@click.option("--email", prompt="Email", help="Email")
-@click.option("--password", prompt="Password", hide_input=True, confirmation_prompt=True, help="Password")
-def create_user(email: str, password: str):
+@click.option("--email", help="Email")
+@click.option("--password", help="Password")
+def create_user(email: str | None, password: str | None):
     _emit_bootstrap_messages(prompt_for_initial_user=False)
+    if not email:
+        email = click.prompt("Email")
+    if not password:
+        password = click.prompt("Password", hide_input=True, confirmation_prompt=True)
     asyncio.run(create_local_user(email, password))
 
 
