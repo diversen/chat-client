@@ -21,7 +21,7 @@ from chat_client.schemas.prompt import PromptUpsertRequest
 templates = get_templates()
 
 
-async def prompt_list_get(request: Request):
+async def prompts_page(request: Request):
     user_id_or_response = await get_user_id_or_redirect(request)
     if isinstance(user_id_or_response, RedirectResponse):
         return user_id_or_response
@@ -35,7 +35,7 @@ async def prompt_list_get(request: Request):
     )
 
 
-async def prompt_list_json(request: Request):
+async def list_prompts(request: Request):
     try:
         user_id = await require_user_id_json(request, message="Not authenticated")
         prompts = await prompt_repository.list_prompts(user_id)
@@ -49,10 +49,10 @@ async def prompt_list_json(request: Request):
         ]
         return json_success(prompts=data)
     except exceptions_validation.JSONError as e:
-        return json_error_from_exception(e, redirect_to="/prompt")
+        return json_error_from_exception(e, redirect_to="/prompts")
 
 
-async def prompt_create_get(request: Request):
+async def create_prompt_page(request: Request):
     user_id_or_response = await get_user_id_or_redirect(request)
     if isinstance(user_id_or_response, RedirectResponse):
         return user_id_or_response
@@ -64,19 +64,19 @@ async def prompt_create_get(request: Request):
     )
 
 
-async def prompt_create_post(request: Request):
+async def create_prompt(request: Request):
     try:
         user_id = await require_user_id_json(request, message="Not authenticated")
         payload = await parse_json_payload(request, PromptUpsertRequest)
         result = await prompt_repository.create_prompt(user_id, payload.title, payload.prompt)
         return json_success(prompt_id=result["prompt_id"], message="Prompt created successfully")
     except exceptions_validation.JSONError as e:
-        return json_error_from_exception(e, redirect_to="/prompt")
+        return json_error_from_exception(e, redirect_to="/prompts")
     except exceptions_validation.UserValidate as e:
         return json_validation_error(e)
 
 
-async def prompt_detail(request: Request):
+async def prompt_page(request: Request):
     prompt_id = int(request.path_params["prompt_id"])
     user_id_or_response = await get_user_id_or_redirect(request)
     if isinstance(user_id_or_response, RedirectResponse):
@@ -85,7 +85,7 @@ async def prompt_detail(request: Request):
     try:
         prompt = await prompt_repository.get_prompt(user_id, prompt_id)
     except exceptions_validation.UserValidate:
-        return RedirectResponse("/prompt")
+        return RedirectResponse("/prompts")
     return await render_template(
         templates,
         request,
@@ -94,7 +94,7 @@ async def prompt_detail(request: Request):
     )
 
 
-async def prompt_detail_json(request: Request):
+async def get_prompt(request: Request):
     try:
         prompt_id = int(request.path_params["prompt_id"])
         user_id = await require_user_id_json(request, message="Not authenticated")
@@ -102,7 +102,7 @@ async def prompt_detail_json(request: Request):
     except exceptions_validation.UserValidate:
         return json_error("Prompt not found", status_code=404)
     except exceptions_validation.JSONError as e:
-        return json_error_from_exception(e, redirect_to="/prompt")
+        return json_error_from_exception(e, redirect_to="/prompts")
     data = {
         "prompt_id": prompt.prompt_id,
         "title": prompt.title,
@@ -111,7 +111,7 @@ async def prompt_detail_json(request: Request):
     return json_success(prompt=data)
 
 
-async def prompt_edit_get(request: Request):
+async def edit_prompt_page(request: Request):
     prompt_id = int(request.path_params["prompt_id"])
     user_id_or_response = await get_user_id_or_redirect(request)
     if isinstance(user_id_or_response, RedirectResponse):
@@ -120,7 +120,7 @@ async def prompt_edit_get(request: Request):
     try:
         prompt = await prompt_repository.get_prompt(user_id, prompt_id)
     except exceptions_validation.UserValidate:
-        return RedirectResponse("/prompt")
+        return RedirectResponse("/prompts")
     return await render_template(
         templates,
         request,
@@ -129,7 +129,7 @@ async def prompt_edit_get(request: Request):
     )
 
 
-async def prompt_edit_post(request: Request):
+async def update_prompt(request: Request):
     try:
         prompt_id = int(request.path_params["prompt_id"])
         user_id = await require_user_id_json(request, message="Not authenticated")
@@ -142,12 +142,12 @@ async def prompt_edit_post(request: Request):
     except ValueError:
         return json_error("Prompt not found", status_code=404)
     except exceptions_validation.JSONError as e:
-        return json_error_from_exception(e, redirect_to="/prompt")
+        return json_error_from_exception(e, redirect_to="/prompts")
     except exceptions_validation.UserValidate as e:
         return json_validation_error(e)
 
 
-async def prompt_delete_post(request: Request):
+async def delete_prompt(request: Request):
     try:
         prompt_id = int(request.path_params["prompt_id"])
         user_id = await require_user_id_json(request, message="Not authenticated")
@@ -159,6 +159,6 @@ async def prompt_delete_post(request: Request):
     except ValueError:
         return json_error("Prompt not found", status_code=404)
     except exceptions_validation.JSONError as e:
-        return json_error_from_exception(e, redirect_to="/prompt")
+        return json_error_from_exception(e, redirect_to="/prompts")
     except exceptions_validation.UserValidate as e:
         return json_validation_error(e)

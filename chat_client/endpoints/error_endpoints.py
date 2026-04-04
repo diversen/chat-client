@@ -10,7 +10,7 @@ from logging import Logger
 log: Logger = logging.getLogger(__name__)
 
 
-async def error_log_post(request: Request):
+async def create_error_log(request: Request):
     """
     Log posted json data
     """

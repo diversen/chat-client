@@ -16,7 +16,7 @@ function initUsersNewPasswordPage() {
         try {
             const form = document.getElementById('new-password-form');
             const formData = new FormData(form);
-            const response = await Requests.asyncPost('/user/new-password', formData);
+            const response = await Requests.asyncPost('/user/password/new', formData);
             Flash.storeMessageForNextPage(response.message, 'success');
             window.location.replace('/user/login');
         } catch (error) {

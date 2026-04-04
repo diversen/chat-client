@@ -19,8 +19,8 @@ function initPromptsDetailPage() {
         }
 
         try {
-            await Requests.asyncPostJson(`/prompt/${promptId}/delete`, {});
-            window.location.href = '/prompt';
+            await Requests.asyncPostJson(`/api/prompts/${promptId}`, {}, 'DELETE');
+            window.location.href = '/prompts';
         } catch (error) {
             console.error(error);
             Flash.setMessageFromError(error, 'An error occurred while deleting the prompt.');

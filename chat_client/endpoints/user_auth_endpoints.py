@@ -38,7 +38,7 @@ async def signup_page(request: Request):
     )
 
 
-async def signup_submit(request: Request):
+async def signup(request: Request):
     try:
         user_row = await user_repository.create_user(request)
         user_session.set_session_variable(request, "user_id", user_row["user_id"])
@@ -68,7 +68,7 @@ async def verify_page(request: Request):
     )
 
 
-async def verify_submit(request: Request):
+async def verify(request: Request):
     try:
         await user_repository.verify_user(request)
         return json_success(message="Your account has been verified successfully")
@@ -95,7 +95,7 @@ async def login_page(request: Request):
     )
 
 
-async def login_submit(request: Request):
+async def login(request: Request):
     try:
         payload = await request.json()
         login_user = await user_repository.login_user(request)
@@ -109,7 +109,7 @@ async def login_submit(request: Request):
         return json_error("An unexpected error occurred")
 
 
-async def captcha_image(request: Request):
+async def get_captcha(request: Request):
     captcha_text = _generate_captcha_text()
     request.session["captcha"] = captcha_text
 
@@ -154,7 +154,7 @@ async def reset_password_page(request: Request):
     )
 
 
-async def reset_password_submit(request: Request):
+async def reset_password(request: Request):
     try:
         await user_repository.reset_password(request)
         return json_success(
@@ -184,7 +184,7 @@ async def new_password_page(request: Request):
     )
 
 
-async def new_password_submit(request: Request):
+async def new_password(request: Request):
     try:
         await user_repository.new_password(request)
         return json_success(message="Password has been updated. You can now login.")

@@ -602,8 +602,8 @@ class TestChatEndpoints(BaseTestCase):
         assert "Chat" in response.text
 
     def test_config_endpoint(self):
-        """Test GET /config"""
-        response = self.client.get("/config")
+        """Test GET /chat/config"""
+        response = self.client.get("/chat/config")
         assert response.status_code == 200
         data = response.json()
         assert "default_model" in data
@@ -620,7 +620,7 @@ class TestChatEndpoints(BaseTestCase):
         {"vision-model": {"provider": "x"}, "tool-model": {"provider": "x"}, "combo-model": {"provider": "x"}},
     )
     def test_config_endpoint_includes_model_capabilities(self):
-        response = self.client.get("/config")
+        response = self.client.get("/chat/config")
 
         assert response.status_code == 200
         data = response.json()
@@ -649,8 +649,8 @@ class TestChatEndpoints(BaseTestCase):
         }
 
     def test_list_models(self):
-        """Test GET /list (available models)"""
-        response = self.client.get("/list")
+        """Test GET /chat/models (available models)"""
+        response = self.client.get("/chat/models")
         assert response.status_code == 200
         data = response.json()
         assert "model_names" in data
@@ -906,10 +906,10 @@ class TestChatEndpoints(BaseTestCase):
 
     @patch("chat_client.core.user_session.is_logged_in")
     def test_create_dialog_not_authenticated(self, mock_logged_in):
-        """Test POST /chat/create-dialog when not authenticated"""
+        """Test POST /chat/dialogs when not authenticated"""
         mock_logged_in.return_value = False
 
-        response = self.client.post("/chat/create-dialog", json={"title": "Test Dialog"})
+        response = self.client.post("/chat/dialogs", json={"title": "Test Dialog"})
 
         assert response.status_code == 401
         data = response.json()
@@ -920,11 +920,11 @@ class TestChatEndpoints(BaseTestCase):
     @patch("chat_client.repositories.chat_repository.create_dialog")
     @patch("chat_client.core.user_session.is_logged_in")
     def test_create_dialog_authenticated(self, mock_logged_in, mock_create):
-        """Test POST /chat/create-dialog when authenticated"""
+        """Test POST /chat/dialogs when authenticated"""
         mock_logged_in.return_value = 1
         mock_create.return_value = "test-dialog-id"
 
-        response = self.client.post("/chat/create-dialog", json={"title": "Test Dialog"})
+        response = self.client.post("/chat/dialogs", json={"title": "Test Dialog"})
 
         assert response.status_code == 200
         data = response.json()
@@ -934,13 +934,13 @@ class TestChatEndpoints(BaseTestCase):
     @patch("chat_client.repositories.chat_repository.create_dialog")
     @patch("chat_client.core.user_session.is_logged_in")
     def test_create_dialog_validation_error(self, mock_logged_in, mock_create):
-        """Test POST /chat/create-dialog with validation error"""
+        """Test POST /chat/dialogs with validation error"""
         mock_logged_in.return_value = 1
         from chat_client.core.exceptions_validation import UserValidate
 
         mock_create.side_effect = UserValidate("Invalid title")
 
-        response = self.client.post("/chat/create-dialog", json={"title": ""})
+        response = self.client.post("/chat/dialogs", json={"title": ""})
 
         assert response.status_code == 400
         data = response.json()
@@ -949,10 +949,10 @@ class TestChatEndpoints(BaseTestCase):
 
     @patch("chat_client.core.user_session.is_logged_in")
     def test_create_message_not_authenticated(self, mock_logged_in):
-        """Test POST /chat/create-message/{dialog_id} when not authenticated"""
+        """Test POST /chat/dialogs/{dialog_id}/messages when not authenticated"""
         mock_logged_in.return_value = False
 
-        response = self.client.post("/chat/create-message/test-dialog", json={"content": "Test message", "role": "user"})
+        response = self.client.post("/chat/dialogs/test-dialog/messages", json={"content": "Test message", "role": "user"})
 
         assert response.status_code == 401
         data = response.json()
@@ -966,7 +966,7 @@ class TestChatEndpoints(BaseTestCase):
     @patch("chat_client.repositories.chat_repository.create_message")
     @patch("chat_client.core.user_session.is_logged_in")
     def test_create_message_authenticated(self, mock_logged_in, mock_create, mock_get_attachments):
-        """Test POST /chat/create-message/{dialog_id} when authenticated"""
+        """Test POST /chat/dialogs/{dialog_id}/messages when authenticated"""
         mock_logged_in.return_value = 1
         mock_create.return_value = 123  # message_id
         mock_get_attachments.return_value = [
@@ -980,7 +980,7 @@ class TestChatEndpoints(BaseTestCase):
         ]
 
         response = self.client.post(
-            "/chat/create-message/test-dialog",
+            "/chat/dialogs/test-dialog/messages",
             json={
                 "content": "Test message",
                 "role": "user",
@@ -1022,7 +1022,7 @@ class TestChatEndpoints(BaseTestCase):
         ]
 
         response = self.client.post(
-            "/chat/create-message/test-dialog",
+            "/chat/dialogs/test-dialog/messages",
             json={
                 "content": "Use attached file",
                 "role": "user",
@@ -1039,7 +1039,7 @@ class TestChatEndpoints(BaseTestCase):
         mock_logged_in.return_value = False
 
         response = self.client.post(
-            "/chat/generate-dialog-title/test-dialog",
+            "/chat/dialogs/test-dialog/title",
         )
 
         assert response.status_code == 401
@@ -1052,7 +1052,7 @@ class TestChatEndpoints(BaseTestCase):
         mock_logged_in.return_value = False
 
         response = self.client.post(
-            "/chat/create-assistant-turn-events/test-dialog",
+            "/chat/dialogs/test-dialog/assistant-turn-events",
             json={"turn_id": "turn-1", "events": []},
         )
 
@@ -1090,7 +1090,7 @@ class TestChatEndpoints(BaseTestCase):
         mock_update_dialog_title.return_value = {"dialog_id": "test-dialog", "title": "Mounted network drive"}
 
         response = self.client.post(
-            "/chat/generate-dialog-title/test-dialog",
+            "/chat/dialogs/test-dialog/title",
         )
 
         assert response.status_code == 200
@@ -1126,7 +1126,7 @@ class TestChatEndpoints(BaseTestCase):
         mock_update_dialog_title.return_value = {"dialog_id": "test-dialog", "title": "How do I mount a network drive on Linux"}
 
         response = self.client.post(
-            "/chat/generate-dialog-title/test-dialog",
+            "/chat/dialogs/test-dialog/title",
         )
 
         assert response.status_code == 200
@@ -1155,7 +1155,7 @@ class TestChatEndpoints(BaseTestCase):
         mock_get_messages.return_value = []
 
         response = self.client.post(
-            "/chat/generate-dialog-title/test-dialog",
+            "/chat/dialogs/test-dialog/title",
         )
 
         assert response.status_code == 200
@@ -1171,7 +1171,7 @@ class TestChatEndpoints(BaseTestCase):
         mock_logged_in.return_value = False
 
         response = self.client.post(
-            "/chat/upload-attachment",
+            "/chat/attachments",
             files={"file": ("notes.txt", b"hello", "text/plain")},
         )
 
@@ -1191,7 +1191,7 @@ class TestChatEndpoints(BaseTestCase):
             "storage_path": str(html_path),
         }
 
-        response = self.client.get("/chat/attachment/7/preview")
+        response = self.client.get("/chat/attachments/7/preview")
 
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("text/plain")
@@ -1219,7 +1219,7 @@ class TestChatEndpoints(BaseTestCase):
             "storage_path": str(image_path),
         }
 
-        response = self.client.get("/chat/attachment/8/preview")
+        response = self.client.get("/chat/attachments/8/preview")
 
         assert response.status_code == 200
         assert response.headers["content-type"].startswith("image/png")
@@ -1251,7 +1251,7 @@ class TestChatEndpoints(BaseTestCase):
         }
 
         response = self.client.post(
-            "/chat/upload-attachment",
+            "/chat/attachments",
             files={"file": ("notes.txt", b"hello", "text/plain")},
         )
 
@@ -1266,11 +1266,11 @@ class TestChatEndpoints(BaseTestCase):
     @patch("chat_client.endpoints.chat_endpoints.VISION_MODELS", [])
     @patch("chat_client.core.user_session.is_logged_in")
     def test_create_message_rejects_non_vision_model_when_images_present(self, mock_logged_in):
-        """Test POST /chat/create-message/{dialog_id} rejects images for non-vision model"""
+        """Test POST /chat/dialogs/{dialog_id}/messages rejects images for non-vision model"""
         mock_logged_in.return_value = 1
 
         response = self.client.post(
-            "/chat/create-message/test-dialog",
+            "/chat/dialogs/test-dialog/messages",
             json={
                 "content": "Test message",
                 "role": "user",
@@ -1291,7 +1291,7 @@ class TestChatEndpoints(BaseTestCase):
         mock_logged_in.return_value = 1
 
         response = self.client.post(
-            "/chat/create-message/test-dialog",
+            "/chat/dialogs/test-dialog/messages",
             json={
                 "content": "Use attached file",
                 "role": "user",
@@ -1307,10 +1307,10 @@ class TestChatEndpoints(BaseTestCase):
 
     @patch("chat_client.core.user_session.is_logged_in")
     def test_get_dialog_not_authenticated(self, mock_logged_in):
-        """Test GET /chat/get-dialog/{dialog_id} when not authenticated"""
+        """Test GET /chat/dialogs/{dialog_id} when not authenticated"""
         mock_logged_in.return_value = False
 
-        response = self.client.get("/chat/get-dialog/test-dialog")
+        response = self.client.get("/chat/dialogs/test-dialog")
 
         assert response.status_code == 401
         data = response.json()
@@ -1320,11 +1320,11 @@ class TestChatEndpoints(BaseTestCase):
     @patch("chat_client.repositories.chat_repository.get_dialog")
     @patch("chat_client.core.user_session.is_logged_in")
     def test_get_dialog_authenticated(self, mock_logged_in, mock_get):
-        """Test GET /chat/get-dialog/{dialog_id} when authenticated"""
+        """Test GET /chat/dialogs/{dialog_id} when authenticated"""
         mock_logged_in.return_value = 1
         mock_get.return_value = {"dialog_id": "test-dialog", "title": "Test Dialog", "user_id": 1}
 
-        response = self.client.get("/chat/get-dialog/test-dialog")
+        response = self.client.get("/chat/dialogs/test-dialog")
 
         assert response.status_code == 200
         data = response.json()
@@ -1333,10 +1333,10 @@ class TestChatEndpoints(BaseTestCase):
 
     @patch("chat_client.core.user_session.is_logged_in")
     def test_get_messages_not_authenticated(self, mock_logged_in):
-        """Test GET /chat/get-messages/{dialog_id} when not authenticated"""
+        """Test GET /chat/dialogs/{dialog_id}/messages when not authenticated"""
         mock_logged_in.return_value = False
 
-        response = self.client.get("/chat/get-messages/test-dialog")
+        response = self.client.get("/chat/dialogs/test-dialog/messages")
 
         assert response.status_code == 401
         data = response.json()
@@ -1346,11 +1346,11 @@ class TestChatEndpoints(BaseTestCase):
     @patch("chat_client.repositories.chat_repository.get_messages")
     @patch("chat_client.core.user_session.is_logged_in")
     def test_get_messages_authenticated(self, mock_logged_in, mock_get):
-        """Test GET /chat/get-messages/{dialog_id} when authenticated"""
+        """Test GET /chat/dialogs/{dialog_id}/messages when authenticated"""
         mock_logged_in.return_value = 1
         mock_get.return_value = [{"message_id": 1, "content": "Hello", "role": "user", "dialog_id": "test-dialog"}]
 
-        response = self.client.get("/chat/get-messages/test-dialog")
+        response = self.client.get("/chat/dialogs/test-dialog/messages")
 
         assert response.status_code == 200
         data = response.json()
@@ -1359,10 +1359,10 @@ class TestChatEndpoints(BaseTestCase):
 
     @patch("chat_client.core.user_session.is_logged_in")
     def test_update_message_not_authenticated(self, mock_logged_in):
-        """Test POST /chat/update-message/{message_id} when not authenticated"""
+        """Test POST /chat/messages/{message_id} when not authenticated"""
         mock_logged_in.return_value = False
 
-        response = self.client.post("/chat/update-message/1?next=/chat/test-dialog", json={"content": "Updated message"})
+        response = self.client.post("/chat/messages/1?next=/chat/test-dialog", json={"content": "Updated message"})
 
         assert response.status_code == 401
         data = response.json()
@@ -1372,11 +1372,11 @@ class TestChatEndpoints(BaseTestCase):
     @patch("chat_client.repositories.chat_repository.update_message")
     @patch("chat_client.core.user_session.is_logged_in")
     def test_update_message_authenticated(self, mock_logged_in, mock_update):
-        """Test POST /chat/update-message/{message_id} when authenticated"""
+        """Test POST /chat/messages/{message_id} when authenticated"""
         mock_logged_in.return_value = 1
         mock_update.return_value = {"message_id": 1}
 
-        response = self.client.post("/chat/update-message/1", json={"content": "Updated message"})
+        response = self.client.post("/chat/messages/1", json={"content": "Updated message"})
 
         assert response.status_code == 200
         data = response.json()
@@ -1385,10 +1385,10 @@ class TestChatEndpoints(BaseTestCase):
 
     @patch("chat_client.core.user_session.is_logged_in")
     def test_delete_dialog_not_authenticated(self, mock_logged_in):
-        """Test POST /chat/delete-dialog/{dialog_id} when not authenticated"""
+        """Test POST /chat/dialogs/{dialog_id} delete when not authenticated"""
         mock_logged_in.return_value = False
 
-        response = self.client.post("/chat/delete-dialog/test-dialog")
+        response = self.client.post("/chat/dialogs/test-dialog")
 
         assert response.status_code == 401
         data = response.json()
@@ -1398,11 +1398,11 @@ class TestChatEndpoints(BaseTestCase):
     @patch("chat_client.repositories.chat_repository.delete_dialog")
     @patch("chat_client.core.user_session.is_logged_in")
     def test_delete_dialog_authenticated(self, mock_logged_in, mock_delete):
-        """Test POST /chat/delete-dialog/{dialog_id} when authenticated"""
+        """Test POST /chat/dialogs/{dialog_id} delete when authenticated"""
         mock_logged_in.return_value = 1
         mock_delete.return_value = True
 
-        response = self.client.post("/chat/delete-dialog/test-dialog")
+        response = self.client.post("/chat/dialogs/test-dialog")
 
         assert response.status_code == 200
         data = response.json()

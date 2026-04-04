@@ -31,9 +31,9 @@ function initPromptsCreatePage() {
         };
 
         try {
-            const response = await Requests.asyncPostJson('/prompt/create', data);
+            const response = await Requests.asyncPostJson('/api/prompts', data);
             Flash.storeMessageForNextPage(response.message, 'success');
-            window.location.href = '/prompt';
+            window.location.href = '/prompts';
         } catch (error) {
             console.error(error);
             Flash.setMessageFromError(error);

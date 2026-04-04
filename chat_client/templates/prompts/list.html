@@ -5,7 +5,7 @@
     <h3>Your Prompts</h3>
 
     <div class="action-links">
-        <a class="action-link" href="/prompt/create">Create new prompt</a>
+        <a class="action-link" href="/prompts/new">Create new prompt</a>
     </div>
 
     <div class="prompt-list">
@@ -14,7 +14,7 @@
         {% for p in prompts %}
         <div class="prompt">
 
-            <a class="svg-container" href="/prompt/{{ p.prompt_id }}/edit">
+            <a class="svg-container" href="/prompts/{{ p.prompt_id }}/edit">
                 <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px"
                     fill="#e3e3e3">
                     <path

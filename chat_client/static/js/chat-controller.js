@@ -210,7 +210,7 @@ class ConversationController {
             tileButton.setAttribute('aria-label', `Preview ${fileName}`);
             tileButton.addEventListener('click', () => {
                 if (!attachmentId) return;
-                window.open(`/chat/attachment/${attachmentId}/preview`, '_blank', 'noopener');
+                window.open(`/chat/attachments/${attachmentId}/preview`, '_blank', 'noopener');
             });
 
             const extensionElement = document.createElement('span');
@@ -927,7 +927,7 @@ class ConversationController {
 
     async initializeFromPrompt(promptID) {
         try {
-            const promptData = await Requests.asyncGetJson(`/prompt/${promptID}/json`);
+            const promptData = await Requests.asyncGetJson(`/api/prompts/${promptID}`);
             const promptText = promptData.prompt.prompt;
             const promptRole = this.getInitialPromptRole();
 

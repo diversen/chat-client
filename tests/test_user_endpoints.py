@@ -178,13 +178,13 @@ class TestUserEndpoints(BaseTestCase):
 
     def test_captcha_endpoint(self):
         """Test captcha image generation"""
-        response = self.client.get("/captcha")
+        response = self.client.get("/user/captcha")
         assert response.status_code == 200
         assert response.headers["content-type"] == "image/png"
 
     def test_reset_password_get(self):
-        """Test GET /user/reset"""
-        response = self.client.get("/user/reset")
+        """Test GET /user/password/reset"""
+        response = self.client.get("/user/password/reset")
         assert response.status_code == 200
         assert "Reset password" in response.text
 
@@ -193,7 +193,7 @@ class TestUserEndpoints(BaseTestCase):
         """Test successful password reset request"""
         mock_reset.return_value = True
 
-        response = self.client.post("/user/reset", json={"email": "test@example.com"})
+        response = self.client.post("/user/password/reset", json={"email": "test@example.com"})
 
         assert response.status_code == 200
         data = response.json()
@@ -208,7 +208,7 @@ class TestUserEndpoints(BaseTestCase):
 
         mock_reset.side_effect = UserValidate("User not found")
 
-        response = self.client.post("/user/reset", json={"email": "nonexistent@example.com"})
+        response = self.client.post("/user/password/reset", json={"email": "nonexistent@example.com"})
 
         assert response.status_code == 400
         data = response.json()
@@ -222,7 +222,7 @@ class TestUserEndpoints(BaseTestCase):
 
         mock_reset.side_effect = UserValidate("Invalid email")
 
-        response = self.client.post("/user/reset", json={"email": "not-an-email"})
+        response = self.client.post("/user/password/reset", json={"email": "not-an-email"})
 
         assert response.status_code == 400
         data = response.json()
@@ -230,8 +230,8 @@ class TestUserEndpoints(BaseTestCase):
         assert "Invalid email" in data["message"]
 
     def test_new_password_get(self):
-        """Test GET /user/new-password with token"""
-        response = self.client.get("/user/new-password?token=test-token")
+        """Test GET /user/password/new with token"""
+        response = self.client.get("/user/password/new?token=test-token")
         assert response.status_code == 200
         assert "New password" in response.text
 
@@ -241,7 +241,7 @@ class TestUserEndpoints(BaseTestCase):
         mock_new_pass.return_value = True
 
         response = self.client.post(
-            "/user/new-password", json={"token": "valid-token", "password": "newpassword123", "password_repeat": "newpassword123"}
+            "/user/password/new", json={"token": "valid-token", "password": "newpassword123", "password_repeat": "newpassword123"}
         )
 
         assert response.status_code == 200
@@ -339,10 +339,10 @@ class TestUserEndpoints(BaseTestCase):
 
     @patch("chat_client.core.user_session.is_logged_in")
     def test_list_dialogs_json_not_authenticated(self, mock_logged_in):
-        """Test /user/dialogs/json when not authenticated"""
+        """Test /api/user/dialogs when not authenticated"""
         mock_logged_in.return_value = False
 
-        response = self.client.get("/user/dialogs/json")
+        response = self.client.get("/api/user/dialogs")
         assert response.status_code == 401
         data = response.json()
         assert data["error"] is True
@@ -351,11 +351,11 @@ class TestUserEndpoints(BaseTestCase):
     @patch("chat_client.repositories.chat_repository.get_dialogs_info")
     @patch("chat_client.core.user_session.is_logged_in")
     def test_list_dialogs_json_authenticated(self, mock_logged_in, mock_get_dialogs):
-        """Test /user/dialogs/json when authenticated"""
+        """Test /api/user/dialogs when authenticated"""
         mock_logged_in.return_value = 1
         mock_get_dialogs.return_value = {"dialogs": [{"dialog_id": "test-dialog", "title": "Test Dialog"}], "has_next": False}
 
-        response = self.client.get("/user/dialogs/json")
+        response = self.client.get("/api/user/dialogs")
         assert response.status_code == 200
         data = response.json()
         assert data["error"] is False
@@ -365,11 +365,11 @@ class TestUserEndpoints(BaseTestCase):
     @patch("chat_client.repositories.chat_repository.get_dialogs_info")
     @patch("chat_client.core.user_session.is_logged_in")
     def test_list_dialogs_json_with_search_query(self, mock_logged_in, mock_get_dialogs):
-        """Test /user/dialogs/json search query handling"""
+        """Test /api/user/dialogs search query handling"""
         mock_logged_in.return_value = 1
         mock_get_dialogs.return_value = {"dialogs": [], "has_next": False}
 
-        response = self.client.get("/user/dialogs/json?q=hello&page=2")
+        response = self.client.get("/api/user/dialogs?q=hello&page=2")
         assert response.status_code == 200
         data = response.json()
         assert data["error"] is False
@@ -377,10 +377,10 @@ class TestUserEndpoints(BaseTestCase):
 
     @patch("chat_client.core.user_session.is_logged_in")
     def test_list_dialogs_json_invalid_page(self, mock_logged_in):
-        """Test /user/dialogs/json invalid page parameter"""
+        """Test /api/user/dialogs invalid page parameter"""
         mock_logged_in.return_value = 1
 
-        response = self.client.get("/user/dialogs/json?page=abc")
+        response = self.client.get("/api/user/dialogs?page=abc")
         assert response.status_code == 400
         data = response.json()
         assert data["error"] is True

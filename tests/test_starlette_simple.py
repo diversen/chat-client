@@ -36,7 +36,7 @@ def test_basic_routes():
             print("✓ Protected route handling works")
 
         # Test config endpoint
-        response = client.get("/config")
+        response = client.get("/chat/config")
         assert response.status_code == 200, f"Config endpoint failed: {response.text}"
         data = response.json()
         assert "default_model" in data
@@ -45,7 +45,7 @@ def test_basic_routes():
         print("✓ Config endpoint works")
 
         # Test models list endpoint
-        response = client.get("/list")
+        response = client.get("/chat/models")
         assert response.status_code == 200, f"List models endpoint failed: {response.text}"
         data = response.json()
         assert "model_names" in data
@@ -78,7 +78,7 @@ def test_user_routes():
             print("✓ Login GET works")
 
         # Test captcha
-        response = client.get("/captcha")
+        response = client.get("/user/captcha")
         assert response.status_code == 200, f"Captcha failed: {response.status_code}"
         assert response.headers["content-type"] == "image/png"
         print("✓ Captcha works")
@@ -107,7 +107,7 @@ def test_authenticated_routes():
             # Test prompt list
             with patch("chat_client.repositories.user_repository.get_profile", return_value={}):
                 with patch("chat_client.repositories.prompt_repository.list_prompts", return_value=[]):
-                    response = client.get("/prompt")
+                    response = client.get("/prompts")
                     assert response.status_code == 200
                     print("✓ Prompt list works when authenticated")
     finally:
@@ -129,7 +129,7 @@ def test_json_endpoints():
             print("✓ Chat endpoint requires authentication")
 
             # Test create dialog without auth - should return 401
-            response = client.post("/chat/create-dialog", json={"title": "Test"})
+            response = client.post("/chat/dialogs", json={"title": "Test"})
             assert response.status_code == 401
             print("✓ Create dialog endpoint requires authentication")
     finally:

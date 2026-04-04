@@ -41,7 +41,7 @@ function initTopMenuOverlay() {
             panel: topMenuOverlay,
             beforeOpen: async function () {
                 try {
-                    const response = await fetch('/prompt/json');
+                    const response = await fetch('/api/prompts');
                     if (!response.ok) {
                         throw new Error(`Failed to fetch prompts: ${response.status}`);
                     }
@@ -70,7 +70,7 @@ function initTopMenuOverlay() {
                         });
                     } else {
                         const createPromptLink = document.createElement('a');
-                        createPromptLink.href = '/prompt/create';
+                        createPromptLink.href = '/prompts/new';
                         createPromptLink.textContent = 'New Custom Prompt';
                         createPromptLink.className = 'no-prompts-message';
                         promptsPanel.appendChild(createPromptLink);

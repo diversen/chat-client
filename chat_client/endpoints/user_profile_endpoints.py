@@ -29,7 +29,7 @@ async def profile_page(request: Request):
     return await render_template(templates, request, "users/profile.html", {"title": "Profile", "profile": profile_data})
 
 
-async def profile_update(request: Request):
+async def update_profile(request: Request):
     try:
         await require_user_id_json(request, message="You must be logged in to update your profile")
         await user_repository.update_profile(request)

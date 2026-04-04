@@ -56,14 +56,14 @@ class TestStarletteBackend:
                     print("  ✓ Chat streaming works when authenticated")
 
             # Test dialog creation without auth
-            response = client.post("/chat/create-dialog", json={"title": "Test Dialog"})
+            response = client.post("/chat/dialogs", json={"title": "Test Dialog"})
             assert response.status_code == 401
             print("  ✓ Create dialog requires authentication")
 
             # Test dialog creation with auth
             with patch("chat_client.core.user_session.is_logged_in", return_value=1):
                 with patch("chat_client.repositories.chat_repository.create_dialog", return_value="dialog-123"):
-                    response = client.post("/chat/create-dialog", json={"title": "Test Dialog"})
+                    response = client.post("/chat/dialogs", json={"title": "Test Dialog"})
                     assert response.status_code == 200
                     data = response.json()
                     assert data["error"] is False
@@ -74,7 +74,7 @@ class TestStarletteBackend:
             with patch("chat_client.core.user_session.is_logged_in", return_value=1):
                 # Create message
                 with patch("chat_client.repositories.chat_repository.create_message", return_value=456):
-                    response = client.post("/chat/create-message/dialog-123", json={"content": "Test message", "role": "user"})
+                    response = client.post("/chat/dialogs/dialog-123/messages", json={"content": "Test message", "role": "user"})
                     assert response.status_code == 200
                     data = response.json()
                     assert data["message_id"] == 456
@@ -85,7 +85,7 @@ class TestStarletteBackend:
                     "chat_client.repositories.chat_repository.get_messages",
                     return_value=[{"message_id": 456, "content": "Test message", "role": "user"}],
                 ):
-                    response = client.get("/chat/get-messages/dialog-123")
+                    response = client.get("/chat/dialogs/dialog-123/messages")
                     assert response.status_code == 200
                     messages = response.json()
                     assert len(messages) == 1
@@ -94,7 +94,7 @@ class TestStarletteBackend:
 
                 # Update message
                 with patch("chat_client.repositories.chat_repository.update_message", return_value={"message_id": 456}):
-                    response = client.post("/chat/update-message/456", json={"content": "Updated message"})
+                    response = client.post("/chat/messages/456", json={"content": "Updated message"})
                     assert response.status_code == 200
                     data = response.json()
                     assert data["error"] is False
@@ -104,7 +104,7 @@ class TestStarletteBackend:
                 with patch(
                     "chat_client.repositories.chat_repository.get_dialog", return_value={"dialog_id": "dialog-123", "title": "Test Dialog"}
                 ):
-                    response = client.get("/chat/get-dialog/dialog-123")
+                    response = client.get("/chat/dialogs/dialog-123")
                     assert response.status_code == 200
                     dialog = response.json()
                     assert dialog["title"] == "Test Dialog"
@@ -112,7 +112,7 @@ class TestStarletteBackend:
 
                 # Delete dialog
                 with patch("chat_client.repositories.chat_repository.delete_dialog", return_value=True):
-                    response = client.post("/chat/delete-dialog/dialog-123")
+                    response = client.post("/chat/dialogs/dialog-123")
                     assert response.status_code == 200
                     data = response.json()
                     assert data["error"] is False
@@ -160,7 +160,7 @@ class TestStarletteBackend:
 
             # Test password reset request
             with patch("chat_client.repositories.user_repository.reset_password", return_value=True):
-                response = client.post("/user/reset", json={"email": "test@example.com"})
+                response = client.post("/user/password/reset", json={"email": "test@example.com"})
                 assert response.status_code == 200
                 data = response.json()
                 assert data["error"] is False
@@ -169,7 +169,7 @@ class TestStarletteBackend:
             # Test new password setting
             with patch("chat_client.repositories.user_repository.new_password", return_value=True):
                 response = client.post(
-                    "/user/new-password", json={"token": "reset-token", "password": "newpassword123", "password_repeat": "newpassword123"}
+                    "/user/password/new", json={"token": "reset-token", "password": "newpassword123", "password_repeat": "newpassword123"}
                 )
                 assert response.status_code == 200
                 data = response.json()
@@ -202,7 +202,7 @@ class TestStarletteBackend:
                     "chat_client.repositories.chat_repository.get_dialogs_info",
                     return_value=[{"dialog_id": "test-dialog", "title": "Test Dialog"}],
                 ):
-                    response = client.get("/user/dialogs/json")
+                    response = client.get("/api/user/dialogs")
                     assert response.status_code == 200
                     data = response.json()
                     assert data["error"] is False
@@ -218,7 +218,7 @@ class TestStarletteBackend:
         client = SyncASGITestClient(self.app)
         try:
             # Test prompt operations without authentication
-            response = client.get("/prompt/json")
+            response = client.get("/api/prompts")
             assert response.status_code == 401
             print("  ✓ Prompt endpoints require authentication")
 
@@ -231,7 +231,7 @@ class TestStarletteBackend:
                 mock_prompt.prompt = "Test content"
 
                 with patch("chat_client.repositories.prompt_repository.list_prompts", return_value=[mock_prompt]):
-                    response = client.get("/prompt/json")
+                    response = client.get("/api/prompts")
                     assert response.status_code == 200
                     data = response.json()
                     assert data["error"] is False
@@ -241,7 +241,7 @@ class TestStarletteBackend:
 
                 # Create prompt
                 with patch("chat_client.repositories.prompt_repository.create_prompt", return_value={"prompt_id": 2}):
-                    response = client.post("/prompt/create", json={"title": "New Prompt", "prompt": "New prompt content"})
+                    response = client.post("/api/prompts", json={"title": "New Prompt", "prompt": "New prompt content"})
                     assert response.status_code == 200
                     data = response.json()
                     assert data["error"] is False
@@ -250,7 +250,7 @@ class TestStarletteBackend:
 
                 # Get prompt detail
                 with patch("chat_client.repositories.prompt_repository.get_prompt", return_value=mock_prompt):
-                    response = client.get("/prompt/1/json")
+                    response = client.get("/api/prompts/1")
                     assert response.status_code == 200
                     data = response.json()
                     assert data["error"] is False
@@ -260,7 +260,7 @@ class TestStarletteBackend:
                 # Update prompt
                 with patch("chat_client.repositories.prompt_repository.get_prompt", return_value=mock_prompt):
                     with patch("chat_client.repositories.prompt_repository.update_prompt", return_value=True):
-                        response = client.post("/prompt/1/edit", json={"title": "Updated Prompt", "prompt": "Updated content"})
+                        response = client.post("/api/prompts/1", json={"title": "Updated Prompt", "prompt": "Updated content"})
                         assert response.status_code == 200
                         data = response.json()
                         assert data["error"] is False
@@ -269,7 +269,7 @@ class TestStarletteBackend:
                 # Delete prompt
                 with patch("chat_client.repositories.prompt_repository.get_prompt", return_value=mock_prompt):
                     with patch("chat_client.repositories.prompt_repository.delete_prompt", return_value=True):
-                        response = client.post("/prompt/1/delete")
+                        response = client.request("DELETE", "/api/prompts/1")
                         assert response.status_code == 200
                         data = response.json()
                         assert data["error"] is False
@@ -338,8 +338,8 @@ class TestStarletteBackend:
             # These routes should all require authentication and redirect or return 401
             protected_routes = [
                 ("GET", "/user/profile"),
-                ("GET", "/prompt"),
-                ("POST", "/chat/create-dialog", {"title": "Test"}),
+                ("GET", "/prompts"),
+                ("POST", "/chat/dialogs", {"title": "Test"}),
             ]
 
             for method, url, *json_data in protected_routes:

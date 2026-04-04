@@ -20,7 +20,7 @@ function initCaptcha(captchaElem, captchaContainerElem) {
     }
 
     const refreshCaptcha = () => {
-        captchaElem.src = `/captcha?${Math.random()}`;
+        captchaElem.src = `/user/captcha?${Math.random()}`;
     };
 
     captchaElem.addEventListener('click', refreshCaptcha);

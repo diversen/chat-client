@@ -13,7 +13,7 @@ test('main menu opens and shows logged-in links', async ({ page }) => {
   await expect(topMenuOverlay).toBeVisible();
   await expect(topMenuOverlay).toHaveAttribute('data-mode', 'main');
   await expect(topMenuOverlay.locator('.top-menu-panel-main a[href="/user/profile"]')).toBeVisible();
-  await expect(topMenuOverlay.locator('.top-menu-panel-main a[href="/prompt"]')).toBeVisible();
+  await expect(topMenuOverlay.locator('.top-menu-panel-main a[href="/prompts"]')).toBeVisible();
   await expect(topMenuOverlay.locator('.top-menu-panel-main a[href="/user/logout"]')).toBeVisible();
 });
 
@@ -35,7 +35,7 @@ test('custom prompt button switches to prompts mode and closes on outside click'
 
   const emptyStateLink = topMenuOverlay.locator('.top-menu-panel-prompts .no-prompts-message');
   if (await emptyStateLink.count()) {
-    await expect(emptyStateLink).toHaveAttribute('href', '/prompt/create');
+    await expect(emptyStateLink).toHaveAttribute('href', '/prompts/new');
     await expect(emptyStateLink).toHaveText('New Custom Prompt');
   }
 

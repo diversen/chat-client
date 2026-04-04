@@ -295,7 +295,7 @@ function createMessageAttachments(attachments = [], removable = false, onRemove 
             tileButton.title = `Preview ${fileName}`;
             tileButton.setAttribute('aria-label', `Preview ${fileName}`);
             tileButton.addEventListener('click', () => {
-                window.open(`/chat/attachment/${attachmentId}/preview`, '_blank', 'noopener');
+                window.open(`/chat/attachments/${attachmentId}/preview`, '_blank', 'noopener');
             });
         }
         tileButton.className = 'upload-preview-open';

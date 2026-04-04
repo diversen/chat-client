@@ -48,7 +48,7 @@ function initUsersDialogsPage() {
         loadMoreButton.disabled = true;
 
         try {
-            const response = await Requests.asyncGetJson(`/user/dialogs/json?page=${page}&q=${encodeURIComponent(currentQuery)}`);
+            const response = await Requests.asyncGetJson(`/api/user/dialogs?page=${page}&q=${encodeURIComponent(currentQuery)}`);
             const info = response.dialogs_info;
             if (info.dialogs.length === 0 && currentPage === 1) {
                 noDialogs.classList.remove('hidden');
@@ -119,7 +119,7 @@ function initUsersDialogsPage() {
         loading.classList.remove('hidden');
 
         try {
-            await Requests.asyncPostJson(`/chat/delete-dialog/${dialogId}`, {});
+            await Requests.asyncPostJson(`/chat/dialogs/${dialogId}`, {});
             const dialog = elem.closest('.dialog');
             dialog?.remove();
             if (container.querySelectorAll('.dialog').length === 0 && !hasMore) {

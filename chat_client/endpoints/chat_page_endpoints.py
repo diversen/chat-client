@@ -41,7 +41,7 @@ async def chat_page(
     return templates.TemplateResponse("home/chat.html", context)
 
 
-async def frontend_config(
+async def get_chat_config(
     request: Request,
     *,
     frontend_config_impl,
@@ -61,7 +61,7 @@ async def frontend_config(
     )
 
 
-async def list_models(
+async def list_chat_models(
     request: Request,
     *,
     list_models_impl,

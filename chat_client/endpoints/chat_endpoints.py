@@ -495,7 +495,7 @@ async def _chat_response_stream(
         yield chunk
 
 
-async def chat_response_stream(request: Request):
+async def stream_chat(request: Request):
     return await chat_stream_endpoints.chat_response_stream(
         request,
         require_user_id_json=require_user_id_json,
@@ -546,10 +546,10 @@ async def preview_attachment(request: Request):
     )
 
 
-async def frontend_config(request: Request):
-    return await chat_page_endpoints.frontend_config(
+async def get_chat_config(request: Request):
+    return await chat_page_endpoints.get_chat_config(
         request,
-        frontend_config_impl=chat_dialog_endpoints.frontend_config,
+        frontend_config_impl=chat_dialog_endpoints.get_chat_config,
         config=config,
         system_message_denylist=SYSTEM_MESSAGE_DENYLIST,
         vision_models=VISION_MODELS,
@@ -562,10 +562,10 @@ async def _get_model_names():
     return list(MODELS.keys())
 
 
-async def list_models(request: Request):
-    return await chat_page_endpoints.list_models(
+async def list_chat_models(request: Request):
+    return await chat_page_endpoints.list_chat_models(
         request,
-        list_models_impl=chat_dialog_endpoints.list_models,
+        list_models_impl=chat_dialog_endpoints.list_chat_models,
         get_model_names=_get_model_names,
         json_success=json_success,
     )
@@ -606,15 +606,15 @@ async def create_message(request: Request):
 
 
 @_with_auth_redirect_on_json_error()
-async def generate_dialog_title(request: Request):
-    return await chat_dialog_endpoints.generate_dialog_title(
+async def create_dialog_title(request: Request):
+    return await chat_dialog_endpoints.create_dialog_title(
         request,
         require_user_id_json=require_user_id_json,
         chat_repository=chat_repository,
         dialog_title_model=DIALOG_TITLE_MODEL,
         is_pending_dialog_title=_is_pending_dialog_title,
         extract_first_user_message=_extract_first_user_message,
-        generate_dialog_title_fn=_generate_dialog_title,
+        create_dialog_title_fn=_generate_dialog_title,
         derive_dialog_title_from_user_message=_derive_dialog_title_from_user_message,
         log_chat_event=_log_chat_event,
         exceptions_validation=exceptions_validation,
@@ -652,8 +652,8 @@ async def get_dialog(request: Request):
 
 
 @_with_auth_redirect_on_json_error()
-async def get_messages(request: Request):
-    return await chat_dialog_endpoints.get_messages(
+async def list_messages(request: Request):
+    return await chat_dialog_endpoints.list_messages(
         request,
         require_user_id_json=require_user_id_json,
         chat_repository=chat_repository,

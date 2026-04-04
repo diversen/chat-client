@@ -38,9 +38,9 @@ function initPromptsEditPage() {
         };
 
         try {
-            const response = await Requests.asyncPostJson(`/prompt/${promptId}/edit`, data);
+            const response = await Requests.asyncPostJson(`/api/prompts/${promptId}`, data);
             Flash.storeMessageForNextPage(response.message, 'success');
-            window.location.href = '/prompt';
+            window.location.href = '/prompts';
         } catch (error) {
             console.error(error);
             Flash.setMessageFromError(error, 'An error occurred while updating the prompt.');

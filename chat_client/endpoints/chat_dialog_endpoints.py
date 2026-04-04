@@ -5,7 +5,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 
-async def frontend_config(request: Request, *, config, system_message_denylist, vision_models, build_model_capabilities, json_success):
+async def get_chat_config(request: Request, *, config, system_message_denylist, vision_models, build_model_capabilities, json_success):
     config_values = {
         "default_model": getattr(config, "DEFAULT_MODEL", ""),
         "use_katex": getattr(config, "USE_KATEX", False),
@@ -16,7 +16,7 @@ async def frontend_config(request: Request, *, config, system_message_denylist, 
     return json_success(**config_values)
 
 
-async def list_models(request: Request, *, get_model_names, json_success):
+async def list_chat_models(request: Request, *, get_model_names, json_success):
     model_names = await get_model_names()
     return json_success(model_names=model_names)
 
@@ -105,7 +105,7 @@ async def create_message(
         return json_error("Error saving message", status_code=500)
 
 
-async def generate_dialog_title(
+async def create_dialog_title(
     request: Request,
     *,
     require_user_id_json,
@@ -113,7 +113,7 @@ async def generate_dialog_title(
     dialog_title_model: str,
     is_pending_dialog_title,
     extract_first_user_message,
-    generate_dialog_title_fn,
+    create_dialog_title_fn,
     derive_dialog_title_from_user_message,
     log_chat_event,
     exceptions_validation,
@@ -144,7 +144,7 @@ async def generate_dialog_title(
             title_source = "model"
             title_model = dialog_title_model
             generated_title = await asyncio.to_thread(
-                generate_dialog_title_fn,
+                create_dialog_title_fn,
                 first_user_message,
                 dialog_title_model,
             )
@@ -236,7 +236,7 @@ async def get_dialog(
         return json_error("Error getting dialog", status_code=500)
 
 
-async def get_messages(
+async def list_messages(
     request: Request,
     *,
     require_user_id_json,

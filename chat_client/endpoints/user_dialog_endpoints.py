@@ -9,7 +9,7 @@ from chat_client.repositories import chat_repository
 templates = get_templates()
 
 
-async def list_dialogs_json(request: Request):
+async def list_dialogs(request: Request):
     try:
         user_id = await require_user_id_json(
             request,
