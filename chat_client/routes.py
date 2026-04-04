@@ -6,7 +6,7 @@ from chat_client.endpoints import prompt_endpoints
 from chat_client.endpoints import user_endpoints
 
 user_routes: list[Route] = [
-    Route("/captcha", user_endpoints.captcha_, methods=["GET"]),
+    Route("/captcha", user_endpoints.captcha_image, methods=["GET"]),
     Route("/user/signup", user_endpoints.signup_get, methods=["GET"]),
     Route("/user/signup", user_endpoints.signup_post, methods=["POST"]),
     Route("/user/login", user_endpoints.login_get, methods=["GET"]),
@@ -30,7 +30,7 @@ chat_routes: list[Route] = [
     Route("/chat", chat_endpoints.chat_response_stream, methods=["POST"]),
     Route("/chat/upload-attachment", chat_endpoints.upload_attachment, methods=["POST"]),
     Route("/chat/attachment/{attachment_id:int}/preview", chat_endpoints.preview_attachment, methods=["GET"]),
-    Route("/config", chat_endpoints.config_),
+    Route("/config", chat_endpoints.frontend_config),
     Route("/list", chat_endpoints.list_models, methods=["GET"]),
     Route("/chat/create-dialog", chat_endpoints.create_dialog, methods=["POST"]),
     Route("/chat/create-message/{dialog_id}", chat_endpoints.create_message, methods=["POST"]),

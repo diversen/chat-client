@@ -1,4 +1,5 @@
 import asyncio
+from functools import wraps
 from html import escape, unescape
 import time
 import json
@@ -21,6 +22,7 @@ from chat_client.core import mcp_client
 from chat_client.core import model_capabilities
 from chat_client.core import tool_executor
 from chat_client.core.templates import get_templates
+from chat_client.endpoints import chat_attachment_endpoints, chat_dialog_endpoints
 from chat_client.repositories import attachment_repository, chat_repository, prompt_repository
 from chat_client.core import exceptions_validation
 from chat_client.core.http import (
@@ -102,6 +104,20 @@ def _json_error_with_auth_redirect(request: Request, error: exceptions_validatio
         error,
         redirect_to=_chat_login_redirect_path(request, fallback=fallback),
     )
+
+
+def _with_auth_redirect_on_json_error(*, fallback: str = "/"):
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(request: Request, *args, **kwargs):
+            try:
+                return await func(request, *args, **kwargs)
+            except exceptions_validation.JSONError as error:
+                return _json_error_with_auth_redirect(request, error, fallback=fallback)
+
+        return wrapper
+
+    return decorator
 
 
 def _resolve_provider_info(model: str) -> dict:
@@ -822,107 +838,42 @@ async def chat_response_stream(request: Request):
         return json_error(str(e), status_code=e.status_code)
 
 
+@_with_auth_redirect_on_json_error()
 async def upload_attachment(request: Request):
-    try:
-        user_id = await require_user_id_json(request, message="You must be logged in to upload files")
-        form = await request.form()
-        upload = form.get("file")
-        if upload is None or not hasattr(upload, "filename"):
-            raise exceptions_validation.UserValidate("A file upload is required.")
-
-        filename = str(getattr(upload, "filename", "") or "").strip()
-        content_type = str(getattr(upload, "content_type", "") or "").strip().lower()
-        file_bytes = await upload.read()
-        size_bytes = len(file_bytes)
-        safe_name, normalized_content_type = attachment_service.validate_attachment_metadata(
-            filename,
-            content_type,
-            size_bytes,
-        )
-        attachment_id = await attachment_repository.create_attachment(
-            user_id=user_id,
-            name=safe_name,
-            content_type=normalized_content_type or content_type,
-            size_bytes=size_bytes,
-            storage_path="",
-        )
-        if not attachment_id:
-            raise RuntimeError("Failed to create attachment id")
-
-        storage_path = attachment_service.build_attachment_storage_path(attachment_id, safe_name)
-        storage_path.parent.mkdir(parents=True, exist_ok=True)
-        storage_path.write_bytes(file_bytes)
-        await attachment_repository.update_attachment_storage_path(user_id, int(attachment_id), str(storage_path))
-        attachment = await attachment_repository.get_attachment(user_id, int(attachment_id))
-        return JSONResponse(attachment_service.serialize_attachment_response(attachment))
-    except attachment_service.AttachmentValidationError as e:
-        return json_error(str(e), status_code=400)
-    except exceptions_validation.JSONError as e:
-        return _json_error_with_auth_redirect(request, e)
-    except exceptions_validation.UserValidate as e:
-        return json_error(str(e), status_code=400)
-    except Exception:
-        logger.exception("Error uploading attachment")
-        return json_error("Error uploading attachment", status_code=500)
+    return await chat_attachment_endpoints.upload_attachment(
+        request,
+        require_user_id_json=require_user_id_json,
+        attachment_service=attachment_service,
+        attachment_repository=attachment_repository,
+        exceptions_validation=exceptions_validation,
+        json_success=json_success,
+        json_error=json_error,
+        logger=logger,
+    )
 
 
 async def preview_attachment(request: Request):
-    try:
-        user_id_or_response = await get_user_id_or_redirect(
-            request,
-            notice="You must be logged in to preview attachments",
-        )
-        if not isinstance(user_id_or_response, int):
-            return user_id_or_response
-
-        attachment_id = int(request.path_params.get("attachment_id", 0))
-        attachment = await attachment_repository.get_attachment(user_id_or_response, attachment_id)
-        storage_path = Path(str(attachment.get("storage_path", "") or "")).expanduser()
-        if not storage_path.is_file():
-            return json_error("Attachment file was not found on disk.", status_code=404)
-
-        filename = str(attachment.get("name", "") or storage_path.name)
-        content_type = str(attachment.get("content_type", "") or "").strip().lower()
-        suffix = storage_path.suffix.lower()
-
-        if _attachment_preview_is_image(content_type, suffix):
-            response = FileResponse(str(storage_path), media_type=content_type or None, filename=filename)
-            response.headers["Content-Disposition"] = f'inline; filename="{escape(filename, quote=True)}"'
-            return response
-
-        if _attachment_preview_is_text(content_type, suffix):
-            text_content = storage_path.read_text(encoding="utf-8", errors="replace")
-            return PlainTextResponse(text_content, media_type="text/plain")
-
-        response = FileResponse(
-            str(storage_path),
-            media_type=content_type or "application/octet-stream",
-            filename=filename,
-        )
-        response.headers["Content-Disposition"] = f'attachment; filename="{escape(filename, quote=True)}"'
-        return response
-    except exceptions_validation.UserValidate as e:
-        return json_error(str(e), status_code=404)
-    except ValueError:
-        return json_error("Attachment id is invalid.", status_code=400)
-    except Exception:
-        logger.exception("Error previewing attachment")
-        return json_error("Error previewing attachment", status_code=500)
+    return await chat_attachment_endpoints.preview_attachment(
+        request,
+        get_user_id_or_redirect=get_user_id_or_redirect,
+        attachment_repository=attachment_repository,
+        exceptions_validation=exceptions_validation,
+        json_error=json_error,
+        attachment_preview_is_image=_attachment_preview_is_image,
+        attachment_preview_is_text=_attachment_preview_is_text,
+        logger=logger,
+    )
 
 
-async def config_(request: Request):
-    """
-    GET frontend configuration
-    """
-    config_values = {
-        "default_model": getattr(config, "DEFAULT_MODEL", ""),
-        "use_katex": getattr(config, "USE_KATEX", False),
-        "system_message_denylist": SYSTEM_MESSAGE_DENYLIST,
-        "vision_models": VISION_MODELS,
-        "model_capabilities": _build_model_capabilities(),
-    }
-
-    return JSONResponse(config_values)
+async def frontend_config(request: Request):
+    return await chat_dialog_endpoints.frontend_config(
+        request,
+        config=config,
+        system_message_denylist=SYSTEM_MESSAGE_DENYLIST,
+        vision_models=VISION_MODELS,
+        build_model_capabilities=_build_model_capabilities,
+        json_success=json_success,
+    )
 
 
 async def _get_model_names():
@@ -930,247 +881,124 @@ async def _get_model_names():
 
 
 async def list_models(request: Request):
-    """
-    GET available models
-    """
-
-    model_names = await _get_model_names()
-    return JSONResponse({"model_names": model_names})
+    return await chat_dialog_endpoints.list_models(request, get_model_names=_get_model_names, json_success=json_success)
 
 
+@_with_auth_redirect_on_json_error()
 async def create_dialog(request: Request):
-    """
-    Save dialog to database
-    """
-    try:
-        user_id = await require_user_id_json(request, message="You must be logged in to save a dialog")
-        payload = await parse_json_payload(request, CreateDialogRequest)
-        dialog_id = await chat_repository.create_dialog(user_id, payload.title)
-        return json_success(dialog_id=dialog_id, message="Dialog saved")
-    except exceptions_validation.JSONError as e:
-        return _json_error_with_auth_redirect(request, e)
-    except exceptions_validation.UserValidate as e:
-        return json_error(str(e), status_code=400)
-    except Exception:
-        logger.exception("Error saving dialog")
-        return json_error("Error saving dialog", status_code=500)
+    return await chat_dialog_endpoints.create_dialog(
+        request,
+        require_user_id_json=require_user_id_json,
+        parse_json_payload=parse_json_payload,
+        create_dialog_request=CreateDialogRequest,
+        chat_repository=chat_repository,
+        exceptions_validation=exceptions_validation,
+        json_success=json_success,
+        json_error=json_error,
+        logger=logger,
+    )
 
 
+@_with_auth_redirect_on_json_error()
 async def create_message(request: Request):
-    """
-    Save message to database
-    """
-    try:
-        user_id = await require_user_id_json(request, message="You must be logged in in order to create a message")
-        dialog_id = str(request.path_params.get("dialog_id", "")).strip()
-        if not dialog_id:
-            raise exceptions_validation.UserValidate("Dialog id is required")
-
-        payload = await parse_json_payload(request, CreateMessageRequest)
-        if payload.role == "user" and payload.images:
-            selected_model = payload.model.strip()
-            if not selected_model:
-                raise exceptions_validation.UserValidate("Model is required when attaching images")
-            if not _supports_model_images(selected_model):
-                raise exceptions_validation.UserValidate(chat_service.IMAGE_MODALITY_ERROR_MESSAGE)
-        if payload.role == "user" and payload.attachments:
-            selected_model = payload.model.strip()
-            if not selected_model:
-                raise exceptions_validation.UserValidate("Model is required when attaching files")
-            if not _supports_model_attachments(selected_model):
-                raise exceptions_validation.UserValidate("The selected model does not support file attachments.")
-        if payload.attachments:
-            await attachment_repository.get_attachments(
-                user_id,
-                [attachment.attachment_id for attachment in payload.attachments],
-            )
-        message_id = await chat_repository.create_message(
-            user_id,
-            dialog_id,
-            payload.role,
-            payload.content,
-            [image.model_dump() for image in payload.images],
-            [attachment.model_dump() for attachment in payload.attachments],
-        )
-        return JSONResponse({"message_id": message_id})
-    except exceptions_validation.JSONError as e:
-        return _json_error_with_auth_redirect(request, e)
-    except exceptions_validation.UserValidate as e:
-        return json_error(str(e), status_code=400)
-    except Exception:
-        logger.exception("Error saving message")
-        return json_error("Error saving message", status_code=500)
+    return await chat_dialog_endpoints.create_message(
+        request,
+        require_user_id_json=require_user_id_json,
+        parse_json_payload=parse_json_payload,
+        create_message_request=CreateMessageRequest,
+        attachment_repository=attachment_repository,
+        chat_repository=chat_repository,
+        supports_model_images=_supports_model_images,
+        supports_model_attachments=_supports_model_attachments,
+        image_modality_error_message=chat_service.IMAGE_MODALITY_ERROR_MESSAGE,
+        exceptions_validation=exceptions_validation,
+        json_success=json_success,
+        json_error=json_error,
+        logger=logger,
+    )
 
 
+@_with_auth_redirect_on_json_error()
 async def generate_dialog_title(request: Request):
-    """
-    Generate and persist a dialog title using the selected model.
-    """
-    dialog_id = ""
-    try:
-        user_id = await require_user_id_json(request, message="You must be logged in to update a dialog title")
-        dialog_id = str(request.path_params.get("dialog_id", "")).strip()
-        if not dialog_id:
-            raise exceptions_validation.UserValidate("Dialog id is required")
-
-        dialog = await chat_repository.get_dialog(user_id, dialog_id)
-        existing_title = str(dialog.get("title", "")).strip()
-        if not _is_pending_dialog_title(existing_title):
-            return json_success(dialog_id=dialog_id, title=existing_title, generated=False)
-
-        messages = await chat_repository.get_messages(user_id, dialog_id)
-        first_user_message = _extract_first_user_message(messages)
-        if not first_user_message:
-            return json_success(dialog_id=dialog_id, title=existing_title, generated=False)
-
-        title_source = "derived"
-        title_model = ""
-        if DIALOG_TITLE_MODEL:
-            title_source = "model"
-            title_model = DIALOG_TITLE_MODEL
-            generated_title = await asyncio.to_thread(
-                _generate_dialog_title,
-                first_user_message,
-                DIALOG_TITLE_MODEL,
-            )
-        else:
-            generated_title = _derive_dialog_title_from_user_message(first_user_message)
-        _log_chat_event(
-            logging.INFO,
-            "chat.dialog_title.generated",
-            user_id=user_id,
-            dialog_id=dialog_id,
-            source=title_source,
-            model=title_model,
-            generated_title=generated_title,
-        )
-        result = await chat_repository.update_dialog_title(user_id, dialog_id, generated_title)
-        return json_success(**result, generated=True)
-    except exceptions_validation.JSONError as e:
-        return _json_error_with_auth_redirect(request, e)
-    except exceptions_validation.UserValidate as e:
-        return json_error(str(e), status_code=400)
-    except Exception:
-        logger.exception(
-            "Error generating dialog title",
-            extra={
-                "dialog_id": dialog_id,
-                "model": DIALOG_TITLE_MODEL or "",
-            },
-        )
-        return json_error("Error generating dialog title", status_code=500)
+    return await chat_dialog_endpoints.generate_dialog_title(
+        request,
+        require_user_id_json=require_user_id_json,
+        chat_repository=chat_repository,
+        dialog_title_model=DIALOG_TITLE_MODEL,
+        is_pending_dialog_title=_is_pending_dialog_title,
+        extract_first_user_message=_extract_first_user_message,
+        generate_dialog_title_fn=_generate_dialog_title,
+        derive_dialog_title_from_user_message=_derive_dialog_title_from_user_message,
+        log_chat_event=_log_chat_event,
+        exceptions_validation=exceptions_validation,
+        json_success=json_success,
+        json_error=json_error,
+        logger=logger,
+    )
 
 
+@_with_auth_redirect_on_json_error()
 async def create_assistant_turn_events(request: Request):
-    """
-    Save one completed assistant turn as ordered events.
-    """
-    try:
-        user_id = await require_user_id_json(request, message="You must be logged in in order to create assistant turn events")
-        dialog_id = str(request.path_params.get("dialog_id", "")).strip()
-        if not dialog_id:
-            raise exceptions_validation.UserValidate("Dialog id is required")
-        await chat_repository.get_dialog(user_id, dialog_id)
-        payload = await parse_json_payload(request, CreateAssistantTurnEventsRequest)
-        await chat_repository.create_assistant_turn_events(
-            user_id=user_id,
-            dialog_id=dialog_id,
-            turn_id=payload.turn_id,
-            events=[event.model_dump() for event in payload.events],
-        )
-        return json_success()
-    except exceptions_validation.JSONError as e:
-        return _json_error_with_auth_redirect(request, e)
-    except exceptions_validation.UserValidate as e:
-        return json_error(str(e), status_code=400)
-    except Exception:
-        logger.exception("Error saving assistant turn events")
-        return json_error("Error saving assistant turn events", status_code=500)
+    return await chat_dialog_endpoints.create_assistant_turn_events(
+        request,
+        require_user_id_json=require_user_id_json,
+        parse_json_payload=parse_json_payload,
+        create_assistant_turn_events_request=CreateAssistantTurnEventsRequest,
+        chat_repository=chat_repository,
+        exceptions_validation=exceptions_validation,
+        json_success=json_success,
+        json_error=json_error,
+        logger=logger,
+    )
 
 
+@_with_auth_redirect_on_json_error()
 async def get_dialog(request: Request):
-    """
-    Get dialog from database
-    """
-    try:
-        user_id = await require_user_id_json(request, message="You must be logged in to get a dialog")
-        dialog_id = str(request.path_params.get("dialog_id", "")).strip()
-        if not dialog_id:
-            raise exceptions_validation.UserValidate("Dialog id is required")
-        dialog = await chat_repository.get_dialog(user_id, dialog_id)
-        return JSONResponse(dialog)
-    except exceptions_validation.JSONError as e:
-        return _json_error_with_auth_redirect(request, e)
-    except exceptions_validation.UserValidate as e:
-        return json_error(str(e), status_code=400)
-    except Exception:
-        logger.exception("Error getting dialog")
-        return json_error("Error getting dialog", status_code=500)
+    return await chat_dialog_endpoints.get_dialog(
+        request,
+        require_user_id_json=require_user_id_json,
+        chat_repository=chat_repository,
+        exceptions_validation=exceptions_validation,
+        json_error=json_error,
+        logger=logger,
+    )
 
 
+@_with_auth_redirect_on_json_error()
 async def get_messages(request: Request):
-    """
-    Get messages from database
-    """
-    try:
-        user_id = await require_user_id_json(request, message="You must be logged in to get a dialog")
-        dialog_id = str(request.path_params.get("dialog_id", "")).strip()
-        if not dialog_id:
-            raise exceptions_validation.UserValidate("Dialog id is required")
-        messages = await chat_repository.get_messages(user_id, dialog_id)
-        return JSONResponse(messages)
-    except exceptions_validation.JSONError as e:
-        return _json_error_with_auth_redirect(request, e)
-    except exceptions_validation.UserValidate as e:
-        return json_error(str(e), status_code=400)
-    except Exception:
-        logger.exception("Error getting messages")
-        return json_error("Error getting messages", status_code=500)
+    return await chat_dialog_endpoints.get_messages(
+        request,
+        require_user_id_json=require_user_id_json,
+        chat_repository=chat_repository,
+        exceptions_validation=exceptions_validation,
+        json_error=json_error,
+        logger=logger,
+    )
 
 
+@_with_auth_redirect_on_json_error()
 async def delete_dialog(request: Request):
-    """
-    Delete dialog from database
-    """
-    try:
-        user_id = await require_user_id_json(request, message="You must be logged in to delete a dialog")
-        dialog_id = str(request.path_params.get("dialog_id", "")).strip()
-        if not dialog_id:
-            raise exceptions_validation.UserValidate("Dialog id is required")
-        await chat_repository.delete_dialog(user_id, dialog_id)
-        return json_success()
-    except exceptions_validation.JSONError as e:
-        return _json_error_with_auth_redirect(request, e)
-    except exceptions_validation.UserValidate as e:
-        return json_error(str(e), status_code=400)
-    except Exception:
-        logger.exception("Error deleting dialog")
-        return json_error("Error deleting dialog", status_code=500)
+    return await chat_dialog_endpoints.delete_dialog(
+        request,
+        require_user_id_json=require_user_id_json,
+        chat_repository=chat_repository,
+        exceptions_validation=exceptions_validation,
+        json_success=json_success,
+        json_error=json_error,
+        logger=logger,
+    )
 
 
+@_with_auth_redirect_on_json_error()
 async def update_message(request: Request):
-    """
-    Update message content and deactivate newer messages in the same dialog
-    """
-    try:
-        user_id = await require_user_id_json(
-            request,
-            message="You must be logged in to update a message",
-        )
-
-        raw_message_id = request.path_params.get("message_id")
-        if raw_message_id is None:
-            raise ValueError("Missing message id")
-        message_id = int(raw_message_id)
-        payload = await parse_json_payload(request, UpdateMessageRequest)
-        result = await chat_repository.update_message(user_id, message_id, payload.content)
-        return json_success(**result)
-    except exceptions_validation.JSONError as e:
-        return _json_error_with_auth_redirect(request, e)
-    except (TypeError, ValueError):
-        return json_error("Invalid message id", status_code=400)
-    except exceptions_validation.UserValidate as e:
-        return json_error(str(e), status_code=400)
-    except Exception:
-        logger.exception("Error updating message")
-        return json_error("Error updating message", status_code=500)
+    return await chat_dialog_endpoints.update_message(
+        request,
+        require_user_id_json=require_user_id_json,
+        parse_json_payload=parse_json_payload,
+        update_message_request=UpdateMessageRequest,
+        chat_repository=chat_repository,
+        exceptions_validation=exceptions_validation,
+        json_success=json_success,
+        json_error=json_error,
+        logger=logger,
+    )
