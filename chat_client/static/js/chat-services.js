@@ -1,4 +1,4 @@
-import { createDialog, generateDialogTitle, getMessages, createMessage, createAssistantTurnEvents, updateMessage, isLoggedInOrRedirect, uploadAttachment } from './app-dialog.js';
+import { createDialog, generateDialogTitle, getMessages, createMessage, createAssistantTurnEvents, updateMessage, uploadAttachment } from './app-dialog.js';
 
 const storageService = {
     createDialog,
@@ -8,10 +8,6 @@ const storageService = {
     updateMessage,
     getMessages,
     uploadAttachment,
-};
-
-const authService = {
-    async ensure() { return isLoggedInOrRedirect(); },
 };
 
 const chatService = {
@@ -136,4 +132,4 @@ const chatService = {
     },
 };
 
-export { storageService, authService, chatService };
+export { storageService, chatService };

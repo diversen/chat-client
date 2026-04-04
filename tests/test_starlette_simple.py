@@ -83,14 +83,6 @@ def test_user_routes():
         assert response.headers["content-type"] == "image/png"
         print("✓ Captcha works")
 
-        # Test is-logged-in when not authenticated
-        with patch("chat_client.core.user_session.is_logged_in", return_value=False):
-            response = client.get("/user/is-logged-in?next=/chat/test-dialog-id")
-            assert response.status_code == 400, f"Is-logged-in failed: {response.status_code}"
-            data = response.json()
-            assert data["error"] is True  # Should be error because not logged in
-            assert data["redirect"] == "/user/login?next=/chat/test-dialog-id"
-            print("✓ Is-logged-in endpoint works when not authenticated")
     finally:
         client.close()
 
@@ -111,13 +103,6 @@ def test_authenticated_routes():
                     assert response.status_code == 200, f"Chat page failed: {response.status_code}"
                     assert "Chat" in response.text
                     print("✓ Chat page works when authenticated")
-
-            # Test is-logged-in when authenticated
-            response = client.get("/user/is-logged-in")
-            assert response.status_code == 200
-            data = response.json()
-            assert data["error"] is False  # Should not be error when logged in
-            print("✓ Is-logged-in works when authenticated")
 
             # Test prompt list
             with patch("chat_client.repositories.user_repository.get_profile", return_value={}):

@@ -91,26 +91,6 @@ async function uploadAttachment(file) {
     return data;
 }
 
-async function isLoggedInOrRedirect() {
-    const currentUrl = new URL(window.location.href);
-    const nextPath = `${currentUrl.pathname}${currentUrl.search}`;
-
-    try {
-        const data = await Requests.asyncGetJson(`/user/is-logged-in?next=${encodeURIComponent(nextPath)}`);
-        if (data.error) {
-            window.location.href = data.redirect;
-            return false;
-        }
-        return true;
-    } catch (error) {
-        if (error?.status === 400 && typeof error?.redirect === 'string' && error.redirect.trim()) {
-            window.location.href = error.redirect;
-            return false;
-        }
-        throw error;
-    }
-}
-
 /**
  * Update message content
  * POST updated content to /chat/update-message/{message_id}
@@ -126,4 +106,4 @@ async function updateMessage(messageId, content) {
     return data;
 }
 
-export { createDialog, generateDialogTitle, getMessages, createMessage, createAssistantTurnEvents, getConfig, isLoggedInOrRedirect, updateMessage, uploadAttachment };
+export { createDialog, generateDialogTitle, getMessages, createMessage, createAssistantTurnEvents, getConfig, updateMessage, uploadAttachment };

@@ -15,9 +15,7 @@ from chat_client.core import user_session
 from chat_client.core.templates import get_templates
 from chat_client.core.base_context import get_context
 from chat_client.core.http import (
-    build_login_redirect_target,
     get_user_id_or_redirect,
-    json_auth_error,
     json_error,
     json_error_with_login_redirect,
     json_success,
@@ -292,17 +290,3 @@ async def profile_post(request: Request):
     except Exception as e:
         logger.exception(e)
         return json_error("An unexpected error occurred")
-
-
-async def is_logged_in(request: Request):
-    user_id = await user_session.is_logged_in(request)
-    if not user_id:
-        next_path = _get_safe_next_path(request.query_params.get("next"))
-        flash.set_notice(request, "You are not logged in. Please log in.")
-        return json_auth_error(
-            "You are not logged in. Please log in.",
-            redirect_to=next_path,
-            status_code=400,
-        )
-
-    return json_success(message="You are logged in")

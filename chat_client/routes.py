@@ -22,7 +22,6 @@ user_routes: list[Route] = [
     Route("/user/dialogs/json", user_endpoints.list_dialogs_json, methods=["GET"]),
     Route("/user/profile", user_endpoints.profile, methods=["GET"]),
     Route("/user/profile", user_endpoints.profile_post, methods=["POST"]),
-    Route("/user/is-logged-in", user_endpoints.is_logged_in, methods=["GET"]),
 ]
 
 chat_routes: list[Route] = [

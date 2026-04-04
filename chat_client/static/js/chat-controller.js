@@ -40,10 +40,9 @@ function formatAttachmentSize(sizeBytes) {
 }
 
 class ConversationController {
-    constructor({ view, storage, auth, chat, config }) {
+    constructor({ view, storage, chat, config }) {
         this.view = view;
         this.storage = storage;
-        this.auth = auth;
         this.chat = chat;
         this.config = config;
         this.isSubmitting = false;
@@ -365,7 +364,6 @@ class ConversationController {
         const selectedFiles = Array.from(files || []);
         if (!selectedFiles.length) return;
 
-        await this.auth.ensure();
         for (const file of selectedFiles) {
             try {
                 const uploaded = await this.storage.uploadAttachment(file);
@@ -530,8 +528,6 @@ class ConversationController {
     async sendUserMessage() {
         if (this.isSubmitting || this.isStreaming) return;
         try {
-            const authenticated = await this.auth.ensure();
-            if (authenticated === false) return;
             const userMessage = messageElem.value.trim();
             const images = this.selectedModelSupportsImages()
                 ? this.pendingImages.map((img) => ({ data_url: img.dataUrl }))

@@ -246,29 +246,6 @@ class TestUserEndpoints(BaseTestCase):
         assert data["error"] is False
 
     @patch("chat_client.core.user_session.is_logged_in")
-    def test_is_logged_in_not_authenticated(self, mock_logged_in):
-        """Test /user/is-logged-in when not authenticated"""
-        mock_logged_in.return_value = False
-
-        response = self.client.get("/user/is-logged-in?next=/chat/test-dialog-id")
-        assert response.status_code == 400
-        data = response.json()
-        assert data["error"] is True
-        assert data["redirect"] == "/user/login?next=/chat/test-dialog-id&reason=auth_required"
-        assert "not logged in" in data["message"].lower()
-
-    @patch("chat_client.core.user_session.is_logged_in")
-    def test_is_logged_in_authenticated(self, mock_logged_in):
-        """Test /user/is-logged-in when authenticated"""
-        mock_logged_in.return_value = 1  # User ID
-
-        response = self.client.get("/user/is-logged-in")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["error"] is False
-        assert "logged in" in data["message"]
-
-    @patch("chat_client.core.user_session.is_logged_in")
     def test_profile_get_not_authenticated(self, mock_logged_in):
         """Test GET /user/profile when not authenticated"""
         mock_logged_in.return_value = False

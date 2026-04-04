@@ -5,7 +5,7 @@ import {
 import { initAppEvents } from './app-events.js';
 import { dd } from './diff-dom.js';
 import { renderKatex, renderMarkdownWithKatex } from './katex-render.js';
-import { storageService, authService, chatService } from './chat-services.js';
+import { storageService, chatService } from './chat-services.js';
 import { ConversationController } from './chat-controller.js';
 import { createChatView } from './chat-view.js';
 
@@ -254,7 +254,6 @@ const view = createChatView({
 const controller = new ConversationController({
     view,
     storage: storageService,
-    auth: authService,
     chat: chatService,
     config,
 });
