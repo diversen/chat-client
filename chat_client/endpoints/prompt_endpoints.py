@@ -2,8 +2,7 @@
 
 from starlette.requests import Request
 from starlette.responses import RedirectResponse
-from chat_client.core.templates import get_templates
-from chat_client.core.base_context import get_context
+from chat_client.core.templates import get_templates, render_template
 
 # from chat_client.core.exceptions import UserValidate
 from chat_client.core import exceptions_validation
@@ -11,8 +10,9 @@ from chat_client.repositories import prompt_repository
 from chat_client.core.http import (
     get_user_id_or_redirect,
     json_error,
-    json_error_with_login_redirect,
+    json_error_from_exception,
     json_success,
+    json_validation_error,
     parse_json_payload,
     require_user_id_json,
 )
@@ -21,24 +21,18 @@ from chat_client.schemas.prompt import PromptUpsertRequest
 templates = get_templates()
 
 
-def _prompt_auth_json_error(request: Request, error: exceptions_validation.JSONError):
-    return json_error_with_login_redirect(error, redirect_to="/prompt")
-
-
 async def prompt_list_get(request: Request):
     user_id_or_response = await get_user_id_or_redirect(request)
     if isinstance(user_id_or_response, RedirectResponse):
         return user_id_or_response
     user_id = user_id_or_response
     prompts = await prompt_repository.list_prompts(user_id)
-    context = {
-        "request": request,
-        "title": "Your Prompts",
-        "prompts": prompts,
-        "logged_in": True,
-    }
-    context = await get_context(request, context)
-    return templates.TemplateResponse("prompts/list.html", context)
+    return await render_template(
+        templates,
+        request,
+        "prompts/list.html",
+        {"title": "Your Prompts", "prompts": prompts, "logged_in": True},
+    )
 
 
 async def prompt_list_json(request: Request):
@@ -55,20 +49,19 @@ async def prompt_list_json(request: Request):
         ]
         return json_success(prompts=data)
     except exceptions_validation.JSONError as e:
-        return _prompt_auth_json_error(request, e)
+        return json_error_from_exception(e, redirect_to="/prompt")
 
 
 async def prompt_create_get(request: Request):
     user_id_or_response = await get_user_id_or_redirect(request)
     if isinstance(user_id_or_response, RedirectResponse):
         return user_id_or_response
-    context = {
-        "request": request,
-        "title": "New Custom Prompt",
-        "logged_in": True,
-    }
-    context = await get_context(request, context)
-    return templates.TemplateResponse("prompts/create.html", context)
+    return await render_template(
+        templates,
+        request,
+        "prompts/create.html",
+        {"title": "New Custom Prompt", "logged_in": True},
+    )
 
 
 async def prompt_create_post(request: Request):
@@ -78,9 +71,9 @@ async def prompt_create_post(request: Request):
         result = await prompt_repository.create_prompt(user_id, payload.title, payload.prompt)
         return json_success(prompt_id=result["prompt_id"], message="Prompt created successfully")
     except exceptions_validation.JSONError as e:
-        return _prompt_auth_json_error(request, e)
+        return json_error_from_exception(e, redirect_to="/prompt")
     except exceptions_validation.UserValidate as e:
-        return json_error(str(e), status_code=400)
+        return json_validation_error(e)
 
 
 async def prompt_detail(request: Request):
@@ -93,14 +86,12 @@ async def prompt_detail(request: Request):
         prompt = await prompt_repository.get_prompt(user_id, prompt_id)
     except exceptions_validation.UserValidate:
         return RedirectResponse("/prompt")
-    context = {
-        "request": request,
-        "title": prompt.title,
-        "prompt": prompt,
-        "logged_in": True,
-    }
-    context = await get_context(request, context)
-    return templates.TemplateResponse("prompts/detail.html", context)
+    return await render_template(
+        templates,
+        request,
+        "prompts/detail.html",
+        {"title": prompt.title, "prompt": prompt, "logged_in": True},
+    )
 
 
 async def prompt_detail_json(request: Request):
@@ -111,7 +102,7 @@ async def prompt_detail_json(request: Request):
     except exceptions_validation.UserValidate:
         return json_error("Prompt not found", status_code=404)
     except exceptions_validation.JSONError as e:
-        return _prompt_auth_json_error(request, e)
+        return json_error_from_exception(e, redirect_to="/prompt")
     data = {
         "prompt_id": prompt.prompt_id,
         "title": prompt.title,
@@ -130,14 +121,12 @@ async def prompt_edit_get(request: Request):
         prompt = await prompt_repository.get_prompt(user_id, prompt_id)
     except exceptions_validation.UserValidate:
         return RedirectResponse("/prompt")
-    context = {
-        "request": request,
-        "title": f"Edit {prompt.title}",
-        "prompt": prompt,
-        "logged_in": True,
-    }
-    context = await get_context(request, context)
-    return templates.TemplateResponse("prompts/edit.html", context)
+    return await render_template(
+        templates,
+        request,
+        "prompts/edit.html",
+        {"title": f"Edit {prompt.title}", "prompt": prompt, "logged_in": True},
+    )
 
 
 async def prompt_edit_post(request: Request):
@@ -153,9 +142,9 @@ async def prompt_edit_post(request: Request):
     except ValueError:
         return json_error("Prompt not found", status_code=404)
     except exceptions_validation.JSONError as e:
-        return _prompt_auth_json_error(request, e)
+        return json_error_from_exception(e, redirect_to="/prompt")
     except exceptions_validation.UserValidate as e:
-        return json_error(str(e), status_code=400)
+        return json_validation_error(e)
 
 
 async def prompt_delete_post(request: Request):
@@ -170,6 +159,6 @@ async def prompt_delete_post(request: Request):
     except ValueError:
         return json_error("Prompt not found", status_code=404)
     except exceptions_validation.JSONError as e:
-        return _prompt_auth_json_error(request, e)
+        return json_error_from_exception(e, redirect_to="/prompt")
     except exceptions_validation.UserValidate as e:
-        return json_error(str(e), status_code=400)
+        return json_validation_error(e)

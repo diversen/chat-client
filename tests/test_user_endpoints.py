@@ -93,7 +93,7 @@ class TestUserEndpoints(BaseTestCase):
             }
             return {**base, **variables}
 
-        monkeypatch.setattr("chat_client.endpoints.user_endpoints.get_context", fake_get_context)
+        monkeypatch.setattr("chat_client.core.base_context.get_context", fake_get_context)
 
         response = self.client.get("/user/login?next=/chat/test-dialog-id&reason=auth_required")
 

@@ -1,10 +1,8 @@
 import asyncio
 from functools import wraps
-from html import escape, unescape
 import time
 import json
 import logging
-import re
 import uuid
 from pathlib import Path
 from typing import Any
@@ -17,17 +15,26 @@ from starlette.responses import StreamingResponse, JSONResponse, RedirectRespons
 from chat_client.core import base_context
 from chat_client.core import attachments as attachment_service
 from chat_client.core import chat_service
+from chat_client.core.chat_message_utils import (
+    build_dialog_title_prompt as _build_dialog_title_prompt,
+    build_model_messages_from_dialog_history as _build_model_messages_from_dialog_history,
+    derive_dialog_title_from_user_message as _derive_dialog_title_from_user_message,
+    extract_first_user_message as _extract_first_user_message,
+    is_pending_dialog_title as _is_pending_dialog_title,
+    normalize_chat_messages as _normalize_chat_messages,
+    normalize_generated_dialog_title as _normalize_generated_dialog_title,
+    strip_images_from_messages as _strip_images_from_messages,
+)
 from chat_client.core import config_utils
 from chat_client.core import mcp_client
 from chat_client.core import model_capabilities
 from chat_client.core import tool_executor
-from chat_client.core.templates import get_templates
-from chat_client.endpoints import chat_attachment_endpoints, chat_dialog_endpoints
+from chat_client.endpoints import chat_attachment_endpoints, chat_dialog_endpoints, chat_page_endpoints, chat_stream_endpoints
 from chat_client.repositories import attachment_repository, chat_repository, prompt_repository
 from chat_client.core import exceptions_validation
 from chat_client.core.http import (
     json_error,
-    json_error_with_login_redirect,
+    json_error_from_exception,
     json_success,
     get_user_id_or_redirect,
     parse_json_payload,
@@ -42,7 +49,6 @@ from chat_client.schemas.chat import (
 )
 # Logger
 logger: logging.Logger = logging.getLogger(__name__)
-templates = get_templates()
 
 CONFIGURED_MODELS = getattr(config, "MODELS", {})
 CONFIGURED_PROVIDERS = getattr(config, "PROVIDERS", {})
@@ -100,10 +106,7 @@ def _chat_login_redirect_path(request: Request, fallback: str = "/") -> str:
 
 
 def _json_error_with_auth_redirect(request: Request, error: exceptions_validation.JSONError, fallback: str = "/"):
-    return json_error_with_login_redirect(
-        error,
-        redirect_to=_chat_login_redirect_path(request, fallback=fallback),
-    )
+    return json_error_from_exception(error, redirect_to=_chat_login_redirect_path(request, fallback=fallback))
 
 
 def _with_auth_redirect_on_json_error(*, fallback: str = "/"):
@@ -242,31 +245,14 @@ def _attachment_preview_is_text(content_type: str, suffix: str) -> bool:
 
 
 async def chat_page(request: Request):
-    """
-    The GET chat page
-    """
-    user_id_or_response = await get_user_id_or_redirect(
+    return await chat_page_endpoints.chat_page(
         request,
-        notice="You must be logged in to access the chat",
+        get_user_id_or_redirect=get_user_id_or_redirect,
+        get_model_names=_get_model_names,
+        list_prompts=prompt_repository.list_prompts,
+        get_context=base_context.get_context,
+        default_model=getattr(config, "DEFAULT_MODEL", ""),
     )
-    if isinstance(user_id_or_response, RedirectResponse):
-        return user_id_or_response
-    user_id = user_id_or_response
-
-    model_names = await _get_model_names()
-    prompts = await prompt_repository.list_prompts(user_id)
-
-    context = {
-        "chat": True,
-        "model_names": model_names,
-        "default_model": getattr(config, "DEFAULT_MODEL", ""),
-        "request": request,
-        "title": "Chat",
-        "prompts": prompts,
-    }
-
-    context = await base_context.get_context(request, context)
-    return templates.TemplateResponse("home/chat.html", context)
 
 
 def _list_mcp_tools() -> list[dict]:
@@ -397,250 +383,7 @@ def _serialize_tool_content(result) -> str:
     except TypeError:
         return str(result)
 
-
-def _normalize_chat_messages(messages: list) -> list:
-    """
-    Convert user messages with uploaded images into OpenAI content parts.
-    """
-    return chat_service.normalize_chat_messages(messages)
-
-
-def _build_model_messages_from_dialog_history(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """
-    Build provider-compatible messages from persisted dialog history.
-    Includes tool messages so prior tool outputs stay in context.
-    """
-    normalized: list[dict[str, Any]] = []
-    i = 0
-    while i < len(messages):
-        message = messages[i]
-        if not isinstance(message, dict):
-            i += 1
-            continue
-        role = str(message.get("role", "")).strip()
-        content = str(message.get("content", ""))
-
-        if role == "assistant_turn":
-            events = message.get("events", [])
-            if not isinstance(events, list):
-                i += 1
-                continue
-            pending_tool_calls: list[dict[str, Any]] = []
-            pending_tool_messages: list[dict[str, Any]] = []
-            for raw_event in events:
-                if not isinstance(raw_event, dict):
-                    continue
-                event_type = str(raw_event.get("event_type", "")).strip()
-                if event_type == "assistant_segment":
-                    if pending_tool_calls:
-                        normalized.append(
-                            {
-                                "role": "assistant",
-                                "content": "",
-                                "tool_calls": pending_tool_calls,
-                            }
-                        )
-                        normalized.extend(pending_tool_messages)
-                        pending_tool_calls = []
-                        pending_tool_messages = []
-                    content_text = str(raw_event.get("content_text", ""))
-                    if content_text.strip():
-                        normalized.append({"role": "assistant", "content": content_text})
-                    continue
-                if event_type == "tool_call":
-                    tool_call_id = str(raw_event.get("tool_call_id", "")).strip()
-                    tool_name = str(raw_event.get("tool_name", "")).strip() or "unknown_tool"
-                    raw_arguments = raw_event.get("arguments_json", "{}")
-                    arguments_json = "{}"
-                    if isinstance(raw_arguments, str):
-                        try:
-                            parsed_arguments = json.loads(raw_arguments)
-                            arguments_json = json.dumps(parsed_arguments, ensure_ascii=True, separators=(",", ":"))
-                        except json.JSONDecodeError:
-                            arguments_json = "{}"
-                    pending_tool_calls.append(
-                        {
-                            "id": tool_call_id,
-                            "type": "function",
-                            "function": {
-                                "name": tool_name,
-                                "arguments": arguments_json,
-                            },
-                        }
-                    )
-                    pending_tool_messages.append(
-                        {
-                            "role": "tool",
-                            "tool_call_id": tool_call_id,
-                            "content": str(raw_event.get("result_text", "") or raw_event.get("error_text", "")),
-                        }
-                    )
-            if pending_tool_calls:
-                normalized.append(
-                    {
-                        "role": "assistant",
-                        "content": "",
-                        "tool_calls": pending_tool_calls,
-                    }
-                )
-                normalized.extend(pending_tool_messages)
-            i += 1
-            continue
-
-        if role in {"user", "assistant", "system"}:
-            item: dict[str, Any] = {"role": role, "content": content}
-            if role == "user":
-                images = message.get("images", [])
-                item["images"] = images if isinstance(images, list) else []
-                attachments = message.get("attachments", [])
-                item["attachments"] = attachments if isinstance(attachments, list) else []
-            normalized.append(item)
-            i += 1
-            continue
-
-        if role == "tool":
-            consecutive_tools: list[dict[str, Any]] = []
-            while i < len(messages):
-                candidate = messages[i]
-                if not isinstance(candidate, dict):
-                    break
-                if str(candidate.get("role", "")).strip() != "tool":
-                    break
-                tool_call_id = str(candidate.get("tool_call_id", "")).strip()
-                if tool_call_id:
-                    consecutive_tools.append(candidate)
-                i += 1
-
-            if not consecutive_tools:
-                continue
-
-            tool_calls: list[dict[str, Any]] = []
-            for tool_message in consecutive_tools:
-                tool_call_id = str(tool_message.get("tool_call_id", "")).strip()
-                tool_name = str(tool_message.get("tool_name", "")).strip() or "unknown_tool"
-                raw_arguments = tool_message.get("arguments_json", "{}")
-                arguments_json = "{}"
-                if isinstance(raw_arguments, str):
-                    try:
-                        parsed_arguments = json.loads(raw_arguments)
-                        arguments_json = json.dumps(parsed_arguments, ensure_ascii=True, separators=(",", ":"))
-                    except json.JSONDecodeError:
-                        arguments_json = "{}"
-
-                tool_calls.append(
-                    {
-                        "id": tool_call_id,
-                        "type": "function",
-                        "function": {
-                            "name": tool_name,
-                            "arguments": arguments_json,
-                        },
-                    }
-                )
-
-            normalized.append(
-                {
-                    "role": "assistant",
-                    "content": "",
-                    "tool_calls": tool_calls,
-                }
-            )
-            for tool_message in consecutive_tools:
-                tool_call_id = str(tool_message.get("tool_call_id", "")).strip()
-                normalized.append(
-                    {
-                        "role": "tool",
-                        "tool_call_id": tool_call_id,
-                        "content": str(tool_message.get("content", "")),
-                    }
-                )
-            continue
-        i += 1
-    return normalized
-
-
-def _strip_images_from_messages(messages: list[dict]) -> list[dict]:
-    """
-    Remove image attachments from messages before sending to non-vision models.
-    """
-    stripped: list[dict] = []
-    for message in messages:
-        if not isinstance(message, dict):
-            continue
-        message_copy = dict(message)
-        message_copy["images"] = []
-        stripped.append(message_copy)
-    return stripped
-
-
 TITLE_GENERATION_MAX_TOKENS = 24
-TITLE_FALLBACK_MAX_LENGTH = 80
-PENDING_DIALOG_TITLES = {"New Chat"}
-TITLE_FALLBACK_WORD_LIMIT = 25
-
-
-def _normalize_generated_dialog_title(value: str) -> str:
-    normalized = str(value or "").strip()
-    normalized = normalized.strip(" \t\r\n\"'`")
-    normalized = " ".join(normalized.split())
-    if len(normalized) > TITLE_FALLBACK_MAX_LENGTH:
-        normalized = normalized[:TITLE_FALLBACK_MAX_LENGTH].rstrip(" ,.;:-")
-    return normalized or "New Chat"
-
-
-def _derive_dialog_title_from_user_message(user_content: str) -> str:
-    normalized = unescape(str(user_content or "").strip())
-    normalized = re.sub(r"<[^>]+>", " ", normalized)
-    normalized = re.sub(r"[^\w\s]", " ", normalized, flags=re.UNICODE)
-    normalized = re.sub(r"[_\d]+", " ", normalized)
-    words = [word for word in normalized.split() if any(char.isalpha() for char in word)]
-    if TITLE_FALLBACK_WORD_LIMIT > 0:
-        words = words[:TITLE_FALLBACK_WORD_LIMIT]
-    fallback_title = " ".join(words)
-    if fallback_title:
-        fallback_title = fallback_title[0].upper() + fallback_title[1:]
-    return _normalize_generated_dialog_title(fallback_title)
-
-
-def _is_pending_dialog_title(title: str) -> bool:
-    normalized_title = str(title or "").strip()
-    return normalized_title in PENDING_DIALOG_TITLES
-
-
-def _extract_first_user_message(messages: list[dict[str, Any]]) -> str:
-    first_user_message = ""
-
-    for message in messages:
-        if not isinstance(message, dict):
-            continue
-
-        role = str(message.get("role", "")).strip()
-        if not first_user_message and role == "user":
-            first_user_message = str(message.get("content", "")).strip()
-            break
-
-    return first_user_message
-
-
-def _build_dialog_title_prompt(user_content: str) -> list[dict[str, str]]:
-    normalized_user_content = str(user_content or "").strip()
-    return [
-        {
-            "role": "system",
-            "content": (
-                "Generate a short title for a chat based on the first user message. "
-                "Return only the title as plain text. Keep it short, typically under 10 words. "
-                "Write it as a very short summary of the main topic or task. "
-                "Do not use quotes. Do not add labels or explanations. "
-                "Do not use HTML, XML, Markdown, code formatting, or any markup. "
-                "Do not use math symbols or equations."
-            ),
-        },
-        {
-            "role": "user",
-            "content": f"First user message:\n{normalized_user_content}",
-        },
-    ]
 
 
 def _generate_dialog_title(user_content: str, model: str) -> str:
@@ -753,89 +496,27 @@ async def _chat_response_stream(
 
 
 async def chat_response_stream(request: Request):
-    try:
-        logged_in = await require_user_id_json(request, message="You must be logged in to use the chat")
-        trace_id = _new_trace_id()
-        payload = await parse_json_payload(request, ChatStreamRequest)
-        payload_messages = [message.model_dump() for message in payload.messages]
-        raw_messages = payload_messages
-        dialog_id = str(payload.dialog_id).strip()
-        available_attachments: list[dict[str, Any]] = []
-        log_context = _build_chat_log_context(trace_id=trace_id, user_id=logged_in, dialog_id=dialog_id, model=payload.model)
-        _log_chat_event(
-            logging.INFO,
-            "chat.request.start",
-            request_path=str(request.url.path),
-            **chat_service.summarize_messages_for_log(payload_messages),
-            **log_context,
-        )
-        if dialog_id:
-            await chat_repository.get_dialog(logged_in, dialog_id)
-            persisted_messages = await chat_repository.get_messages(logged_in, dialog_id)
-            raw_messages = _build_model_messages_from_dialog_history(persisted_messages)
-            _log_chat_event(
-                logging.INFO,
-                "chat.request.loaded_dialog",
-                persisted_message_count=len(persisted_messages),
-                **chat_service.summarize_messages_for_log(raw_messages),
-                **log_context,
-            )
-        for candidate in reversed(raw_messages):
-            if not isinstance(candidate, dict):
-                continue
-            if str(candidate.get("role", "")).strip() != "user":
-                continue
-            attachments = candidate.get("attachments", [])
-            if not isinstance(attachments, list) or not attachments:
-                break
-            available_attachments = await attachment_repository.get_attachments(
-                logged_in,
-                [
-                    int(attachment.get("attachment_id"))
-                    for attachment in attachments
-                    if isinstance(attachment, dict) and attachment.get("attachment_id") is not None
-                ],
-            )
-            break
-        if payload.model not in VISION_MODELS:
-            raw_messages = _strip_images_from_messages(raw_messages)
-            _log_chat_event(
-                logging.DEBUG,
-                "chat.request.images_stripped",
-                **chat_service.summarize_messages_for_log(raw_messages),
-                **log_context,
-            )
-        messages = _normalize_chat_messages(raw_messages)
-        _log_chat_event(
-            logging.INFO,
-            "chat.request.normalized",
-            **chat_service.summarize_messages_for_log(messages),
-            **chat_service.summarize_last_user_message_for_log(messages),
-            **log_context,
-        )
-        return StreamingResponse(
-            _chat_response_stream(
-                request,
-                messages,
-                payload.model,
-                logged_in,
-                dialog_id,
-                trace_id,
-                available_attachments=available_attachments,
-            ),
-            media_type="text/event-stream",
-        )
-    except exceptions_validation.JSONError as e:
-        if e.status_code == 401:
-            try:
-                await request.json()
-            except Exception:
-                pass
-            return json_error_with_login_redirect(
-                e,
-                redirect_to=_chat_login_redirect_path(request),
-            )
-        return json_error(str(e), status_code=e.status_code)
+    return await chat_stream_endpoints.chat_response_stream(
+        request,
+        require_user_id_json=require_user_id_json,
+        parse_json_payload=parse_json_payload,
+        chat_stream_request=ChatStreamRequest,
+        new_trace_id=_new_trace_id,
+        build_chat_log_context=_build_chat_log_context,
+        log_chat_event=_log_chat_event,
+        summarize_messages_for_log=chat_service.summarize_messages_for_log,
+        summarize_last_user_message_for_log=chat_service.summarize_last_user_message_for_log,
+        get_dialog=chat_repository.get_dialog,
+        get_messages=chat_repository.get_messages,
+        build_model_messages_from_dialog_history=_build_model_messages_from_dialog_history,
+        get_attachments=attachment_repository.get_attachments,
+        vision_models=VISION_MODELS,
+        strip_images_from_messages=_strip_images_from_messages,
+        normalize_chat_messages=_normalize_chat_messages,
+        stream_response_fn=_chat_response_stream,
+        json_error_from_exception=json_error_from_exception,
+        chat_login_redirect_path=_chat_login_redirect_path,
+    )
 
 
 @_with_auth_redirect_on_json_error()
@@ -866,8 +547,9 @@ async def preview_attachment(request: Request):
 
 
 async def frontend_config(request: Request):
-    return await chat_dialog_endpoints.frontend_config(
+    return await chat_page_endpoints.frontend_config(
         request,
+        frontend_config_impl=chat_dialog_endpoints.frontend_config,
         config=config,
         system_message_denylist=SYSTEM_MESSAGE_DENYLIST,
         vision_models=VISION_MODELS,
@@ -881,7 +563,12 @@ async def _get_model_names():
 
 
 async def list_models(request: Request):
-    return await chat_dialog_endpoints.list_models(request, get_model_names=_get_model_names, json_success=json_success)
+    return await chat_page_endpoints.list_models(
+        request,
+        list_models_impl=chat_dialog_endpoints.list_models,
+        get_model_names=_get_model_names,
+        json_success=json_success,
+    )
 
 
 @_with_auth_redirect_on_json_error()

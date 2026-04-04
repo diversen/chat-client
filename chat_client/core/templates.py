@@ -106,6 +106,13 @@ def get_static_files():
     return static_files
 
 
+async def render_template(templates: AppTemplates, request: Request, template_name: str, context_values: dict[str, Any]) -> _TemplateResponse:
+    from chat_client.core.base_context import get_context
+
+    context = await get_context(request, {"request": request, **context_values})
+    return templates.TemplateResponse(template_name, context)
+
+
 async def get_template_content(template_path: str, context_values: dict) -> str:
     """
     Get template string content from a jinja2 template and a dict of context values

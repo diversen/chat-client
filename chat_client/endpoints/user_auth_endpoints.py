@@ -8,8 +8,8 @@ from starlette.requests import Request
 from starlette.responses import RedirectResponse, Response
 
 from chat_client.core import exceptions_validation, flash, user_session
-from chat_client.core.http import json_error, json_success
-from chat_client.core.templates import get_templates
+from chat_client.core.http import json_error, json_success, json_validation_error
+from chat_client.core.templates import get_templates, render_template
 from chat_client.repositories import user_repository
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -27,16 +27,18 @@ def _generate_captcha_text(length: int = 4) -> str:
     return "".join(random.choices(string.ascii_uppercase, k=length))
 
 
-async def signup_get(request: Request, *, get_context_fn):
-    context = {
-        "request": request,
+async def signup_page(request: Request):
+    return await render_template(
+        templates,
+        request,
+        "users/signup.html",
+        {
         "title": "Sign up",
-    }
-    context = await get_context_fn(request, context)
-    return templates.TemplateResponse("users/signup.html", context)
+        },
+    )
 
 
-async def signup_post(request: Request):
+async def signup_submit(request: Request):
     try:
         user_row = await user_repository.create_user(request)
         user_session.set_session_variable(request, "user_id", user_row["user_id"])
@@ -47,49 +49,53 @@ async def signup_post(request: Request):
             )
         )
     except exceptions_validation.UserValidate as e:
-        return json_error(str(e), status_code=400)
+        return json_validation_error(e)
     except Exception as e:
         logger.exception(e)
         return json_error("An unexpected error occurred")
 
 
-async def verify_get(request: Request, *, get_context_fn):
+async def verify_page(request: Request):
     token = request.query_params.get("token")
-    context = {
-        "request": request,
+    return await render_template(
+        templates,
+        request,
+        "users/verify.html",
+        {
         "title": "Verify account",
         "token": token,
-    }
-    context = await get_context_fn(request, context)
-    return templates.TemplateResponse("users/verify.html", context)
+        },
+    )
 
 
-async def verify_post(request: Request):
+async def verify_submit(request: Request):
     try:
         await user_repository.verify_user(request)
         return json_success(message="Your account has been verified successfully")
     except exceptions_validation.UserValidate as e:
-        return json_error(str(e), status_code=400)
+        return json_validation_error(e)
     except Exception as e:
         logger.exception(e)
         return json_error("An unexpected error occurred")
 
 
-async def login_get(request: Request, *, get_context_fn):
+async def login_page(request: Request):
     next_path = _get_safe_next_path(request.query_params.get("next"))
     if request.query_params.get("reason") == "auth_required" and not await user_session.is_logged_in(request):
         flash.set_notice(request, "You are not logged in. Please log in.")
 
-    context = {
-        "request": request,
+    return await render_template(
+        templates,
+        request,
+        "users/login.html",
+        {
         "title": "Login",
         "next_path": next_path,
-    }
-    context = await get_context_fn(request, context)
-    return templates.TemplateResponse("users/login.html", context)
+        },
+    )
 
 
-async def login_post(request: Request):
+async def login_submit(request: Request):
     try:
         payload = await request.json()
         login_user = await user_repository.login_user(request)
@@ -97,7 +103,7 @@ async def login_post(request: Request):
         next_path = _get_safe_next_path(payload.get("next"))
         return json_success(redirect=next_path, message="You are now logged in")
     except exceptions_validation.UserValidate as e:
-        return json_error(str(e), status_code=400)
+        return json_validation_error(e)
     except Exception as e:
         logger.exception(e)
         return json_error("An unexpected error occurred")
@@ -116,7 +122,7 @@ async def captcha_image(request: Request):
     return Response(content=img_bytes.getvalue(), media_type="image/png")
 
 
-async def logout_get(request: Request, *, get_context_fn):
+async def logout_page(request: Request):
     if request.query_params.get("logout"):
         await user_session.clear_user_session(request)
         flash.set_success(request, "You are logged out")
@@ -127,24 +133,28 @@ async def logout_get(request: Request, *, get_context_fn):
         flash.set_success(request, "You are logged out of all your devices")
         return RedirectResponse(url="/user/login")
 
-    context = {
-        "request": request,
+    return await render_template(
+        templates,
+        request,
+        "users/logout.html",
+        {
         "title": "Logout",
-    }
-    context = await get_context_fn(request, context)
-    return templates.TemplateResponse("users/logout.html", context)
+        },
+    )
 
 
-async def reset_password_get(request: Request, *, get_context_fn):
-    context = {
-        "request": request,
+async def reset_password_page(request: Request):
+    return await render_template(
+        templates,
+        request,
+        "users/reset_password.html",
+        {
         "title": "Reset password",
-    }
-    context = await get_context_fn(request, context)
-    return templates.TemplateResponse("users/reset_password.html", context)
+        },
+    )
 
 
-async def reset_password_post(request: Request):
+async def reset_password_submit(request: Request):
     try:
         await user_repository.reset_password(request)
         return json_success(
@@ -155,29 +165,31 @@ async def reset_password_post(request: Request):
             )
         )
     except exceptions_validation.UserValidate as e:
-        return json_error(str(e), status_code=400)
+        return json_validation_error(e)
     except Exception as e:
         logger.exception(e)
         return json_error("An unexpected error occurred")
 
 
-async def new_password_get(request: Request, *, get_context_fn):
+async def new_password_page(request: Request):
     token = request.query_params.get("token")
-    context = {
-        "request": request,
+    return await render_template(
+        templates,
+        request,
+        "users/new_password.html",
+        {
         "title": "New password",
         "token": token,
-    }
-    context = await get_context_fn(request, context)
-    return templates.TemplateResponse("users/new_password.html", context)
+        },
+    )
 
 
-async def new_password_post(request: Request):
+async def new_password_submit(request: Request):
     try:
         await user_repository.new_password(request)
         return json_success(message="Password has been updated. You can now login.")
     except exceptions_validation.UserValidate as e:
-        return json_error(str(e), status_code=400)
+        return json_validation_error(e)
     except Exception as e:
         logger.exception(e)
         return json_error("An unexpected error occurred")

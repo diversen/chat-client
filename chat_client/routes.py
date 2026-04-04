@@ -3,25 +3,25 @@ from starlette.routing import BaseRoute, Mount, Route
 from chat_client.endpoints import chat_endpoints
 from chat_client.endpoints import error_endpoints
 from chat_client.endpoints import prompt_endpoints
-from chat_client.endpoints import user_endpoints
+from chat_client.endpoints import user_auth_endpoints, user_dialog_endpoints, user_profile_endpoints
 
 user_routes: list[Route] = [
-    Route("/captcha", user_endpoints.captcha_image, methods=["GET"]),
-    Route("/user/signup", user_endpoints.signup_get, methods=["GET"]),
-    Route("/user/signup", user_endpoints.signup_post, methods=["POST"]),
-    Route("/user/login", user_endpoints.login_get, methods=["GET"]),
-    Route("/user/login", user_endpoints.login_post, methods=["POST"]),
-    Route("/user/verify", user_endpoints.verify_get, methods=["GET"]),
-    Route("/user/verify", user_endpoints.verify_post, methods=["POST"]),
-    Route("/user/logout", user_endpoints.logout_get, methods=["GET"]),
-    Route("/user/reset", user_endpoints.reset_password_get, methods=["GET"]),
-    Route("/user/reset", user_endpoints.reset_password_post, methods=["POST"]),
-    Route("/user/new-password", user_endpoints.new_password_get, methods=["GET"]),
-    Route("/user/new-password", user_endpoints.new_password_post, methods=["POST"]),
-    Route("/user/dialogs", user_endpoints.list_dialogs, methods=["GET"]),
-    Route("/user/dialogs/json", user_endpoints.list_dialogs_json, methods=["GET"]),
-    Route("/user/profile", user_endpoints.profile, methods=["GET"]),
-    Route("/user/profile", user_endpoints.profile_post, methods=["POST"]),
+    Route("/captcha", user_auth_endpoints.captcha_image, methods=["GET"]),
+    Route("/user/signup", user_auth_endpoints.signup_page, methods=["GET"]),
+    Route("/user/signup", user_auth_endpoints.signup_submit, methods=["POST"]),
+    Route("/user/login", user_auth_endpoints.login_page, methods=["GET"]),
+    Route("/user/login", user_auth_endpoints.login_submit, methods=["POST"]),
+    Route("/user/verify", user_auth_endpoints.verify_page, methods=["GET"]),
+    Route("/user/verify", user_auth_endpoints.verify_submit, methods=["POST"]),
+    Route("/user/logout", user_auth_endpoints.logout_page, methods=["GET"]),
+    Route("/user/reset", user_auth_endpoints.reset_password_page, methods=["GET"]),
+    Route("/user/reset", user_auth_endpoints.reset_password_submit, methods=["POST"]),
+    Route("/user/new-password", user_auth_endpoints.new_password_page, methods=["GET"]),
+    Route("/user/new-password", user_auth_endpoints.new_password_submit, methods=["POST"]),
+    Route("/user/dialogs", user_dialog_endpoints.dialogs_page, methods=["GET"]),
+    Route("/user/dialogs/json", user_dialog_endpoints.list_dialogs_json, methods=["GET"]),
+    Route("/user/profile", user_profile_endpoints.profile_page, methods=["GET"]),
+    Route("/user/profile", user_profile_endpoints.profile_update, methods=["POST"]),
 ]
 
 chat_routes: list[Route] = [

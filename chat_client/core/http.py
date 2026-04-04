@@ -108,6 +108,27 @@ def json_error_with_login_redirect(
     )
 
 
+def json_error_from_exception(
+    error: exceptions_validation.JSONError,
+    *,
+    redirect_to: str | None = None,
+    reason: str = "auth_required",
+    **extra,
+):
+    if redirect_to is None:
+        return json_error(str(error), status_code=error.status_code, **extra)
+    return json_error_with_login_redirect(error, redirect_to=redirect_to, reason=reason, **extra)
+
+
+def json_validation_error(
+    error: exceptions_validation.UserValidate,
+    *,
+    status_code: int = 400,
+    **extra,
+):
+    return json_error(str(error), status_code=status_code, **extra)
+
+
 def json_error(message: str, status_code: int = 400, **extra):
     return JSONResponse({"error": True, "message": message, **extra}, status_code=status_code)
 

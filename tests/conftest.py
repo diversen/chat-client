@@ -144,7 +144,5 @@ def stub_common_context(monkeypatch):
         return {}
 
     monkeypatch.setattr("chat_client.core.base_context.get_context", fake_get_context)
-    monkeypatch.setattr("chat_client.endpoints.user_endpoints.get_context", fake_get_context)
-    monkeypatch.setattr("chat_client.endpoints.prompt_endpoints.get_context", fake_get_context)
     monkeypatch.setattr("chat_client.repositories.prompt_repository.list_prompts", fake_list_prompts)
     monkeypatch.setattr("chat_client.repositories.user_repository.get_profile", fake_get_profile)
