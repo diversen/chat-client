@@ -19,7 +19,7 @@ function initUsersProfilePage() {
                 theme_preference: document.getElementById('theme_preference').value,
             };
 
-            const response = await Requests.asyncPostJson('/user/profile', jsonData);
+            const response = await Requests.asyncPostJson('/api/user/profile', jsonData);
             Flash.storeMessageForNextPage(response.message, 'success');
             window.location.reload();
         } catch (error) {

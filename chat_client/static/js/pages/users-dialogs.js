@@ -119,7 +119,7 @@ function initUsersDialogsPage() {
         loading.classList.remove('hidden');
 
         try {
-            await Requests.asyncPostJson(`/chat/dialogs/${dialogId}`, {});
+            await Requests.asyncPostJson(`/api/chat/dialogs/${dialogId}`, {});
             const dialog = elem.closest('.dialog');
             dialog?.remove();
             if (container.querySelectorAll('.dialog').length === 0 && !hasMore) {

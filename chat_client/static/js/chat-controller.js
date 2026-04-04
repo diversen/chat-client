@@ -210,7 +210,7 @@ class ConversationController {
             tileButton.setAttribute('aria-label', `Preview ${fileName}`);
             tileButton.addEventListener('click', () => {
                 if (!attachmentId) return;
-                window.open(`/chat/attachments/${attachmentId}/preview`, '_blank', 'noopener');
+                window.open(`/api/chat/attachments/${attachmentId}/preview`, '_blank', 'noopener');
             });
 
             const extensionElement = document.createElement('span');

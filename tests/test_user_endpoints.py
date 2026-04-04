@@ -276,7 +276,7 @@ class TestUserEndpoints(BaseTestCase):
         mock_logged_in.return_value = 1
         mock_update.return_value = True
 
-        response = self.client.post("/user/profile", json={"username": "Updated user"})
+        response = self.client.post("/api/user/profile", json={"username": "Updated user"})
 
         assert response.status_code == 200
         data = response.json()
@@ -298,7 +298,7 @@ class TestUserEndpoints(BaseTestCase):
         auth_cookie = signer.sign(b64encode(json.dumps(auth_payload).encode("utf-8"))).decode("utf-8")
 
         response = self.client.post(
-            "/user/profile",
+            "/api/user/profile",
             json={"username": "Updated user"},
             cookies={config.SESSION_COOKIE: auth_cookie},
         )
@@ -312,7 +312,7 @@ class TestUserEndpoints(BaseTestCase):
     def test_profile_post_not_authenticated(self, mock_logged_in):
         mock_logged_in.return_value = False
 
-        response = self.client.post("/user/profile", json={"username": "Updated user"})
+        response = self.client.post("/api/user/profile", json={"username": "Updated user"})
 
         assert response.status_code == 401
         data = response.json()

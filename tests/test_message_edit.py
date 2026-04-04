@@ -17,7 +17,7 @@ class TestMessageEdit(BaseTestCase):
 
             # Create a dialog
             dialog_response = await self.client.post(
-                "/chat/dialogs", json={"title": "Test Dialog"}, cookies=self.session_cookies(user_id)
+                "/api/chat/dialogs", json={"title": "Test Dialog"}, cookies=self.session_cookies(user_id)
             )
             self.assertEqual(dialog_response.status_code, 200)
             dialog_data = dialog_response.json()
@@ -25,7 +25,7 @@ class TestMessageEdit(BaseTestCase):
 
             # Create a user message
             message_response = await self.client.post(
-                f"/chat/dialogs/{dialog_id}/messages",
+                f"/api/chat/dialogs/{dialog_id}/messages",
                 json={"role": "user", "content": "Original message"},
                 cookies=self.session_cookies(user_id),
             )
@@ -35,7 +35,7 @@ class TestMessageEdit(BaseTestCase):
 
             # Create an assistant message after the user message
             assistant_response = await self.client.post(
-                f"/chat/dialogs/{dialog_id}/messages",
+                f"/api/chat/dialogs/{dialog_id}/messages",
                 json={"role": "assistant", "content": "Assistant response"},
                 cookies=self.session_cookies(user_id),
             )
@@ -43,7 +43,7 @@ class TestMessageEdit(BaseTestCase):
 
             # Update the user message
             update_response = await self.client.post(
-                f"/chat/messages/{message_id}", json={"content": "Updated message content"}, cookies=self.session_cookies(user_id)
+                f"/api/chat/messages/{message_id}", json={"content": "Updated message content"}, cookies=self.session_cookies(user_id)
             )
             self.assertEqual(update_response.status_code, 200)
             update_data = update_response.json()
@@ -51,7 +51,7 @@ class TestMessageEdit(BaseTestCase):
             self.assertEqual(update_data["content"], "Updated message content")
 
             # Verify the message was updated
-            messages_response = await self.client.get(f"/chat/dialogs/{dialog_id}/messages", cookies=self.session_cookies(user_id))
+            messages_response = await self.client.get(f"/api/chat/dialogs/{dialog_id}/messages", cookies=self.session_cookies(user_id))
             self.assertEqual(messages_response.status_code, 200)
             messages = messages_response.json()
 
@@ -72,7 +72,7 @@ class TestMessageEdit(BaseTestCase):
 
             # Try to update non-existent message
             update_response = await self.client.post(
-                "/chat/messages/999999", json={"content": "Updated content"}, cookies=self.session_cookies(user_id)
+                "/api/chat/messages/999999", json={"content": "Updated content"}, cookies=self.session_cookies(user_id)
             )
             self.assertEqual(update_response.status_code, 200)
             update_data = update_response.json()
@@ -81,13 +81,13 @@ class TestMessageEdit(BaseTestCase):
             # Try to update with empty content
             # First create a valid message
             dialog_response = await self.client.post(
-                "/chat/dialogs", json={"title": "Test Dialog"}, cookies=self.session_cookies(user_id)
+                "/api/chat/dialogs", json={"title": "Test Dialog"}, cookies=self.session_cookies(user_id)
             )
             dialog_data = dialog_response.json()
             dialog_id = dialog_data["dialog_id"]
 
             message_response = await self.client.post(
-                f"/chat/dialogs/{dialog_id}/messages",
+                f"/api/chat/dialogs/{dialog_id}/messages",
                 json={"role": "user", "content": "Original message"},
                 cookies=self.session_cookies(user_id),
             )
@@ -96,7 +96,7 @@ class TestMessageEdit(BaseTestCase):
 
             # Try to update with empty content
             update_response = await self.client.post(
-                f"/chat/messages/{message_id}", json={"content": ""}, cookies=self.session_cookies(user_id)
+                f"/api/chat/messages/{message_id}", json={"content": ""}, cookies=self.session_cookies(user_id)
             )
             self.assertEqual(update_response.status_code, 200)
             update_data = update_response.json()

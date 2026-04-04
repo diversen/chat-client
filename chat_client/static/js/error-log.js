@@ -22,7 +22,7 @@ async function logError(error, customMessage) {
     const errorData = serializeError(error, customMessage);
 
     // Send as json
-    await fetch('/error/log', {
+    await fetch('/api/error/log', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',

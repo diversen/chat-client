@@ -56,14 +56,14 @@ class TestStarletteBackend:
                     print("  ✓ Chat streaming works when authenticated")
 
             # Test dialog creation without auth
-            response = client.post("/chat/dialogs", json={"title": "Test Dialog"})
+            response = client.post("/api/chat/dialogs", json={"title": "Test Dialog"})
             assert response.status_code == 401
             print("  ✓ Create dialog requires authentication")
 
             # Test dialog creation with auth
             with patch("chat_client.core.user_session.is_logged_in", return_value=1):
                 with patch("chat_client.repositories.chat_repository.create_dialog", return_value="dialog-123"):
-                    response = client.post("/chat/dialogs", json={"title": "Test Dialog"})
+                    response = client.post("/api/chat/dialogs", json={"title": "Test Dialog"})
                     assert response.status_code == 200
                     data = response.json()
                     assert data["error"] is False
@@ -74,7 +74,7 @@ class TestStarletteBackend:
             with patch("chat_client.core.user_session.is_logged_in", return_value=1):
                 # Create message
                 with patch("chat_client.repositories.chat_repository.create_message", return_value=456):
-                    response = client.post("/chat/dialogs/dialog-123/messages", json={"content": "Test message", "role": "user"})
+                    response = client.post("/api/chat/dialogs/dialog-123/messages", json={"content": "Test message", "role": "user"})
                     assert response.status_code == 200
                     data = response.json()
                     assert data["message_id"] == 456
@@ -85,7 +85,7 @@ class TestStarletteBackend:
                     "chat_client.repositories.chat_repository.get_messages",
                     return_value=[{"message_id": 456, "content": "Test message", "role": "user"}],
                 ):
-                    response = client.get("/chat/dialogs/dialog-123/messages")
+                    response = client.get("/api/chat/dialogs/dialog-123/messages")
                     assert response.status_code == 200
                     messages = response.json()
                     assert len(messages) == 1
@@ -94,7 +94,7 @@ class TestStarletteBackend:
 
                 # Update message
                 with patch("chat_client.repositories.chat_repository.update_message", return_value={"message_id": 456}):
-                    response = client.post("/chat/messages/456", json={"content": "Updated message"})
+                    response = client.post("/api/chat/messages/456", json={"content": "Updated message"})
                     assert response.status_code == 200
                     data = response.json()
                     assert data["error"] is False
@@ -104,7 +104,7 @@ class TestStarletteBackend:
                 with patch(
                     "chat_client.repositories.chat_repository.get_dialog", return_value={"dialog_id": "dialog-123", "title": "Test Dialog"}
                 ):
-                    response = client.get("/chat/dialogs/dialog-123")
+                    response = client.get("/api/chat/dialogs/dialog-123")
                     assert response.status_code == 200
                     dialog = response.json()
                     assert dialog["title"] == "Test Dialog"
@@ -112,7 +112,7 @@ class TestStarletteBackend:
 
                 # Delete dialog
                 with patch("chat_client.repositories.chat_repository.delete_dialog", return_value=True):
-                    response = client.post("/chat/dialogs/dialog-123")
+                    response = client.post("/api/chat/dialogs/dialog-123")
                     assert response.status_code == 200
                     data = response.json()
                     assert data["error"] is False
@@ -191,7 +191,7 @@ class TestStarletteBackend:
 
                 # Update profile
                 with patch("chat_client.repositories.user_repository.update_profile", return_value=True):
-                    response = client.post("/user/profile", json={"username": "Updated user"})
+                    response = client.post("/api/user/profile", json={"username": "Updated user"})
                     assert response.status_code == 200
                     data = response.json()
                     assert data["error"] is False
@@ -285,7 +285,7 @@ class TestStarletteBackend:
         try:
             # Test error logging
             with patch("chat_client.endpoints.error_endpoints.log") as mock_logger:
-                response = client.post("/error/log", json={"error": "JavaScript error", "url": "/chat", "line": 42})
+                response = client.post("/api/error/log", json={"error": "JavaScript error", "url": "/chat", "line": 42})
                 assert response.status_code == 200
                 data = response.json()
                 assert data["status"] == "received"
@@ -339,7 +339,7 @@ class TestStarletteBackend:
             protected_routes = [
                 ("GET", "/user/profile"),
                 ("GET", "/prompts"),
-                ("POST", "/chat/dialogs", {"title": "Test"}),
+                ("POST", "/api/chat/dialogs", {"title": "Test"}),
             ]
 
             for method, url, *json_data in protected_routes:

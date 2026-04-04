@@ -1,17 +1,17 @@
 import { Requests } from '/static/js/requests.js';
 
 async function getConfig() {
-    return await Requests.asyncGetJson('/chat/config');
+    return await Requests.asyncGetJson('/api/chat/config');
 }
 
 /**
  * Send user message to the server
  * Dialog starts with a placeholder title and can be renamed later
- * POST 'title' to '/chat/dialogs'
+ * POST 'title' to '/api/chat/dialogs'
  */
 async function createDialog(title) {
 
-    const data = await Requests.asyncPostJson('/chat/dialogs', { title: title });
+    const data = await Requests.asyncPostJson('/api/chat/dialogs', { title: title });
 
     if (data.error) {
         throw new Error(data.message);
@@ -27,7 +27,7 @@ async function createDialog(title) {
 }
 
 async function generateDialogTitle(dialogID) {
-    const data = await Requests.asyncPostJson(`/chat/dialogs/${dialogID}/title`, {});
+    const data = await Requests.asyncPostJson(`/api/chat/dialogs/${dialogID}/title`, {});
 
     if (data.error) {
         throw new Error(data.message);
@@ -38,11 +38,11 @@ async function generateDialogTitle(dialogID) {
 
 /**
  * Get messages connected to a dialog_id
- * /chat/dialogs/{dialog_id}/messages
+ * /api/chat/dialogs/{dialog_id}/messages
  */
 async function getMessages(dialogID) {
 
-    const data = await Requests.asyncGetJson(`/chat/dialogs/${dialogID}/messages`);
+    const data = await Requests.asyncGetJson(`/api/chat/dialogs/${dialogID}/messages`);
     console.log(data)
 
     if (data.error) {
@@ -54,13 +54,13 @@ async function getMessages(dialogID) {
 }
 
 /**
- * POST message object ({ role: role, message: message } ) to /chat/dialogs/{dialog_id}/messages
+ * POST message object ({ role: role, message: message } ) to /api/chat/dialogs/{dialog_id}/messages
  * Returns the message_id of the created message
  */
 async function createMessage(dialogID, message) {
 
     console.log('Creating message:', message);
-    const data = await Requests.asyncPostJson(`/chat/dialogs/${dialogID}/messages`, message);
+    const data = await Requests.asyncPostJson(`/api/chat/dialogs/${dialogID}/messages`, message);
 
     if (data.error) {
         throw new Error(data.message);
@@ -70,7 +70,7 @@ async function createMessage(dialogID, message) {
 }
 
 async function createAssistantTurnEvents(dialogID, payload) {
-    const data = await Requests.asyncPostJson(`/chat/dialogs/${dialogID}/assistant-turn-events`, payload);
+    const data = await Requests.asyncPostJson(`/api/chat/dialogs/${dialogID}/assistant-turn-events`, payload);
 
     if (data.error) {
         throw new Error(data.message);
@@ -82,7 +82,7 @@ async function createAssistantTurnEvents(dialogID, payload) {
 async function uploadAttachment(file) {
     const formData = new FormData();
     formData.append('file', file);
-    const data = await Requests.asyncPost('/chat/attachments', formData);
+    const data = await Requests.asyncPost('/api/chat/attachments', formData);
 
     if (data.error) {
         throw new Error(data.message);
@@ -93,11 +93,11 @@ async function uploadAttachment(file) {
 
 /**
  * Update message content
- * POST updated content to /chat/messages/{message_id}
+ * POST updated content to /api/chat/messages/{message_id}
  */
 async function updateMessage(messageId, content) {
     console.log('Updating message:', messageId, content);
-    const data = await Requests.asyncPostJson(`/chat/messages/${messageId}`, { content: content });
+    const data = await Requests.asyncPostJson(`/api/chat/messages/${messageId}`, { content: content });
 
     if (data.error) {
         throw new Error(data.message);

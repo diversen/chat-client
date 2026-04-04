@@ -11,7 +11,7 @@
     <h3>Profile</h3>
     {% set theme_preference = profile.theme_preference if profile.theme_preference in ["light", "dark", "system"] else "system" %}
 
-    <form method="post" action="/user/profile" class="profile-form">
+    <form method="post" action="/api/user/profile" class="profile-form">
         <label for="username">Your Username</label>
         <input type="text" id="username" name="username" placeholder="Your username" aria-label="Username"
             value="{{ profile.username }}" autocomplete="off" required>

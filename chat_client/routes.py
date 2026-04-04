@@ -21,29 +21,29 @@ user_routes: list[Route] = [
     Route("/user/dialogs", user_dialog_endpoints.dialogs_page, methods=["GET"]),
     Route("/api/user/dialogs", user_dialog_endpoints.list_dialogs, methods=["GET"]),
     Route("/user/profile", user_profile_endpoints.profile_page, methods=["GET"]),
-    Route("/user/profile", user_profile_endpoints.update_profile, methods=["POST"]),
+    Route("/api/user/profile", user_profile_endpoints.update_profile, methods=["POST"]),
 ]
 
 chat_routes: list[Route] = [
     Route("/", chat_endpoints.chat_page, methods=["GET"]),
     Route("/chat", chat_endpoints.stream_chat, methods=["POST"]),
-    Route("/chat/attachments", chat_endpoints.upload_attachment, methods=["POST"]),
-    Route("/chat/attachments/{attachment_id:int}/preview", chat_endpoints.preview_attachment, methods=["GET"]),
-    Route("/chat/config", chat_endpoints.get_chat_config, methods=["GET"]),
-    Route("/chat/models", chat_endpoints.list_chat_models, methods=["GET"]),
-    Route("/chat/dialogs", chat_endpoints.create_dialog, methods=["POST"]),
-    Route("/chat/dialogs/{dialog_id:str}", chat_endpoints.get_dialog, methods=["GET"]),
-    Route("/chat/dialogs/{dialog_id:str}/messages", chat_endpoints.list_messages, methods=["GET"]),
-    Route("/chat/dialogs/{dialog_id:str}/messages", chat_endpoints.create_message, methods=["POST"]),
-    Route("/chat/dialogs/{dialog_id:str}/title", chat_endpoints.create_dialog_title, methods=["POST"]),
-    Route("/chat/dialogs/{dialog_id:str}/assistant-turn-events", chat_endpoints.create_assistant_turn_events, methods=["POST"]),
-    Route("/chat/messages/{message_id:int}", chat_endpoints.update_message, methods=["POST"]),
     Route("/chat/{dialog_id:str}", chat_endpoints.chat_page, methods=["GET"]),
-    Route("/chat/dialogs/{dialog_id:str}", chat_endpoints.delete_dialog, methods=["POST"]),
+    Route("/api/chat/attachments", chat_endpoints.upload_attachment, methods=["POST"]),
+    Route("/api/chat/attachments/{attachment_id:int}/preview", chat_endpoints.preview_attachment, methods=["GET"]),
+    Route("/api/chat/config", chat_endpoints.get_chat_config, methods=["GET"]),
+    Route("/api/chat/models", chat_endpoints.list_chat_models, methods=["GET"]),
+    Route("/api/chat/dialogs", chat_endpoints.create_dialog, methods=["POST"]),
+    Route("/api/chat/dialogs/{dialog_id:str}", chat_endpoints.get_dialog, methods=["GET"]),
+    Route("/api/chat/dialogs/{dialog_id:str}/messages", chat_endpoints.list_messages, methods=["GET"]),
+    Route("/api/chat/dialogs/{dialog_id:str}/messages", chat_endpoints.create_message, methods=["POST"]),
+    Route("/api/chat/dialogs/{dialog_id:str}/title", chat_endpoints.create_dialog_title, methods=["POST"]),
+    Route("/api/chat/dialogs/{dialog_id:str}/assistant-turn-events", chat_endpoints.create_assistant_turn_events, methods=["POST"]),
+    Route("/api/chat/messages/{message_id:int}", chat_endpoints.update_message, methods=["POST"]),
+    Route("/api/chat/dialogs/{dialog_id:str}", chat_endpoints.delete_dialog, methods=["POST"]),
 ]
 
 error_routes: list[Route] = [
-    Route("/error/log", error_endpoints.create_error_log, methods=["POST"]),
+    Route("/api/error/log", error_endpoints.create_error_log, methods=["POST"]),
 ]
 
 prompt_routes: list[Route] = [

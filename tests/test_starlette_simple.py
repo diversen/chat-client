@@ -23,7 +23,7 @@ def test_basic_routes():
     client = SyncASGITestClient(app)
     try:
         # Test error endpoint - should work without auth
-        response = client.post("/error/log", json={"error": "test"})
+        response = client.post("/api/error/log", json={"error": "test"})
         assert response.status_code == 200, f"Error endpoint failed: {response.text}"
         print("✓ Error endpoint works")
 
@@ -36,7 +36,7 @@ def test_basic_routes():
             print("✓ Protected route handling works")
 
         # Test config endpoint
-        response = client.get("/chat/config")
+        response = client.get("/api/chat/config")
         assert response.status_code == 200, f"Config endpoint failed: {response.text}"
         data = response.json()
         assert "default_model" in data
@@ -45,7 +45,7 @@ def test_basic_routes():
         print("✓ Config endpoint works")
 
         # Test models list endpoint
-        response = client.get("/chat/models")
+        response = client.get("/api/chat/models")
         assert response.status_code == 200, f"List models endpoint failed: {response.text}"
         data = response.json()
         assert "model_names" in data
@@ -129,7 +129,7 @@ def test_json_endpoints():
             print("✓ Chat endpoint requires authentication")
 
             # Test create dialog without auth - should return 401
-            response = client.post("/chat/dialogs", json={"title": "Test"})
+            response = client.post("/api/chat/dialogs", json={"title": "Test"})
             assert response.status_code == 401
             print("✓ Create dialog endpoint requires authentication")
     finally:
