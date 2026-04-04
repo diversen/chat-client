@@ -71,6 +71,7 @@ class SessionMiddlewareNoResignUnlessChanged:
         self,
         app,
         secret_key: str,
+        scope_key: str = "session",
         session_cookie: str = "session",
         max_age: int | None = 14 * 24 * 60 * 60,
         path: str = "/",
@@ -80,6 +81,7 @@ class SessionMiddlewareNoResignUnlessChanged:
     ):
         self.app = app
         self.signer = TimestampSigner(str(secret_key))
+        self.scope_key = scope_key
         self.session_cookie = session_cookie
         self.max_age = max_age
         self.path = path
@@ -103,17 +105,17 @@ class SessionMiddlewareNoResignUnlessChanged:
             try:
                 cookie_data = self.signer.unsign(cookie_data, max_age=self.max_age)
                 initial_session_data = json.loads(b64decode(cookie_data))
-                scope["session"] = dict(initial_session_data)
+                scope[self.scope_key] = dict(initial_session_data)
                 initial_session_was_empty = False
             except BadSignature:
-                scope["session"] = {}
+                scope[self.scope_key] = {}
         else:
-            scope["session"] = {}
+            scope[self.scope_key] = {}
 
         async def send_wrapper(message: Message) -> None:
             if message["type"] == "http.response.start":
                 headers = MutableHeaders(scope=message)
-                current_session_data = dict(scope["session"])
+                current_session_data = dict(scope[self.scope_key])
                 session_changed = current_session_data != initial_session_data
 
                 if current_session_data and session_changed:
@@ -146,9 +148,22 @@ session_cookie = getattr(config, "SESSION_COOKIE", "chat_client_session")
 session_middleware = Middleware(
     SessionMiddlewareNoResignUnlessChanged,
     secret_key=getattr(config, "SESSION_SECRET_KEY", "SECRET_KEY"),
+    scope_key="session",
     session_cookie=session_cookie,
     https_only=getattr(config, "SESSION_HTTPS_ONLY", True),
     max_age=max_age,
+    same_site="lax",
+)
+
+flash_max_age = getattr(config, "FLASH_MAX_AGE", 120)
+flash_cookie = getattr(config, "FLASH_COOKIE", "chat_client_flash")
+flash_middleware = Middleware(
+    SessionMiddlewareNoResignUnlessChanged,
+    secret_key=getattr(config, "FLASH_SECRET_KEY", getattr(config, "SESSION_SECRET_KEY", "SECRET_KEY")),
+    scope_key="flash_session",
+    session_cookie=flash_cookie,
+    https_only=getattr(config, "SESSION_HTTPS_ONLY", True),
+    max_age=flash_max_age,
     same_site="lax",
 )
 
@@ -160,6 +175,7 @@ limit_request_size_middlewares = Middleware(LimitRequestSizeMiddleware, max_size
 middleware = []
 middleware.append(no_cache_middlewares)
 middleware.append(session_middleware)
+middleware.append(flash_middleware)
 middleware.append(limit_request_size_middlewares)
 
 # gzip won't work with streaming responses

@@ -3,7 +3,10 @@ Tests for user endpoints (authentication, registration, profile, etc.)
 """
 
 import json
+from base64 import b64encode
 from unittest.mock import patch, MagicMock
+
+from itsdangerous import TimestampSigner
 
 from tests.test_base import BaseTestCase, run_async_test
 
@@ -297,6 +300,32 @@ class TestUserEndpoints(BaseTestCase):
         assert response.status_code == 200
         data = response.json()
         assert data["error"] is False
+
+    @patch("chat_client.repositories.user_repository.update_profile")
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_profile_post_sets_flash_cookie_without_refreshing_auth_cookie(self, mock_logged_in, mock_update):
+        import data.config as config
+
+        mock_logged_in.return_value = 1
+        mock_update.return_value = True
+
+        signer = TimestampSigner(config.SESSION_SECRET_KEY)
+        auth_payload = {
+            "user_id": {"value": 1},
+            "token": {"value": "test-token"},
+        }
+        auth_cookie = signer.sign(b64encode(json.dumps(auth_payload).encode("utf-8"))).decode("utf-8")
+
+        response = self.client.post(
+            "/user/profile",
+            json={"username": "Updated user"},
+            cookies={config.SESSION_COOKIE: auth_cookie},
+        )
+
+        assert response.status_code == 200
+        set_cookie_headers = response.headers.get_list("set-cookie")
+        assert any(header.startswith(f"{config.FLASH_COOKIE}=") for header in set_cookie_headers)
+        assert not any(header.startswith(f"{config.SESSION_COOKIE}=") for header in set_cookie_headers)
 
     @patch("chat_client.core.user_session.is_logged_in")
     def test_profile_post_not_authenticated(self, mock_logged_in):

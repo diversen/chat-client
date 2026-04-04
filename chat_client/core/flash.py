@@ -6,6 +6,15 @@ import typing
 from starlette.requests import Request
 
 
+def _get_flash_store(request: Request) -> list[dict[str, str]]:
+    flash_store = request.scope.setdefault("flash_session", {})
+    messages = flash_store.get("flash")
+    if not isinstance(messages, list):
+        messages = []
+        flash_store["flash"] = messages
+    return messages
+
+
 def _set_message(request: Request, message: str, type="notice") -> None:
     """Set a flash message to be displayed to the user.
     Args:
@@ -16,7 +25,7 @@ def _set_message(request: Request, message: str, type="notice") -> None:
     if type not in ["notice", "success", "warning", "error"]:
         type = "notice"
 
-    request.session.setdefault("flash", []).append({"type": type, "message": message})
+    _get_flash_store(request).append({"type": type, "message": message})
 
 
 def set_notice(request: Request, message: str) -> None:
@@ -39,4 +48,8 @@ def set_error(request: Request, message: str) -> None:
 
 def get_messages(request) -> typing.List:
     """Get a flash message to be displayed to the user."""
-    return request.session.pop("flash", [])
+    flash_store = request.scope.setdefault("flash_session", {})
+    messages = flash_store.pop("flash", [])
+    if isinstance(messages, list):
+        return messages
+    return []

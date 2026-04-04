@@ -20,6 +20,8 @@ def _install_test_config() -> None:
     config_module.SITE_NAME = "test.invalid"
     config_module.SESSION_SECRET_KEY = "test-secret-key"
     config_module.SESSION_COOKIE = "chat_client_test_session"
+    config_module.FLASH_COOKIE = "chat_client_test_flash"
+    config_module.FLASH_MAX_AGE = 30
     config_module.SESSION_HTTPS_ONLY = False
     config_module.REQUEST_MAX_SIZE = 10 * 1024 * 1024
     config_module.USE_KATEX = False
