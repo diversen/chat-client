@@ -516,34 +516,6 @@ function createEmbeddedToolCallElement(toolMessage, toolCallsOpenByDefault) {
     return container;
 }
 
-function splitThinkingMarkup(rawText) {
-    const text = String(rawText || '');
-    const tagRegex = /<\/?(?:think|thinking|thought)>/gi;
-    const segments = [];
-    let isThinking = false;
-    let lastIndex = 0;
-    let match;
-
-    const pushSegment = (type, value) => {
-        if (!value) return;
-        const previous = segments[segments.length - 1];
-        if (previous && previous.type === type) {
-            previous.text += value;
-            return;
-        }
-        segments.push({ type, text: value });
-    };
-
-    while ((match = tagRegex.exec(text)) !== null) {
-        pushSegment(isThinking ? 'thinking' : 'normal', text.slice(lastIndex, match.index));
-        isThinking = !String(match[0] || '').startsWith('</');
-        lastIndex = tagRegex.lastIndex;
-    }
-
-    pushSegment(isThinking ? 'thinking' : 'normal', text.slice(lastIndex));
-    return segments;
-}
-
 function createAssistantSegmentShell(messageId = null, initialKind = 'Thinking', showLoader = false) {
     const container = document.createElement('section');
     container.className = 'assistant-segment';
@@ -817,11 +789,7 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                     reasoningText = String(item?.reasoning_text || '');
                     contentText = String(item?.content_text || '');
                 } else {
-                    const parts = splitThinkingMarkup(String(item?.content || ''));
-                    for (const part of parts) {
-                        if (part.type === 'thinking') reasoningText += part.text;
-                        else contentText += part.text;
-                    }
+                    contentText = String(item?.content || '');
                 }
 
                 const hasReasoning = String(reasoningText || '').trim().length > 0;

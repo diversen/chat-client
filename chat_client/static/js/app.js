@@ -42,41 +42,6 @@ function shouldRunKatex(isFinal = true) {
         : STREAM_RENDER_CONFIG.runKatexOnUpdate;
 }
 
-function splitThinkingSegments(rawText) {
-    const text = String(rawText || '');
-    const tagRegex = /<\/?(?:think|thinking|thought)>/gi;
-    const segments = [];
-    let isThinking = false;
-    let lastIndex = 0;
-    let match;
-
-    const pushSegment = (type, value) => {
-        if (!value) return;
-        const prev = segments[segments.length - 1];
-        if (prev && prev.type === type) {
-            prev.text += value;
-            return;
-        }
-        segments.push({ type, text: value });
-    };
-
-    while ((match = tagRegex.exec(text)) !== null) {
-        const before = text.slice(lastIndex, match.index);
-        pushSegment(isThinking ? 'thinking' : 'normal', before);
-
-        const tag = String(match[0] || '').toLowerCase();
-        if (tag.startsWith('</')) {
-            isThinking = false;
-        } else {
-            isThinking = true;
-        }
-        lastIndex = tagRegex.lastIndex;
-    }
-
-    pushSegment(isThinking ? 'thinking' : 'normal', text.slice(lastIndex));
-    return segments;
-}
-
 function appendRenderedMarkdown(target, markdownText) {
     if (useKatex) {
         renderMarkdownWithKatex(target, markdownText);
@@ -90,60 +55,6 @@ function appendRenderedMarkdown(target, markdownText) {
     }
 }
 
-function createThinkingBlock(markdownText, isOpen = false) {
-    const block = document.createElement('section');
-    block.className = 'thinking-block';
-
-    const toggle = document.createElement('h4');
-    toggle.className = 'role role_tool thinking-toggle';
-    toggle.textContent = 'Thinking';
-    toggle.setAttribute('role', 'button');
-    toggle.setAttribute('tabindex', '0');
-    toggle.setAttribute('aria-expanded', String(Boolean(isOpen)));
-
-    const body = document.createElement('div');
-    body.className = `thinking-body${isOpen ? '' : ' hidden'}`;
-    appendRenderedMarkdown(body, markdownText);
-
-    block.appendChild(toggle);
-    block.appendChild(body);
-    return block;
-}
-
-function bindThinkingToggleEvents(contentElement) {
-    if (!contentElement || contentElement.dataset.thinkingToggleBound === '1') return;
-    contentElement.dataset.thinkingToggleBound = '1';
-
-    const getHeaderFromEventTarget = (target) => {
-        if (!target) return null;
-        const element = target instanceof Element ? target : target.parentElement;
-        if (!element) return null;
-        return element.closest('.thinking-toggle');
-    };
-
-    const toggleForHeader = (header) => {
-        const body = header?.nextElementSibling;
-        if (!body || !body.classList.contains('thinking-body')) return;
-        const isOpen = !body.classList.contains('hidden');
-        body.classList.toggle('hidden', isOpen);
-        header.setAttribute('aria-expanded', String(!isOpen));
-    };
-
-    contentElement.addEventListener('click', (event) => {
-        const header = getHeaderFromEventTarget(event.target);
-        if (!header || !contentElement.contains(header)) return;
-        toggleForHeader(header);
-    });
-
-    contentElement.addEventListener('keydown', (event) => {
-        const header = getHeaderFromEventTarget(event.target);
-        if (!header || !contentElement.contains(header)) return;
-        if (event.key !== 'Enter' && event.key !== ' ') return;
-        event.preventDefault();
-        toggleForHeader(header);
-    });
-}
-
 /**
  * Render streamed response text into the content element (static render)
  * Note: renamed from renderSteamedResponseText
@@ -151,25 +62,8 @@ function bindThinkingToggleEvents(contentElement) {
 async function renderStreamedResponseText(contentElement, streamedResponseText, isFinal = true) {
     const startTime = performance.now();
 
-    const segments = splitThinkingSegments(streamedResponseText);
-    const previousThinkingStates = Array.from(contentElement.querySelectorAll('.thinking-toggle')).map((header) => {
-        const expanded = String(header.getAttribute('aria-expanded') || '').toLowerCase();
-        return expanded === 'true';
-    });
     contentElement.innerHTML = '';
-
-    let thinkingIndex = 0;
-    for (const segment of segments) {
-        if (segment.type === 'thinking') {
-            const isOpen = previousThinkingStates[thinkingIndex] === true;
-            const thinkingBlock = createThinkingBlock(segment.text, isOpen);
-            contentElement.appendChild(thinkingBlock);
-            thinkingIndex += 1;
-            continue;
-        }
-        appendRenderedMarkdown(contentElement, segment.text);
-    }
-    bindThinkingToggleEvents(contentElement);
+    appendRenderedMarkdown(contentElement, streamedResponseText);
 
     // Expensive post-processing can be tuned independently for update/finalize.
     if (shouldRunHighlight(isFinal)) {
