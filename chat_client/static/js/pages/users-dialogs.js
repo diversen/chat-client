@@ -40,6 +40,45 @@ function initUsersDialogsPage() {
         return `${hrefUrl.pathname}${hrefUrl.search}`;
     }
 
+    function createDeleteIcon() {
+        const svgNamespace = 'http://www.w3.org/2000/svg';
+        const svg = document.createElementNS(svgNamespace, 'svg');
+        svg.setAttribute('xmlns', svgNamespace);
+        svg.setAttribute('height', '24px');
+        svg.setAttribute('viewBox', '0 -960 960 960');
+        svg.setAttribute('width', '24px');
+        svg.setAttribute('fill', '#e8eaed');
+
+        const path = document.createElementNS(svgNamespace, 'path');
+        path.setAttribute(
+            'd',
+            'M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z',
+        );
+        svg.appendChild(path);
+        return svg;
+    }
+
+    function createDialogElement(dialog) {
+        const dialogElem = document.createElement('div');
+        dialogElem.className = 'dialog';
+
+        const dialogHref = getDialogHref(dialog.dialog_id);
+
+        const deleteLink = document.createElement('a');
+        deleteLink.href = dialogHref;
+        deleteLink.className = 'delete svg-container';
+        deleteLink.dataset.id = String(dialog.dialog_id);
+        deleteLink.appendChild(createDeleteIcon());
+
+        const titleLink = document.createElement('a');
+        titleLink.href = dialogHref;
+        titleLink.textContent = String(dialog.title || '');
+
+        dialogElem.appendChild(deleteLink);
+        dialogElem.appendChild(titleLink);
+        return dialogElem;
+    }
+
     async function loadDialogs(page) {
         if (isLoading || !hasMore) return;
 
@@ -76,45 +115,18 @@ function initUsersDialogsPage() {
         }
     }
 
-    function escapeHtml(unsafe) {
-        return unsafe
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/\"/g, '&quot;')
-            .replace(/'/g, '&#039;');
-    }
-
     function renderDialogs(dialogs) {
         for (const dialog of dialogs) {
-            const dialogHref = getDialogHref(dialog.dialog_id);
-            const html = `
-                <div class="dialog">
-                    <a href="${dialogHref}" class="delete svg-container" data-id="${dialog.dialog_id}">
-                        <svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e8eaed">
-                            <path d="M280-120q-33 0-56.5-23.5T200-200v-520h-40v-80h200v-40h240v40h200v80h-40v520q0 33-23.5 56.5T680-120H280Zm400-600H280v520h400v-520ZM360-280h80v-360h-80v360Zm160 0h80v-360h-80v360ZM280-720v520-520Z" />
-                        </svg>
-                    </a>
-                    <a href="${dialogHref}">${escapeHtml(dialog.title)}</a>
-                </div>
-            `;
-            container.insertAdjacentHTML('beforeend', html);
+            container.appendChild(createDialogElement(dialog));
         }
-
-        attachDeleteHandlers();
     }
 
-    function attachDeleteHandlers() {
-        document.querySelectorAll('.delete').forEach((elem) => {
-            elem.removeEventListener('click', handleDelete);
-            elem.addEventListener('click', handleDelete);
-        });
-    }
-
-    async function handleDelete(event) {
-        event.preventDefault();
-        const elem = event.currentTarget;
+    async function handleDelete(elem) {
         const dialogId = elem.getAttribute('data-id');
+        if (!dialogId) {
+            Flash.setMessage('Dialog ID is missing.', 'error');
+            return;
+        }
 
         loading.classList.remove('hidden');
 
@@ -171,6 +183,16 @@ function initUsersDialogsPage() {
         searchTimer = setTimeout(() => {
             resetAndLoad(searchInput.value);
         }, 500);
+    });
+
+    container.addEventListener('click', async (event) => {
+        const deleteLink = event.target.closest('.delete');
+        if (!deleteLink || !container.contains(deleteLink)) {
+            return;
+        }
+
+        event.preventDefault();
+        await handleDelete(deleteLink);
     });
 
     loadMoreButton.addEventListener('click', () => {
