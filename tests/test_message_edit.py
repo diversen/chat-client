@@ -1,4 +1,3 @@
-import json
 import asyncio
 import pytest
 from tests.test_base import BaseTestCase
@@ -7,7 +6,6 @@ pytestmark = pytest.mark.skip(reason="Legacy async endpoint harness has not been
 
 
 class TestMessageEdit(BaseTestCase):
-
     def test_update_message_endpoint(self):
         """Test the update_message endpoint functionality"""
 

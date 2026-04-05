@@ -85,9 +85,7 @@ class TestChatEndpoints(BaseTestCase):
 
         assert len(normalized) == 1
         assert normalized[0]["role"] == "user"
-        assert normalized[0]["content"] == (
-            "Can you see any files?\n\n" "Attached files available to tools:\n" "- /mnt/data/0059_cipher.txt"
-        )
+        assert normalized[0]["content"] == ("Can you see any files?\n\nAttached files available to tools:\n- /mnt/data/0059_cipher.txt")
 
     def test_build_user_message_text_includes_attachment_note(self):
         from chat_client.core.chat_service import build_user_message_text

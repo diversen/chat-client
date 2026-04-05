@@ -2,16 +2,15 @@
 set -e
 
 CHECK_PATHS="chat_client tests bin"
-BLACK_EXCLUDE='/(chat_client/migrations)/'
 
-echo "Running black ..."
-black $CHECK_PATHS --config pyproject.toml --target-version py312 --check --force-exclude "$BLACK_EXCLUDE"
+echo "Running ruff format ..."
+ruff format $CHECK_PATHS --check
 
 echo "Running mypy ..."
 mypy  --config-file pyproject.toml chat_client 
 
-echo "Running flake8 ..."
-flake8 $CHECK_PATHS -j 1 --config .flake8
+echo "Running ruff check ..."
+ruff check $CHECK_PATHS
 
 echo "Running pytest ..."
 pytest -q \

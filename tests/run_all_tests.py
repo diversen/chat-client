@@ -4,7 +4,6 @@ This module provides different levels of testing for the backend.
 """
 
 import sys
-import os
 import subprocess
 from pathlib import Path
 

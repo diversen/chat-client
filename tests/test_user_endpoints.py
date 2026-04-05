@@ -4,11 +4,11 @@ Tests for user endpoints (authentication, registration, profile, etc.)
 
 import json
 from base64 import b64encode
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from itsdangerous import TimestampSigner
 
-from tests.test_base import BaseTestCase, run_async_test
+from tests.test_base import BaseTestCase
 
 
 class TestUserEndpoints(BaseTestCase):

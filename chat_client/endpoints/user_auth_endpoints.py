@@ -33,7 +33,7 @@ async def signup_page(request: Request):
         request,
         "users/signup.html",
         {
-        "title": "Sign up",
+            "title": "Sign up",
         },
     )
 
@@ -44,8 +44,7 @@ async def signup(request: Request):
         user_session.set_session_variable(request, "user_id", user_row["user_id"])
         return json_success(
             message=(
-                "Your account was created successfully. "
-                "Check your email in order to verify your account. After verification you may login."
+                "Your account was created successfully. Check your email in order to verify your account. After verification you may login."
             )
         )
     except exceptions_validation.UserValidate as e:
@@ -62,8 +61,8 @@ async def verify_page(request: Request):
         request,
         "users/verify.html",
         {
-        "title": "Verify account",
-        "token": token,
+            "title": "Verify account",
+            "token": token,
         },
     )
 
@@ -89,8 +88,8 @@ async def login_page(request: Request):
         request,
         "users/login.html",
         {
-        "title": "Login",
-        "next_path": next_path,
+            "title": "Login",
+            "next_path": next_path,
         },
     )
 
@@ -138,7 +137,7 @@ async def logout_page(request: Request):
         request,
         "users/logout.html",
         {
-        "title": "Logout",
+            "title": "Logout",
         },
     )
 
@@ -149,7 +148,7 @@ async def reset_password_page(request: Request):
         request,
         "users/reset_password.html",
         {
-        "title": "Reset password",
+            "title": "Reset password",
         },
     )
 
@@ -178,8 +177,8 @@ async def new_password_page(request: Request):
         request,
         "users/new_password.html",
         {
-        "title": "New password",
-        "token": token,
+            "title": "New password",
+            "token": token,
         },
     )
 

@@ -24,7 +24,7 @@ def google_search(query: str, num_results: int = 5) -> str:
     api_key, cx = _resolve_google_search_credentials()
     if not api_key or not cx:
         return json.dumps(
-            {"error": ("Google Search tool is not configured. " "Set GOOGLE_SEARCH_API_KEY and GOOGLE_SEARCH_CX environment variables.")},
+            {"error": ("Google Search tool is not configured. Set GOOGLE_SEARCH_API_KEY and GOOGLE_SEARCH_CX environment variables.")},
             ensure_ascii=True,
         )
 

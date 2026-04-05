@@ -2,7 +2,6 @@
 Tests for error endpoints (error logging)
 """
 
-import json
 from unittest.mock import patch, MagicMock
 
 from tests.test_base import BaseTestCase

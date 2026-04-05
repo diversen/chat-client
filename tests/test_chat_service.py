@@ -71,11 +71,7 @@ def test_summarize_last_user_message_for_log_includes_attached_file_path_note():
             {"role": "system", "content": "You are helpful."},
             {
                 "role": "user",
-                "content": (
-                    "Please inspect the file.\n\n"
-                    "Attached files available to tools:\n"
-                    "- /mnt/data/0059_cipher.txt"
-                ),
+                "content": ("Please inspect the file.\n\nAttached files available to tools:\n- /mnt/data/0059_cipher.txt"),
             },
         ]
     )

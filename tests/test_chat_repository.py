@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from chat_client.models import AssistantTurnEvent, Base, Dialog, ToolCallEvent, User
+from chat_client.models import Base, Dialog, ToolCallEvent, User
 
 
 def _aiosqlite_available() -> bool:
@@ -241,14 +241,7 @@ def test_update_dialog_title_updates_existing_dialog():
             assert result["title"] == "Short summary"
 
             async with session_factory() as session:
-                title = (
-                    (
-                        await session.execute(
-                            select(Dialog.title).where(Dialog.dialog_id == dialog_id)
-                        )
-                    )
-                    .scalar_one()
-                )
+                title = (await session.execute(select(Dialog.title).where(Dialog.dialog_id == dialog_id))).scalar_one()
 
             assert title == "Short summary"
         finally:

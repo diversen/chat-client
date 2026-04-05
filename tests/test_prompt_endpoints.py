@@ -2,7 +2,6 @@
 Tests for prompt endpoints (CRUD operations for user prompts)
 """
 
-import json
 from unittest.mock import patch, MagicMock
 
 from tests.test_base import BaseTestCase
