@@ -1,6 +1,6 @@
 import { Requests } from '/static/js/requests.js';
 import { Flash } from '/static/js/flash.js';
-import { initCaptcha, runWithSpinner } from '/static/js/pages/page-utils.js';
+import { buildFormData, initCaptcha, initFormSubmissionPage } from '/static/js/pages/page-utils.js';
 
 function initUsersSignupPage() {
     const submit = document.getElementById('submit');
@@ -11,20 +11,20 @@ function initUsersSignupPage() {
         return;
     }
 
-    submit.addEventListener('click', async (event) => {
-        event.preventDefault();
-        await runWithSpinner(async () => {
-            try {
-                const form = document.getElementById('signup-form');
-                const formData = new FormData(form);
-                const response = await Requests.asyncPost('/user/signup', formData);
-                Flash.storeMessageForNextPage(response.message, 'success');
-                window.location.replace('/user/login');
-            } catch (error) {
-                console.error(error);
-                Flash.setMessageFromError(error, 'An error occurred while creating your account. Try again later.');
-            }
-        });
+    initFormSubmissionPage({
+        buttonId: 'submit',
+        request: async () => {
+            const formData = buildFormData('signup-form');
+            const response = await Requests.asyncPost('/user/signup', formData);
+            return response;
+        },
+        onSuccess: (response) => {
+            Flash.storeMessageForNextPage(response.message, 'success');
+            window.location.replace('/user/login');
+        },
+        onError: (error) => {
+            Flash.setMessageFromError(error, 'An error occurred while creating your account. Try again later.');
+        },
     });
 }
 

@@ -1,6 +1,5 @@
 import { Flash } from './flash.js';
 import { logError } from './error-log.js';
-import { addCopyButtons } from './app-copy-buttons.js';
 import { Requests } from './requests.js';
 import { openImagePreviewModal, closeImagePreviewModal } from './image-preview-modal.js';
 import {
@@ -10,7 +9,6 @@ import {
     abortButtonElem,
     scrollToBottom,
     imageInputElem,
-    pendingUploadsElem,
     attachImageButtonElem,
     attachmentInputElem,
     attachFileButtonElem,
@@ -29,14 +27,6 @@ function fileToDataURL(file) {
         reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
         reader.readAsDataURL(file);
     });
-}
-
-function formatAttachmentSize(sizeBytes) {
-    const size = Number(sizeBytes || 0);
-    if (!Number.isFinite(size) || size <= 0) return '';
-    if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)}MB`;
-    if (size >= 1024) return `${Math.round(size / 1024)}KB`;
-    return `${size}B`;
 }
 
 class ConversationController {
@@ -123,138 +113,26 @@ class ConversationController {
     }
 
     renderPendingUploads() {
-        if (!this.pendingImages.length && !this.pendingAttachments.length) {
-            pendingUploadsElem.innerHTML = '';
-            pendingUploadsElem.classList.add('hidden');
-            return;
-        }
-
-        pendingUploadsElem.classList.remove('hidden');
-        pendingUploadsElem.innerHTML = '';
-
-        const preview = document.createElement('div');
-        preview.className = 'image-preview';
-
-        this.pendingImages.forEach((img) => {
-            const sizeText = formatAttachmentSize(img.size);
-            const item = document.createElement('div');
-            item.className = 'upload-preview-tile';
-
-            const tileButton = document.createElement('button');
-            tileButton.type = 'button';
-            tileButton.className = 'upload-preview-open';
-            tileButton.title = `Preview ${img.name}`;
-            tileButton.setAttribute('aria-label', `Preview ${img.name}`);
-            tileButton.addEventListener('click', () => {
-                this.openImagePreviewModal(img.dataUrl, img.name);
-            });
-
-            const thumbnail = document.createElement('img');
-            thumbnail.className = 'upload-preview-thumb';
-            thumbnail.alt = img.name;
-            thumbnail.src = img.dataUrl;
-
-            const meta = document.createElement('div');
-            meta.className = 'upload-preview-meta';
-
-            const kindElement = document.createElement('span');
-            kindElement.className = 'upload-preview-kind';
-            kindElement.textContent = 'IMAGE';
-
-            const nameElement = document.createElement('span');
-            nameElement.className = 'upload-preview-name';
-            nameElement.textContent = img.name;
-
-            meta.appendChild(kindElement);
-            meta.appendChild(nameElement);
-
-            if (sizeText) {
-                const sizeElement = document.createElement('span');
-                sizeElement.className = 'upload-preview-size';
-                sizeElement.textContent = sizeText;
-                meta.appendChild(sizeElement);
-            }
-
-            tileButton.appendChild(thumbnail);
-            tileButton.appendChild(meta);
-
-            const remove = document.createElement('button');
-            remove.type = 'button';
-            remove.className = 'image-preview-remove';
-            remove.title = `Remove ${img.name}`;
-            remove.setAttribute('aria-label', `Remove ${img.name}`);
-            remove.textContent = '×';
-            remove.addEventListener('click', () => {
-                this.pendingImages = this.pendingImages.filter((pending) => pending.id !== img.id);
+        this.view.renderPendingUploads(this.pendingImages, this.pendingAttachments, {
+            onOpenImagePreview: (dataUrl, name) => {
+                this.openImagePreviewModal(dataUrl, name);
+            },
+            onOpenAttachmentPreview: (attachmentId) => {
+                window.open(`/api/chat/attachments/${attachmentId}/preview`, '_blank', 'noopener');
+            },
+            onRemovePendingImage: (imageId) => {
+                this.pendingImages = this.pendingImages.filter((pending) => pending.id !== imageId);
                 this.renderPendingUploads();
                 this.updateSendButtonState();
-            });
-
-            item.appendChild(tileButton);
-            item.appendChild(remove);
-            preview.appendChild(item);
-        });
-
-        this.pendingAttachments.forEach((attachment) => {
-            const attachmentId = String(attachment?.attachment_id || '');
-            const fileName = String(attachment?.name || 'attachment');
-            const fileExtension = (fileName.split('.').pop() || 'file').slice(0, 6).toUpperCase();
-            const sizeText = formatAttachmentSize(attachment?.size_bytes);
-            const item = document.createElement('div');
-            item.className = 'upload-preview-tile';
-
-            const tileButton = document.createElement('button');
-            tileButton.type = 'button';
-            tileButton.className = 'upload-preview-open';
-            tileButton.title = `Preview ${fileName}`;
-            tileButton.setAttribute('aria-label', `Preview ${fileName}`);
-            tileButton.addEventListener('click', () => {
-                if (!attachmentId) return;
-                window.open(`/api/chat/attachments/${attachmentId}/preview`, '_blank', 'noopener');
-            });
-
-            const extensionElement = document.createElement('span');
-            extensionElement.className = 'upload-preview-kind';
-            extensionElement.textContent = fileExtension;
-
-            const nameElement = document.createElement('span');
-            nameElement.className = 'upload-preview-name';
-            nameElement.textContent = fileName;
-
-            const meta = document.createElement('div');
-            meta.className = 'upload-preview-meta';
-            meta.appendChild(extensionElement);
-            meta.appendChild(nameElement);
-
-            if (sizeText) {
-                const sizeElement = document.createElement('span');
-                sizeElement.className = 'upload-preview-size';
-                sizeElement.textContent = sizeText;
-                meta.appendChild(sizeElement);
-            }
-
-            tileButton.appendChild(meta);
-
-            const remove = document.createElement('button');
-            remove.type = 'button';
-            remove.className = 'image-preview-remove';
-            remove.title = `Remove ${fileName}`;
-            remove.setAttribute('aria-label', `Remove ${fileName}`);
-            remove.textContent = '×';
-            remove.addEventListener('click', () => {
+            },
+            onRemovePendingAttachment: (attachmentId) => {
                 this.pendingAttachments = this.pendingAttachments.filter(
-                    (pending) => String(pending.attachment_id) !== attachmentId,
+                    (pending) => String(pending.attachment_id) !== String(attachmentId),
                 );
                 this.renderPendingUploads();
                 this.updateSendButtonState();
-            });
-
-            item.appendChild(tileButton);
-            item.appendChild(remove);
-            preview.appendChild(item);
+            },
         });
-
-        pendingUploadsElem.appendChild(preview);
     }
 
     openImagePreviewModal(dataUrl, name) {

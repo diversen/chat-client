@@ -1,6 +1,6 @@
 import { Requests } from '/static/js/requests.js';
 import { Flash } from '/static/js/flash.js';
-import { initCaptcha, runWithSpinner } from '/static/js/pages/page-utils.js';
+import { buildFormData, initCaptcha, initFormSubmissionPage } from '/static/js/pages/page-utils.js';
 
 function initUsersResetPasswordPage() {
     const submit = document.getElementById('submit');
@@ -11,20 +11,20 @@ function initUsersResetPasswordPage() {
         return;
     }
 
-    submit.addEventListener('click', async (event) => {
-        event.preventDefault();
-        await runWithSpinner(async () => {
-            try {
-                const form = document.getElementById('reset-form');
-                const formData = new FormData(form);
-                const response = await Requests.asyncPost('/user/password/reset', formData);
-                Flash.storeMessageForNextPage(response.message, 'success');
-                window.location.replace('/user/login');
-            } catch (error) {
-                console.error(error);
-                Flash.setMessageFromError(error, 'An error occurred while resetting your password. Try again later.');
-            }
-        });
+    initFormSubmissionPage({
+        buttonId: 'submit',
+        request: async () => {
+            const formData = buildFormData('reset-form');
+            const response = await Requests.asyncPost('/user/password/reset', formData);
+            return response;
+        },
+        onSuccess: (response) => {
+            Flash.storeMessageForNextPage(response.message, 'success');
+            window.location.replace('/user/login');
+        },
+        onError: (error) => {
+            Flash.setMessageFromError(error, 'An error occurred while resetting your password. Try again later.');
+        },
     });
 }
 

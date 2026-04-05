@@ -1,50 +1,23 @@
 import { Flash } from '/static/js/flash.js';
 import { Requests } from '/static/js/requests.js';
-import { getTrimmedValueById, validateRequiredFields } from '/static/js/pages/page-utils.js';
+import { initPromptFormPage } from '/static/js/pages/page-utils.js';
 
 function initPromptsEditPage() {
-    const saveButton = document.getElementById('save-btn');
-    if (!saveButton) {
-        return;
-    }
-
-    saveButton.addEventListener('click', async (event) => {
-        event.preventDefault();
-
-        const form = document.getElementById('edit-form');
-        const promptId = form?.getAttribute('data-prompt-id');
-        if (!promptId) {
-            Flash.setMessage('Prompt ID is missing.', 'error');
-            return;
-        }
-
-        const title = getTrimmedValueById('title');
-        const prompt = getTrimmedValueById('custom-prompt');
-
-        const isValid = validateRequiredFields(
-            [
-                { value: title, message: 'Please enter a title.' },
-                { value: prompt, message: 'Please enter a prompt.' },
-            ],
-            (message) => Flash.setMessage(message, 'error'),
-        );
-        if (!isValid) {
-            return;
-        }
-
-        const data = {
-            title,
-            prompt,
-        };
-
-        try {
-            const response = await Requests.asyncPostJson(`/api/prompts/${promptId}`, data);
-            Flash.storeMessageForNextPage(response.message, 'success');
-            window.location.href = '/prompts';
-        } catch (error) {
-            console.error(error);
+    initPromptFormPage({
+        buttonId: 'save-btn',
+        promptRecordId: document.getElementById('edit-form')?.getAttribute('data-prompt-id'),
+        getSubmitUrl: ({ promptRecordId }) => {
+            if (!promptRecordId) {
+                Flash.setMessage('Prompt ID is missing.', 'error');
+                return '';
+            }
+            return `/api/prompts/${promptRecordId}`;
+        },
+        onError: (error) => {
             Flash.setMessageFromError(error, 'An error occurred while updating the prompt.');
-        }
+        },
+        requests: Requests,
+        flash: Flash,
     });
 }
 

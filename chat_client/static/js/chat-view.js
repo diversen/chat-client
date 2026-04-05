@@ -5,6 +5,7 @@ import {
     newButtonElem,
     abortButtonElem,
     selectModelElem,
+    pendingUploadsElem,
     imagePreviewModalElem,
     imagePreviewModalImageElem,
 } from './app-elements.js';
@@ -342,6 +343,151 @@ function createMessageAttachments(attachments = [], removable = false, onRemove 
     });
 
     return preview.children.length ? preview : null;
+}
+
+function createPendingUploadsPreview(images = [], attachments = [], handlers = {}) {
+    if (!pendingUploadsElem) return;
+
+    const {
+        onOpenImagePreview = null,
+        onOpenAttachmentPreview = null,
+        onRemovePendingImage = null,
+        onRemovePendingAttachment = null,
+    } = handlers;
+
+    if (!Array.isArray(images) || !Array.isArray(attachments) || (!images.length && !attachments.length)) {
+        pendingUploadsElem.innerHTML = '';
+        pendingUploadsElem.classList.add('hidden');
+        return;
+    }
+
+    pendingUploadsElem.classList.remove('hidden');
+    pendingUploadsElem.innerHTML = '';
+
+    const preview = document.createElement('div');
+    preview.className = 'image-preview';
+
+    images.forEach((image) => {
+        const imageId = String(image?.id || '');
+        const imageName = String(image?.name || 'image');
+        const sizeText = formatAttachmentSize(image?.size);
+        const item = document.createElement('div');
+        item.className = 'upload-preview-tile';
+
+        const tileButton = document.createElement('button');
+        tileButton.type = 'button';
+        tileButton.className = 'upload-preview-open';
+        tileButton.title = `Preview ${imageName}`;
+        tileButton.setAttribute('aria-label', `Preview ${imageName}`);
+        tileButton.addEventListener('click', () => {
+            if (typeof onOpenImagePreview === 'function') {
+                onOpenImagePreview(String(image?.dataUrl || ''), imageName);
+            }
+        });
+
+        const thumbnail = document.createElement('img');
+        thumbnail.className = 'upload-preview-thumb';
+        thumbnail.alt = imageName;
+        thumbnail.src = String(image?.dataUrl || '');
+
+        const meta = document.createElement('div');
+        meta.className = 'upload-preview-meta';
+
+        const kindElement = document.createElement('span');
+        kindElement.className = 'upload-preview-kind';
+        kindElement.textContent = 'IMAGE';
+        meta.appendChild(kindElement);
+
+        const nameElement = document.createElement('span');
+        nameElement.className = 'upload-preview-name';
+        nameElement.textContent = imageName;
+        meta.appendChild(nameElement);
+
+        if (sizeText) {
+            const sizeElement = document.createElement('span');
+            sizeElement.className = 'upload-preview-size';
+            sizeElement.textContent = sizeText;
+            meta.appendChild(sizeElement);
+        }
+
+        tileButton.appendChild(thumbnail);
+        tileButton.appendChild(meta);
+        item.appendChild(tileButton);
+
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'image-preview-remove';
+        remove.title = `Remove ${imageName}`;
+        remove.setAttribute('aria-label', `Remove ${imageName}`);
+        remove.textContent = '×';
+        remove.addEventListener('click', () => {
+            if (typeof onRemovePendingImage === 'function') {
+                onRemovePendingImage(imageId);
+            }
+        });
+        item.appendChild(remove);
+
+        preview.appendChild(item);
+    });
+
+    attachments.forEach((attachment) => {
+        const attachmentId = String(attachment?.attachment_id || attachment?.id || '');
+        const fileName = String(attachment?.name || 'attachment');
+        const fileExtension = (fileName.split('.').pop() || 'file').slice(0, 6).toUpperCase();
+        const sizeText = formatAttachmentSize(attachment?.size_bytes || attachment?.size);
+        const item = document.createElement('div');
+        item.className = 'upload-preview-tile';
+
+        const tileButton = document.createElement('button');
+        tileButton.type = 'button';
+        tileButton.className = 'upload-preview-open';
+        tileButton.title = `Preview ${fileName}`;
+        tileButton.setAttribute('aria-label', `Preview ${fileName}`);
+        tileButton.addEventListener('click', () => {
+            if (!attachmentId || typeof onOpenAttachmentPreview !== 'function') return;
+            onOpenAttachmentPreview(attachmentId);
+        });
+
+        const meta = document.createElement('div');
+        meta.className = 'upload-preview-meta';
+
+        const kindElement = document.createElement('span');
+        kindElement.className = 'upload-preview-kind';
+        kindElement.textContent = fileExtension;
+        meta.appendChild(kindElement);
+
+        const nameElement = document.createElement('span');
+        nameElement.className = 'upload-preview-name';
+        nameElement.textContent = fileName;
+        meta.appendChild(nameElement);
+
+        if (sizeText) {
+            const sizeElement = document.createElement('span');
+            sizeElement.className = 'upload-preview-size';
+            sizeElement.textContent = sizeText;
+            meta.appendChild(sizeElement);
+        }
+
+        tileButton.appendChild(meta);
+        item.appendChild(tileButton);
+
+        const remove = document.createElement('button');
+        remove.type = 'button';
+        remove.className = 'image-preview-remove';
+        remove.title = `Remove ${fileName}`;
+        remove.setAttribute('aria-label', `Remove ${fileName}`);
+        remove.textContent = '×';
+        remove.addEventListener('click', () => {
+            if (typeof onRemovePendingAttachment === 'function') {
+                onRemovePendingAttachment(attachmentId);
+            }
+        });
+        item.appendChild(remove);
+
+        preview.appendChild(item);
+    });
+
+    pendingUploadsElem.appendChild(preview);
 }
 
 function tryParseJson(value) {
@@ -698,6 +844,9 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
 
     return {
         createMessageAttachments,
+        renderPendingUploads(images = [], attachments = [], handlers = {}) {
+            createPendingUploadsPreview(images, attachments, handlers);
+        },
         renderStaticUserMessage(
             message,
             messageId = null,

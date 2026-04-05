@@ -1,18 +1,9 @@
 import { Flash } from '/static/js/flash.js';
 import { Requests } from '/static/js/requests.js';
+import { initAsyncButtonAction } from '/static/js/pages/page-utils.js';
 
 function initUsersProfilePage() {
-    const saveButton = document.getElementById('save');
-    if (!saveButton) {
-        return;
-    }
-
-    saveButton.addEventListener('click', async (event) => {
-        event.preventDefault();
-
-        const spinner = document.querySelector('.loading-spinner');
-        spinner.classList.remove('hidden');
-
+    initAsyncButtonAction('save', async () => {
         try {
             const jsonData = {
                 username: document.getElementById('username').value,
@@ -25,8 +16,6 @@ function initUsersProfilePage() {
         } catch (error) {
             console.error(error);
             Flash.setMessageFromError(error, 'An error occurred while saving your profile.');
-        } finally {
-            spinner.classList.add('hidden');
         }
     });
 }
