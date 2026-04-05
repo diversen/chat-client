@@ -190,9 +190,7 @@ def execute_tool(
         try:
             return tool_registry[func_name](**call_args)
         except TypeError as error:
-            raise chat_service.ToolArgumentsError(
-                f'Tool "{func_name}" was called with invalid arguments: {error}'
-            ) from error
+            raise chat_service.ToolArgumentsError(f'Tool "{func_name}" was called with invalid arguments: {error}') from error
         except chat_service.ToolExecutionError:
             raise
         except PythonRuntimeError as error:

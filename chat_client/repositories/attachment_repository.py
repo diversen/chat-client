@@ -75,10 +75,7 @@ async def get_attachments(user_id: int, attachment_ids: list[int]) -> list[dict[
         )
         result = await session.execute(stmt)
         attachments = result.scalars().all()
-        attachments_by_id = {
-            int(attachment.attachment_id or 0): _serialize_attachment(attachment)
-            for attachment in attachments
-        }
+        attachments_by_id = {int(attachment.attachment_id or 0): _serialize_attachment(attachment) for attachment in attachments}
 
     missing_ids = [attachment_id for attachment_id in normalized_ids if attachment_id not in attachments_by_id]
     if missing_ids:

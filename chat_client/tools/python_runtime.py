@@ -134,11 +134,7 @@ def run_python_in_docker(
         resolved_docker_image = resolve_docker_image(docker_image)
         timeout_seconds = resolve_exec_timeout_seconds()
         temp_attachment_dir_context = tempfile.TemporaryDirectory(prefix="chat-client-python-tool-empty-")
-        attachment_dir_context = (
-            nullcontext(attachment_host_dir)
-            if attachment_host_dir
-            else temp_attachment_dir_context
-        )
+        attachment_dir_context = nullcontext(attachment_host_dir) if attachment_host_dir else temp_attachment_dir_context
         with attachment_dir_context as resolved_attachment_host_dir:
             if not resolved_attachment_host_dir:
                 raise ValueError("attachment_host_dir is required")
@@ -184,9 +180,7 @@ def run_python_in_docker(
                 pass
 
     if completed.returncode == 125:
-        raise PythonRuntimeError(
-            _format_docker_runtime_error(completed.stderr or completed.stdout, resolved_docker_image)
-        )
+        raise PythonRuntimeError(_format_docker_runtime_error(completed.stderr or completed.stdout, resolved_docker_image))
 
     parts: list[str] = []
     stdout_text = completed.stdout.rstrip()

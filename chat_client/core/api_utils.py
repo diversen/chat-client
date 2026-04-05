@@ -47,19 +47,13 @@ def _build_ollama_headers(api_key: str) -> dict[str, str]:
 
 def _extract_ollama_capability_flags(show_payload: dict[str, Any], model_name: str) -> dict[str, bool]:
     capabilities = show_payload.get("capabilities", [])
-    normalized_capabilities = {
-        str(capability).strip().lower()
-        for capability in capabilities
-        if isinstance(capability, (str, int, float))
-    }
+    normalized_capabilities = {str(capability).strip().lower() for capability in capabilities if isinstance(capability, (str, int, float))}
     normalized_name = str(model_name or "").strip().lower()
     return {
         "supports_images": "vision" in normalized_capabilities,
         "supports_tools": "tools" in normalized_capabilities or "tool" in normalized_capabilities,
         "supports_thinking": (
-            "thinking" in normalized_capabilities
-            or "reasoning" in normalized_capabilities
-            or "thinking" in normalized_name
+            "thinking" in normalized_capabilities or "reasoning" in normalized_capabilities or "thinking" in normalized_name
         ),
     }
 

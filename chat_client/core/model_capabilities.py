@@ -44,9 +44,7 @@ def _build_cache_key(
         "models": _normalize_cache_value(models),
         "vision_models": _normalize_cache_value(vision_models if isinstance(vision_models, list) else []),
         "tool_models": _normalize_cache_value(tool_models if isinstance(tool_models, list) else []),
-        "system_message_denylist": _normalize_cache_value(
-            system_message_denylist if isinstance(system_message_denylist, list) else []
-        ),
+        "system_message_denylist": _normalize_cache_value(system_message_denylist if isinstance(system_message_denylist, list) else []),
         "cache_token": _normalize_cache_value(cache_token),
     }
     return json.dumps(payload, sort_keys=True, separators=(",", ":"))

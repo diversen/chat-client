@@ -6,7 +6,6 @@ import json
 import sys
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
@@ -84,10 +83,7 @@ def main() -> int:
         print("No models provided and no Ollama models were discovered.", file=sys.stderr)
         return 2
 
-    results = {
-        model: get_ollama_model_capabilities(provider, model)
-        for model in models
-    }
+    results = {model: get_ollama_model_capabilities(provider, model) for model in models}
 
     if args.json:
         print(json.dumps(results, indent=2, sort_keys=True))

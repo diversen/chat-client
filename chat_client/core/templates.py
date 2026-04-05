@@ -106,7 +106,9 @@ def get_static_files():
     return static_files
 
 
-async def render_template(templates: AppTemplates, request: Request, template_name: str, context_values: dict[str, Any]) -> _TemplateResponse:
+async def render_template(
+    templates: AppTemplates, request: Request, template_name: str, context_values: dict[str, Any]
+) -> _TemplateResponse:
     from chat_client.core.base_context import get_context
 
     context = await get_context(request, {"request": request, **context_values})

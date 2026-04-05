@@ -808,9 +808,7 @@ async def chat_response_stream(
                             chunks_with_tool_calls += 1
                         if hasattr(delta, "model_fields_set") and isinstance(delta.model_fields_set, set):
                             unknown_delta_keys.update(
-                                str(key)
-                                for key in delta.model_fields_set
-                                if str(key) not in {"content", "tool_calls", "role", "refusal"}
+                                str(key) for key in delta.model_fields_set if str(key) not in {"content", "tool_calls", "role", "refusal"}
                             )
                     if getattr(first_choice, "finish_reason", None) is not None:
                         finish_reason = getattr(first_choice, "finish_reason", None)
@@ -894,9 +892,9 @@ async def chat_response_stream(
                 round=rounds,
                 finish_reason=str(finish_reason or ""),
                 answer_chars=assistant_summary["answer_chars"],
-                    answer_preview=assistant_summary["answer_preview"],
-                    **base_log_context,
-                )
+                answer_preview=assistant_summary["answer_preview"],
+                **base_log_context,
+            )
             if chunk_count > 0 and assistant_summary["content_chars"] == 0 and not tool_calls:
                 _log_event(
                     logger,
@@ -914,28 +912,15 @@ async def chat_response_stream(
                     **base_log_context,
                 )
             answer_missing = assistant_summary["answer_chars"] == 0 and not tool_calls
-            stream_incomplete = (
-                chunk_count > 0
-                and finish_reason is None
-                and answer_missing
-            )
-            empty_stopped_answer = (
-                chunk_count > 0
-                and finish_reason is not None
-                and answer_missing
-                and retry_on_empty_answer_stop
-            )
+            stream_incomplete = chunk_count > 0 and finish_reason is None and answer_missing
+            empty_stopped_answer = chunk_count > 0 and finish_reason is not None and answer_missing and retry_on_empty_answer_stop
             if stream_incomplete or empty_stopped_answer:
                 if empty_answer_retry_attempts < max_empty_answer_retries:
                     empty_answer_retry_attempts += 1
                     _log_event(
                         logger,
                         logging.WARNING,
-                        (
-                            "chat.model.incomplete_stream.retry"
-                            if stream_incomplete
-                            else "chat.model.empty_answer_stop.retry"
-                        ),
+                        ("chat.model.incomplete_stream.retry" if stream_incomplete else "chat.model.empty_answer_stop.retry"),
                         round=rounds,
                         retry_attempt=empty_answer_retry_attempts,
                         max_retry_count=max_empty_answer_retries,
