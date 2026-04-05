@@ -47,6 +47,7 @@ from chat_client.schemas.chat import (
     CreateMessageRequest,
     UpdateMessageRequest,
 )
+
 # Logger
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -383,6 +384,7 @@ def _serialize_tool_content(result) -> str:
     except TypeError:
         return str(result)
 
+
 TITLE_GENERATION_MAX_TOKENS = 24
 
 
@@ -510,7 +512,7 @@ async def stream_chat(request: Request):
         get_messages=chat_repository.get_messages,
         build_model_messages_from_dialog_history=_build_model_messages_from_dialog_history,
         get_attachments=attachment_repository.get_attachments,
-        vision_models=VISION_MODELS,
+        supports_model_images=_supports_model_images,
         strip_images_from_messages=_strip_images_from_messages,
         normalize_chat_messages=_normalize_chat_messages,
         stream_response_fn=_chat_response_stream,

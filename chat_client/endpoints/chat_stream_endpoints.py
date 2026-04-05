@@ -22,7 +22,7 @@ async def chat_response_stream(
     get_messages,
     build_model_messages_from_dialog_history,
     get_attachments,
-    vision_models: list[str],
+    supports_model_images,
     strip_images_from_messages,
     normalize_chat_messages,
     stream_response_fn,
@@ -73,7 +73,7 @@ async def chat_response_stream(
                 ],
             )
             break
-        if payload.model not in vision_models:
+        if not supports_model_images(payload.model):
             raw_messages = strip_images_from_messages(raw_messages)
             log_chat_event(
                 logging.DEBUG,

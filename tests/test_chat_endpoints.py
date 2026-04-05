@@ -86,9 +86,7 @@ class TestChatEndpoints(BaseTestCase):
         assert len(normalized) == 1
         assert normalized[0]["role"] == "user"
         assert normalized[0]["content"] == (
-            "Can you see any files?\n\n"
-            "Attached files available to tools:\n"
-            "- /mnt/data/0059_cipher.txt"
+            "Can you see any files?\n\n" "Attached files available to tools:\n" "- /mnt/data/0059_cipher.txt"
         )
 
     def test_build_user_message_text_includes_attachment_note(self):
@@ -772,6 +770,45 @@ class TestChatEndpoints(BaseTestCase):
         called_messages = mock_client.chat.completions.create.call_args.kwargs["messages"]
         assert called_messages[0]["role"] == "user"
         assert called_messages[0]["content"] == "Describe this"
+
+    @patch("chat_client.endpoints.chat_endpoints._supports_model_images", return_value=True)
+    @patch("chat_client.endpoints.chat_endpoints.VISION_MODELS", [])
+    @patch("chat_client.endpoints.chat_endpoints.OpenAI")
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_chat_response_stream_with_images_uses_dynamic_model_capabilities(
+        self,
+        mock_logged_in,
+        mock_openai_class,
+        _mock_supports_model_images,
+    ):
+        mock_logged_in.return_value = 1
+
+        mock_client = mock_openai_client()
+        mock_openai_class.return_value = mock_client
+
+        response = self.client.post(
+            "/chat",
+            json={
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": "Describe this",
+                        "images": [
+                            {"data_url": "data:image/png;base64,AAAA"},
+                        ],
+                    }
+                ],
+                "model": "test-model",
+            },
+        )
+
+        assert response.status_code == 200
+        _ = response.content
+        called_messages = mock_client.chat.completions.create.call_args.kwargs["messages"]
+        assert called_messages[0]["role"] == "user"
+        assert isinstance(called_messages[0]["content"], list)
+        assert called_messages[0]["content"][0]["type"] == "text"
+        assert called_messages[0]["content"][1]["type"] == "image_url"
 
     @patch("chat_client.repositories.chat_repository.get_messages")
     @patch("chat_client.repositories.chat_repository.get_dialog")
