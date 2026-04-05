@@ -761,6 +761,7 @@ class ConversationController {
     }
 
     async loadDialog(savedMessages) {
+        const { responsesElem } = this.elements;
         this.messages = [];
         for (const msg of savedMessages) {
             if (msg.role === 'user' || msg.role === 'system') {
