@@ -4,13 +4,11 @@ import time
 import json
 import logging
 import uuid
-from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import data.config as config
 from openai import OpenAI
 from starlette.requests import Request
-from starlette.responses import StreamingResponse, JSONResponse, RedirectResponse, FileResponse, PlainTextResponse
 
 from chat_client.core import base_context
 from chat_client.core import attachments as attachment_service
@@ -403,7 +401,7 @@ def _generate_dialog_title(user_content: str, model: str) -> str:
     )
     response = client.chat.completions.create(
         model=selected_model,
-        messages=_build_dialog_title_prompt(normalized_user_content),
+        messages=cast(Any, _build_dialog_title_prompt(normalized_user_content)),
         stream=False,
         max_tokens=TITLE_GENERATION_MAX_TOKENS,
     )
@@ -445,7 +443,6 @@ async def _chat_response_stream(
         error_text = ""
         started_at = time.perf_counter()
         try:
-            func_name = str(tool_call.get("function", {}).get("name", "")).strip()
             result = await asyncio.to_thread(
                 _execute_local_tool_with_runtime_context,
                 tool_call,

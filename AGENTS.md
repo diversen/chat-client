@@ -31,6 +31,7 @@ chat-client init-system
 - Format/lint/type-check: `bin/check_code.sh`
 - Run tests: `python tests/run_all_tests.py`
 - Faster smoke test: `python tests/test_starlette_simple.py`
+- E2E tests require Node dependencies. If `npm run e2e` fails with `playwright: not found`, run `npm install` and `npx playwright install` from the project root first.
 
 ## Editing Guidelines
 - Keep endpoint logic thin; prefer repository/core helpers for reusable behavior.

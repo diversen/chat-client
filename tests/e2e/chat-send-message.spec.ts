@@ -2,6 +2,8 @@ import { expect, test } from '@playwright/test';
 import { execSync } from 'node:child_process';
 import { login } from './helpers/auth';
 
+const MESSAGE_TOP_BAR_GAP_PX = 16;
+
 function ensureManagedTestUser(): void {
   if (process.env.E2E_MANAGED_SERVER !== '1') return;
   execSync(
@@ -77,14 +79,14 @@ test('second user message aligns directly below top bar after short assistant re
 
   await expect
     .poll(async () => {
-      return await page.evaluate(() => {
+      return await page.evaluate((messageTopBarGapPx) => {
         const topBar = document.querySelector('.top-bar');
         const secondUser = document.querySelectorAll('.user-message')[1];
         if (!topBar || !secondUser) return null;
         const navBottom = topBar.getBoundingClientRect().bottom;
         const messageTop = secondUser.getBoundingClientRect().top;
-        return Math.abs(messageTop - navBottom);
-      });
+        return Math.abs(messageTop - (navBottom + messageTopBarGapPx));
+      }, MESSAGE_TOP_BAR_GAP_PX);
     })
     .toBeLessThanOrEqual(3);
 });

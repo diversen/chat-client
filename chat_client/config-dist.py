@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from typing import Any
 from chat_client.tools.python_tool import python_hardened as python_hardened_tool
 
 
@@ -91,7 +92,7 @@ PROVIDERS = {
     },
 }
 
-MODELS = {
+MODELS: dict[str, str] = {
     # "gpt-5-nano": "openai",
     # "gemma-3-27b-it": "gemini",
 }
@@ -106,7 +107,7 @@ SYSTEM_MESSAGE_DENYLIST: list[str] = []
 
 # Optional local tool registry (preferred over MCP when configured).
 # Functions must be callables that accept keyword arguments.
-TOOL_REGISTRY = {
+TOOL_REGISTRY: dict[str, Any] = {
     "python_tool": python_hardened_tool,
 }
 

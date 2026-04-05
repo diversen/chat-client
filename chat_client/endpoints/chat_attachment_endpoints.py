@@ -1,10 +1,18 @@
 import logging
 from html import escape
 from pathlib import Path
-from typing import Any
+from typing import Protocol, cast
 
 from starlette.requests import Request
 from starlette.responses import FileResponse, PlainTextResponse
+
+
+class UploadWithRead(Protocol):
+    filename: str | None
+    content_type: str | None
+
+    async def read(self) -> bytes:
+        raise NotImplementedError
 
 
 async def upload_attachment(
@@ -21,9 +29,10 @@ async def upload_attachment(
     try:
         user_id = await require_user_id_json(request, message="You must be logged in to upload files")
         form = await request.form()
-        upload = form.get("file")
-        if upload is None or not hasattr(upload, "filename"):
+        raw_upload = form.get("file")
+        if raw_upload is None or not hasattr(raw_upload, "filename") or not hasattr(raw_upload, "read"):
             raise exceptions_validation.UserValidate("A file upload is required.")
+        upload = cast(UploadWithRead, raw_upload)
 
         filename = str(getattr(upload, "filename", "") or "").strip()
         content_type = str(getattr(upload, "content_type", "") or "").strip().lower()

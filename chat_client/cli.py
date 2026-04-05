@@ -14,6 +14,10 @@ setup_logging(logging.INFO)
 logger: logging.Logger = logging.getLogger(__name__)
 
 
+async def _create_user(email: str, password: str) -> bool:
+    return await create_local_user(email, password)
+
+
 def _emit_bootstrap_messages(*, prompt_for_initial_user: bool) -> None:
     result = bootstrap_runtime(
         prompt_for_initial_user=prompt_for_initial_user,
@@ -106,6 +110,8 @@ def create_user(email: str | None, password: str | None):
         email = click.prompt("Email")
     if not password:
         password = click.prompt("Password", hide_input=True, confirmation_prompt=True)
+    assert email is not None
+    assert password is not None
     asyncio.run(create_local_user(email, password))
 
 
@@ -114,3 +120,7 @@ def init_system():
     _emit_bootstrap_messages(prompt_for_initial_user=True)
     click.echo("Migrations have been run. You may now run the server with `chat-client server-dev`.")
     raise SystemExit(0)
+
+
+if __name__ == "__main__":
+    cli()

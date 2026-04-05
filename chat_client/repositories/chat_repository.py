@@ -123,6 +123,8 @@ async def create_message(
 
         for attachment in attachments or []:
             attachment_id = attachment.get("attachment_id")
+            if attachment_id is None:
+                continue
             try:
                 normalized_attachment_id = int(attachment_id)
             except (TypeError, ValueError):

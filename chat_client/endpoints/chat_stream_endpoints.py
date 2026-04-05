@@ -67,9 +67,11 @@ async def chat_response_stream(
             available_attachments = await get_attachments(
                 logged_in,
                 [
-                    int(attachment.get("attachment_id"))
+                    int(attachment_id)
                     for attachment in attachments
-                    if isinstance(attachment, dict) and attachment.get("attachment_id") is not None
+                    if isinstance(attachment, dict)
+                    and (attachment_id := attachment.get("attachment_id")) is not None
+                    and isinstance(attachment_id, (str, int))
                 ],
             )
             break

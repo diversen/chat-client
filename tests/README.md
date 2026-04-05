@@ -25,6 +25,13 @@ python tests/run_all_tests.py
 
 ## E2E tests
 
+Install the Node/Playwright dependencies first. If `npm run e2e` fails with `playwright: not found`, run:
+
+```bash
+npm install
+npx playwright install
+```
+
 For `npm run e2e`, start the app yourself and make sure the e2e user exists.
 
 ```bash
