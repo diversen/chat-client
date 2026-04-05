@@ -4,6 +4,8 @@ import logging
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+MAX_DIALOG_ATTACHMENTS = 10
+
 
 async def get_chat_config(request: Request, *, config, system_message_denylist, vision_models, build_model_capabilities, json_success):
     config_values = {
@@ -86,6 +88,20 @@ async def create_message(
             await attachment_repository.get_attachments(
                 user_id,
                 [attachment.attachment_id for attachment in payload.attachments],
+            )
+        dialog_messages = await chat_repository.get_messages(user_id, dialog_id)
+        existing_media_count = 0
+        for message in dialog_messages:
+            if not isinstance(message, dict):
+                continue
+            images = message.get("images", [])
+            attachments = message.get("attachments", [])
+            existing_media_count += len(images) if isinstance(images, list) else 0
+            existing_media_count += len(attachments) if isinstance(attachments, list) else 0
+        new_media_count = len(payload.images) + len(payload.attachments)
+        if existing_media_count + new_media_count > MAX_DIALOG_ATTACHMENTS:
+            raise exceptions_validation.UserValidate(
+                f"You can attach at most {MAX_DIALOG_ATTACHMENTS} images/files in a single conversation."
             )
         message_id = await chat_repository.create_message(
             user_id,

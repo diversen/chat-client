@@ -4,6 +4,7 @@ import { Requests } from './requests.js';
 import { openImagePreviewModal, closeImagePreviewModal } from './image-preview-modal.js';
 
 const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
+const MAX_CONVERSATION_UPLOADS = 10;
 
 function fileToDataURL(file) {
     return new Promise((resolve, reject) => {
@@ -189,6 +190,16 @@ class ConversationController {
         this.updateSendButtonState();
     }
 
+    getConversationUploadCount() {
+        let persistedCount = 0;
+        for (const message of this.messages) {
+            if (!message || (message.role !== 'user' && message.role !== 'system')) continue;
+            persistedCount += Array.isArray(message.images) ? message.images.length : 0;
+            persistedCount += Array.isArray(message.attachments) ? message.attachments.length : 0;
+        }
+        return persistedCount + this.pendingImages.length + this.pendingAttachments.length;
+    }
+
     async handleImageSelection(files) {
         const { imageInputElem } = this.elements;
         if (!this.selectedModelSupportsImages()) {
@@ -203,6 +214,10 @@ class ConversationController {
 
         const newImages = [];
         for (const file of selectedFiles) {
+            if (this.getConversationUploadCount() + newImages.length >= MAX_CONVERSATION_UPLOADS) {
+                Flash.setMessage(`You can attach at most ${MAX_CONVERSATION_UPLOADS} images/files in a single conversation.`, 'notice');
+                break;
+            }
             if (!file.type.startsWith('image/')) {
                 Flash.setMessage(`Skipped ${file.name}: file is not an image`, 'notice');
                 continue;
@@ -251,6 +266,7 @@ class ConversationController {
                     pendingAttachmentIds: this.pendingAttachments
                         .map((attachment) => attachment?.attachment_id)
                         .filter((attachmentId) => attachmentId !== null && attachmentId !== undefined),
+                    pendingImageCount: this.pendingImages.length,
                 });
                 this.pendingAttachments.push(uploaded);
             } catch (error) {

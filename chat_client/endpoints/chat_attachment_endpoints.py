@@ -22,6 +22,7 @@ async def upload_attachment(
     *,
     require_user_id_json,
     get_dialog,
+    get_messages,
     attachment_service,
     attachment_repository,
     exceptions_validation,
@@ -34,31 +35,34 @@ async def upload_attachment(
         form = await request.form()
         dialog_id = str(form.get("dialog_id", "") or "").strip()
         pending_attachment_ids = form.getlist("pending_attachment_ids")
+        pending_image_count_raw = form.get("pending_image_count", 0)
         normalized_pending_attachment_ids: list[int] = []
         for attachment_id in pending_attachment_ids:
             try:
                 normalized_pending_attachment_ids.append(int(attachment_id))
             except (TypeError, ValueError):
                 continue
+        try:
+            pending_image_count = max(0, int(pending_image_count_raw))
+        except (TypeError, ValueError):
+            pending_image_count = 0
 
-        dialog_attachment_ids: list[int] = []
+        dialog_media_count = 0
         if dialog_id:
             await get_dialog(user_id, dialog_id)
-            dialog_attachment_ids = await attachment_repository.get_dialog_attachment_ids(user_id, dialog_id)
+            dialog_messages = await get_messages(user_id, dialog_id)
+            for message in dialog_messages:
+                if not isinstance(message, dict):
+                    continue
+                images = message.get("images", [])
+                attachments = message.get("attachments", [])
+                dialog_media_count += len(images) if isinstance(images, list) else 0
+                dialog_media_count += len(attachments) if isinstance(attachments, list) else 0
         pending_attachments = await attachment_repository.get_attachments(user_id, normalized_pending_attachment_ids)
-        current_attachment_ids = {
-            int(attachment_id)
-            for attachment_id in dialog_attachment_ids
-            if isinstance(attachment_id, int)
-        }
-        current_attachment_ids.update(
-            int(attachment.get("attachment_id", 0))
-            for attachment in pending_attachments
-            if int(attachment.get("attachment_id", 0)) > 0
-        )
-        if len(current_attachment_ids) >= MAX_DIALOG_ATTACHMENTS:
+        current_media_count = dialog_media_count + pending_image_count + len(pending_attachments)
+        if current_media_count >= MAX_DIALOG_ATTACHMENTS:
             raise exceptions_validation.UserValidate(
-                f"You can attach at most {MAX_DIALOG_ATTACHMENTS} files in a single conversation."
+                f"You can attach at most {MAX_DIALOG_ATTACHMENTS} images/files in a single conversation."
             )
 
         raw_upload = form.get("file")

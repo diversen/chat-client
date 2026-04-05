@@ -44,12 +44,13 @@ async function createAssistantTurnEvents(dialogID, payload) {
 }
 
 async function uploadAttachment(file, options = {}) {
-    const { dialogId = '', pendingAttachmentIds = [] } = options;
+    const { dialogId = '', pendingAttachmentIds = [], pendingImageCount = 0 } = options;
     const formData = new FormData();
     formData.append('file', file);
     if (dialogId) {
         formData.append('dialog_id', dialogId);
     }
+    formData.append('pending_image_count', String(pendingImageCount));
     pendingAttachmentIds.forEach((attachmentId) => {
         formData.append('pending_attachment_ids', String(attachmentId));
     });
