@@ -1,8 +1,8 @@
-from sqlalchemy import select, update
+from sqlalchemy import distinct, select, update
 
 from chat_client.core import exceptions_validation
 from chat_client.database.db_session import async_session
-from chat_client.models import Attachment, MessageAttachment
+from chat_client.models import Attachment, Message, MessageAttachment
 
 
 def _serialize_attachment(attachment: Attachment) -> dict[str, str | int]:
@@ -117,3 +117,19 @@ async def load_message_attachments(
             }
         )
     return attachments_by_message
+
+
+async def get_dialog_attachment_ids(user_id: int, dialog_id: str) -> list[int]:
+    async with async_session() as session:
+        stmt = (
+            select(distinct(MessageAttachment.attachment_id))
+            .join(Message, Message.message_id == MessageAttachment.message_id)
+            .where(
+                Message.user_id == user_id,
+                Message.dialog_id == dialog_id,
+                Message.active == 1,
+            )
+            .order_by(MessageAttachment.attachment_id.asc())
+        )
+        result = await session.execute(stmt)
+        return [int(attachment_id) for attachment_id in result.scalars().all() if attachment_id is not None]

@@ -6,6 +6,8 @@ from typing import Protocol, cast
 from starlette.requests import Request
 from starlette.responses import FileResponse, PlainTextResponse
 
+MAX_DIALOG_ATTACHMENTS = 10
+
 
 class UploadWithRead(Protocol):
     filename: str | None
@@ -19,6 +21,7 @@ async def upload_attachment(
     request: Request,
     *,
     require_user_id_json,
+    get_dialog,
     attachment_service,
     attachment_repository,
     exceptions_validation,
@@ -29,6 +32,35 @@ async def upload_attachment(
     try:
         user_id = await require_user_id_json(request, message="You must be logged in to upload files")
         form = await request.form()
+        dialog_id = str(form.get("dialog_id", "") or "").strip()
+        pending_attachment_ids = form.getlist("pending_attachment_ids")
+        normalized_pending_attachment_ids: list[int] = []
+        for attachment_id in pending_attachment_ids:
+            try:
+                normalized_pending_attachment_ids.append(int(attachment_id))
+            except (TypeError, ValueError):
+                continue
+
+        dialog_attachment_ids: list[int] = []
+        if dialog_id:
+            await get_dialog(user_id, dialog_id)
+            dialog_attachment_ids = await attachment_repository.get_dialog_attachment_ids(user_id, dialog_id)
+        pending_attachments = await attachment_repository.get_attachments(user_id, normalized_pending_attachment_ids)
+        current_attachment_ids = {
+            int(attachment_id)
+            for attachment_id in dialog_attachment_ids
+            if isinstance(attachment_id, int)
+        }
+        current_attachment_ids.update(
+            int(attachment.get("attachment_id", 0))
+            for attachment in pending_attachments
+            if int(attachment.get("attachment_id", 0)) > 0
+        )
+        if len(current_attachment_ids) >= MAX_DIALOG_ATTACHMENTS:
+            raise exceptions_validation.UserValidate(
+                f"You can attach at most {MAX_DIALOG_ATTACHMENTS} files in a single conversation."
+            )
+
         raw_upload = form.get("file")
         if raw_upload is None or not hasattr(raw_upload, "filename") or not hasattr(raw_upload, "read"):
             raise exceptions_validation.UserValidate("A file upload is required.")

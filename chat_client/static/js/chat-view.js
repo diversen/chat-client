@@ -4,8 +4,7 @@ import { copyIcon, checkIcon, editIcon } from './app-icons.js';
 import { mdNoHTML } from './markdown.js';
 import { openImagePreviewModal } from './image-preview-modal.js';
 import {
-    createMessageImages,
-    createMessageAttachments,
+    createMessageMediaPreview,
     createPendingUploadsPreview,
 } from './chat-view-media.js';
 
@@ -605,21 +604,16 @@ function createChatView({ config, elements, renderStreamedResponseText, updateCo
         ) {
             const safeDisplayRole = String(displayRole || 'User');
             const { container, contentElement } = createMessageElement(safeDisplayRole, messageId, 'User');
-            const imagePreview = createMessageImages(images, {
+            const mediaPreview = createMessageMediaPreview(images, attachments, {
                 onOpenImagePreview: (dataUrl, title) => {
                     openImagePreviewModal(imagePreviewModalElem, imagePreviewModalImageElem, dataUrl, title);
                 },
-            });
-            if (imagePreview) {
-                contentElement.insertAdjacentElement('beforebegin', imagePreview);
-            }
-            const attachmentPreview = createMessageAttachments(attachments, {
                 onOpenAttachmentPreview: (attachmentId) => {
                     window.open(`/api/chat/attachments/${attachmentId}/preview`, '_blank', 'noopener');
                 },
             });
-            if (attachmentPreview) {
-                contentElement.insertAdjacentElement('beforebegin', attachmentPreview);
+            if (mediaPreview) {
+                contentElement.insertAdjacentElement('beforebegin', mediaPreview);
             }
             contentElement.style.whiteSpace = 'pre-wrap';
             contentElement.innerText = message;

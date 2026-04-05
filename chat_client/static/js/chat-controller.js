@@ -246,7 +246,12 @@ class ConversationController {
 
         for (const file of selectedFiles) {
             try {
-                const uploaded = await this.storage.uploadAttachment(file);
+                const uploaded = await this.storage.uploadAttachment(file, {
+                    dialogId: this.dialogId || '',
+                    pendingAttachmentIds: this.pendingAttachments
+                        .map((attachment) => attachment?.attachment_id)
+                        .filter((attachmentId) => attachmentId !== null && attachmentId !== undefined),
+                });
                 this.pendingAttachments.push(uploaded);
             } catch (error) {
                 console.error('Error uploading attachment:', error);

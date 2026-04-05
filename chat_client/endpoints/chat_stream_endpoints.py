@@ -56,25 +56,32 @@ async def chat_response_stream(
                 **summarize_messages_for_log(raw_messages),
                 **log_context,
             )
-        for candidate in reversed(raw_messages):
+        attachment_ids: list[int] = []
+        seen_attachment_ids: set[int] = set()
+        for candidate in raw_messages:
             if not isinstance(candidate, dict):
                 continue
             if str(candidate.get("role", "")).strip() != "user":
                 continue
             attachments = candidate.get("attachments", [])
             if not isinstance(attachments, list) or not attachments:
-                break
-            available_attachments = await get_attachments(
-                logged_in,
-                [
-                    int(attachment_id)
-                    for attachment in attachments
-                    if isinstance(attachment, dict)
-                    and (attachment_id := attachment.get("attachment_id")) is not None
-                    and isinstance(attachment_id, (str, int))
-                ],
-            )
-            break
+                continue
+            for attachment in attachments:
+                if not isinstance(attachment, dict):
+                    continue
+                attachment_id = attachment.get("attachment_id")
+                if not isinstance(attachment_id, (str, int)):
+                    continue
+                try:
+                    normalized_attachment_id = int(attachment_id)
+                except (TypeError, ValueError):
+                    continue
+                if normalized_attachment_id in seen_attachment_ids:
+                    continue
+                seen_attachment_ids.add(normalized_attachment_id)
+                attachment_ids.append(normalized_attachment_id)
+        if attachment_ids:
+            available_attachments = await get_attachments(logged_in, attachment_ids)
         if not supports_model_images(payload.model):
             raw_messages = strip_images_from_messages(raw_messages)
             log_chat_event(

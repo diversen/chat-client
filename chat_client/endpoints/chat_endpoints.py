@@ -523,6 +523,7 @@ async def upload_attachment(request: Request):
     return await chat_attachment_endpoints.upload_attachment(
         request,
         require_user_id_json=require_user_id_json,
+        get_dialog=chat_repository.get_dialog,
         attachment_service=attachment_service,
         attachment_repository=attachment_repository,
         exceptions_validation=exceptions_validation,

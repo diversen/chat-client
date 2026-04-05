@@ -43,9 +43,16 @@ async function createAssistantTurnEvents(dialogID, payload) {
     return Requests.asyncPostJson(`/api/chat/dialogs/${dialogID}/assistant-turn-events`, payload);
 }
 
-async function uploadAttachment(file) {
+async function uploadAttachment(file, options = {}) {
+    const { dialogId = '', pendingAttachmentIds = [] } = options;
     const formData = new FormData();
     formData.append('file', file);
+    if (dialogId) {
+        formData.append('dialog_id', dialogId);
+    }
+    pendingAttachmentIds.forEach((attachmentId) => {
+        formData.append('pending_attachment_ids', String(attachmentId));
+    });
     return Requests.asyncPost('/api/chat/attachments', formData);
 }
 
