@@ -47,7 +47,7 @@ SESSION_HTTPS_ONLY = True  # Set to True if using HTTPS
 SESSION_MAX_AGE = 14 * 24 * 60 * 60  # 14 days
 
 # Maximum accepted HTTP request body size in bytes (default 10 MB)
-REQUEST_MAX_SIZE = 10 * 1024 * 1024
+REQUEST_MAX_SIZE = 100 * 1024 * 1024
 
 # Use mathjax for rendering math
 USE_KATEX = True
@@ -58,7 +58,7 @@ PYTHON_TOOL_TIMEOUT_SECONDS = 60
 
 # Uploaded files available to tools are stored privately here before being mounted into Docker.
 ATTACHMENT_STORAGE_DIR = Path(DATA_DIR) / "attachments"
-MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024
+MAX_ATTACHMENT_SIZE_BYTES = 100 * 1024 * 1024
 PYTHON_TOOL_ATTACHMENT_MOUNT_DIR = "/mnt/data"
 
 # Maximum number of model-response rounds used to produce a single assistant reply.
