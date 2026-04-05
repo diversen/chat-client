@@ -1,14 +1,3 @@
-import {
-    responsesElem,
-    messageElem,
-    sendButtonElem,
-    newButtonElem,
-    abortButtonElem,
-    selectModelElem,
-    pendingUploadsElem,
-    imagePreviewModalElem,
-    imagePreviewModalImageElem,
-} from './app-elements.js';
 import { addCopyButtons } from './app-copy-buttons.js';
 import { Flash } from './flash.js';
 import { copyIcon, checkIcon, editIcon } from './app-icons.js';
@@ -22,7 +11,7 @@ const MESSAGE_INPUT_MIN_HEIGHT_PX = 60;
 const MESSAGE_INPUT_MAX_VIEWPORT_HEIGHT_RATIO = 0.25;
 const MESSAGE_TOP_BAR_GAP_PX = 16;
 
-function resizeMessageInput() {
+function resizeMessageInput(messageElem) {
     if (!messageElem) return;
 
     const maxHeightPx = Math.max(
@@ -35,13 +24,13 @@ function resizeMessageInput() {
     messageElem.style.overflowY = messageElem.scrollHeight > maxHeightPx ? 'auto' : 'hidden';
 }
 
-function resetMessageInputHeight() {
+function resetMessageInputHeight(messageElem) {
     if (!messageElem) return;
     messageElem.style.height = `${MESSAGE_INPUT_MIN_HEIGHT_PX}px`;
     messageElem.style.overflowY = 'hidden';
 }
 
-function getOrCreateAnchorSpacer() {
+function getOrCreateAnchorSpacer(responsesElem) {
     let spacer = responsesElem.querySelector(`.${ANCHOR_SPACER_CLASS}`);
     if (!spacer) {
         spacer = document.createElement('div');
@@ -52,13 +41,13 @@ function getOrCreateAnchorSpacer() {
     return spacer;
 }
 
-function appendBeforeAnchorSpacer(element) {
-    const spacer = getOrCreateAnchorSpacer();
+function appendBeforeAnchorSpacer(responsesElem, element) {
+    const spacer = getOrCreateAnchorSpacer(responsesElem);
     responsesElem.insertBefore(element, spacer);
 }
 
-function ensureScrollRoomForMessage(container, navOffset) {
-    const currentSpacerHeight = getAnchorSpacerHeight();
+function ensureScrollRoomForMessage(responsesElem, container, navOffset) {
+    const currentSpacerHeight = getAnchorSpacerHeight(responsesElem);
     const targetTop = container.getBoundingClientRect().top + window.scrollY - navOffset;
     const targetScrollY = Math.max(0, targetTop);
     const doc = document.documentElement;
@@ -69,12 +58,12 @@ function ensureScrollRoomForMessage(container, navOffset) {
     // delta tells us exactly how much spacer is needed to make top alignment possible.
     const baseScrollDelta = baseScrollHeight - window.innerHeight;
     const requiredSpacerHeight = Math.max(0, targetScrollY - baseScrollDelta);
-    setAnchorSpacerHeight(requiredSpacerHeight + EXTRA_STREAMING_SLACK_PX, false);
+    setAnchorSpacerHeight(responsesElem, requiredSpacerHeight + EXTRA_STREAMING_SLACK_PX, false);
     return targetScrollY;
 }
 
-function getAnchorSpacerHeight() {
-    const spacer = getOrCreateAnchorSpacer();
+function getAnchorSpacerHeight(responsesElem) {
+    const spacer = getOrCreateAnchorSpacer(responsesElem);
     const inlineHeight = parseFloat(spacer.style.height);
     if (Number.isFinite(inlineHeight)) {
         return Math.max(0, inlineHeight);
@@ -83,22 +72,22 @@ function getAnchorSpacerHeight() {
     return Number.isFinite(computedHeight) ? Math.max(0, computedHeight) : 0;
 }
 
-function setAnchorSpacerHeight(heightPx, animate = false) {
-    const spacer = getOrCreateAnchorSpacer();
+function setAnchorSpacerHeight(responsesElem, heightPx, animate = false) {
+    const spacer = getOrCreateAnchorSpacer(responsesElem);
     spacer.style.transition = animate ? 'height 180ms ease-out' : 'none';
     spacer.style.height = `${Math.max(MIN_ANCHOR_SPACER_HEIGHT_PX, Math.ceil(heightPx))}px`;
 }
 
-function getBaseScrollHeight() {
+function getBaseScrollHeight(responsesElem) {
     const doc = document.documentElement;
-    return Math.max(0, doc.scrollHeight - getAnchorSpacerHeight());
+    return Math.max(0, doc.scrollHeight - getAnchorSpacerHeight(responsesElem));
 }
 
-function consumeAnchorSpacerBy(usedHeightPx, animate = false) {
+function consumeAnchorSpacerBy(responsesElem, usedHeightPx, animate = false) {
     if (!Number.isFinite(usedHeightPx) || usedHeightPx <= 0) return;
-    const current = getAnchorSpacerHeight();
+    const current = getAnchorSpacerHeight(responsesElem);
     if (current <= 0) return;
-    setAnchorSpacerHeight(Math.max(MIN_ANCHOR_SPACER_HEIGHT_PX, current - usedHeightPx), animate);
+    setAnchorSpacerHeight(responsesElem, Math.max(MIN_ANCHOR_SPACER_HEIGHT_PX, current - usedHeightPx), animate);
 }
 
 function createMessageElement(role, messageId = null, containerRole = null) {
@@ -345,7 +334,7 @@ function createMessageAttachments(attachments = [], removable = false, onRemove 
     return preview.children.length ? preview : null;
 }
 
-function createPendingUploadsPreview(images = [], attachments = [], handlers = {}) {
+function createPendingUploadsPreview(pendingUploadsElem, images = [], attachments = [], handlers = {}) {
     if (!pendingUploadsElem) return;
 
     const {
@@ -748,7 +737,18 @@ function createAssistantSegmentShell(messageId = null, initialKind = 'Thinking',
     };
 }
 
-function createChatView({ config, renderStreamedResponseText, updateContentDiff }) {
+function createChatView({ config, elements, renderStreamedResponseText, updateContentDiff }) {
+    const {
+        responsesElem,
+        messageElem,
+        sendButtonElem,
+        newButtonElem,
+        abortButtonElem,
+        selectModelElem,
+        pendingUploadsElem,
+        imagePreviewModalElem,
+        imagePreviewModalImageElem,
+    } = elements;
     const toolCallsOpenByDefault = false;
     const getSegmentKindKey = (kind) => String(kind || '').toLowerCase();
     const getSegmentBehavior = (kind) => {
@@ -839,13 +839,13 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
         return segment;
     };
 
-    resetMessageInputHeight();
-    window.addEventListener('resize', resizeMessageInput);
+    resetMessageInputHeight(messageElem);
+    window.addEventListener('resize', () => resizeMessageInput(messageElem));
 
     return {
         createMessageAttachments,
         renderPendingUploads(images = [], attachments = [], handlers = {}) {
-            createPendingUploadsPreview(images, attachments, handlers);
+            createPendingUploadsPreview(pendingUploadsElem, images, attachments, handlers);
         },
         renderStaticUserMessage(
             message,
@@ -873,12 +873,12 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
             if (editable && messageId) {
                 renderEditMessageButton(container, onEdit);
             }
-            appendBeforeAnchorSpacer(container);
+            appendBeforeAnchorSpacer(responsesElem, container);
             return container;
         },
         async renderStaticAssistantMessage(message, messageId = null) {
             const { container, contentElement } = createMessageElement('Assistant', messageId);
-            appendBeforeAnchorSpacer(container);
+            appendBeforeAnchorSpacer(responsesElem, container);
             renderCopyMessageButton(container, message);
             await renderStreamedResponseText(contentElement, message);
             await addCopyButtons(contentElement, config);
@@ -891,7 +891,7 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
             if (beforeElement && beforeElement.parentNode === responsesElem) {
                 responsesElem.insertBefore(turnContainer, beforeElement);
             } else {
-                appendBeforeAnchorSpacer(turnContainer);
+                appendBeforeAnchorSpacer(responsesElem, turnContainer);
             }
 
             let segmentIndex = 0;
@@ -970,19 +970,19 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
             if (beforeElement && beforeElement.parentNode === responsesElem) {
                 responsesElem.insertBefore(container, beforeElement);
             } else {
-                appendBeforeAnchorSpacer(container);
+                appendBeforeAnchorSpacer(responsesElem, container);
             }
             return container;
         },
         createAssistantTurn() {
-            const beforeBaseScrollHeight = getBaseScrollHeight();
+            const beforeBaseScrollHeight = getBaseScrollHeight(responsesElem);
             const { container: turnContainer, contentElement: turnContentElement } = createMessageElement('Assistant');
             turnContainer.classList.add('assistant-turn');
-            appendBeforeAnchorSpacer(turnContainer);
-            const afterBaseScrollHeight = getBaseScrollHeight();
+            appendBeforeAnchorSpacer(responsesElem, turnContainer);
+            const afterBaseScrollHeight = getBaseScrollHeight(responsesElem);
             const consumedOnInsert = Math.max(0, afterBaseScrollHeight - beforeBaseScrollHeight);
-            consumeAnchorSpacerBy(consumedOnInsert, false);
-            let lastBaseScrollHeight = getBaseScrollHeight();
+            consumeAnchorSpacerBy(responsesElem, consumedOnInsert, false);
+            let lastBaseScrollHeight = getBaseScrollHeight(responsesElem);
             let segmentIndex = 0;
 
             const createTextSegment = (kind, showLoader = false, options = {}) => {
@@ -1015,9 +1015,9 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                 let renderPromise = Promise.resolve();
 
                 const syncScrollAfterRender = (beforeBaseScrollHeight) => {
-                    const afterBaseScrollHeight = getBaseScrollHeight();
+                    const afterBaseScrollHeight = getBaseScrollHeight(responsesElem);
                     const consumedHeight = Math.max(0, afterBaseScrollHeight - beforeBaseScrollHeight);
-                    consumeAnchorSpacerBy(consumedHeight, false);
+                    consumeAnchorSpacerBy(responsesElem, consumedHeight, false);
                     lastBaseScrollHeight = afterBaseScrollHeight;
                 };
 
@@ -1080,12 +1080,12 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                         return activeAssistantSegment;
                     }
                     if (activeAssistantSegment) return null;
-                    const beforeBaseScrollHeight = getBaseScrollHeight();
+                    const beforeBaseScrollHeight = getBaseScrollHeight(responsesElem);
                     activeAssistantSegment = createTextSegment(kind, Boolean(options.showLoader), options);
                     turnContentElement.appendChild(activeAssistantSegment.container);
-                    const afterBaseScrollHeight = getBaseScrollHeight();
+                    const afterBaseScrollHeight = getBaseScrollHeight(responsesElem);
                     const consumedOnInsert = Math.max(0, afterBaseScrollHeight - beforeBaseScrollHeight);
-                    consumeAnchorSpacerBy(consumedOnInsert, false);
+                    consumeAnchorSpacerBy(responsesElem, consumedOnInsert, false);
                     lastBaseScrollHeight = afterBaseScrollHeight;
                     return activeAssistantSegment;
                 },
@@ -1111,15 +1111,15 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
                     };
                 },
                 appendToolCall(toolMessage) {
-                    const beforeBaseScrollHeight = getBaseScrollHeight();
+                    const beforeBaseScrollHeight = getBaseScrollHeight(responsesElem);
                     segmentIndex += 1;
                     const targetSegment = appendCommittedToolSegment(turnContentElement, {
                         toolPayload: toolMessage,
                         stepIndex: segmentIndex,
                     });
-                    const afterBaseScrollHeight = getBaseScrollHeight();
+                    const afterBaseScrollHeight = getBaseScrollHeight(responsesElem);
                     const consumedOnInsert = Math.max(0, afterBaseScrollHeight - beforeBaseScrollHeight);
-                    consumeAnchorSpacerBy(consumedOnInsert, false);
+                    consumeAnchorSpacerBy(responsesElem, consumedOnInsert, false);
                     lastBaseScrollHeight = afterBaseScrollHeight;
                     return targetSegment;
                 },
@@ -1132,9 +1132,9 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
         },
         clearInput() {
             messageElem.value = '';
-            resetMessageInputHeight();
+            resetMessageInputHeight(messageElem);
         },
-        resizeInput() { resizeMessageInput(); },
+        resizeInput() { resizeMessageInput(messageElem); },
         disableSend() { sendButtonElem.setAttribute('disabled', true); },
         enableSend() { sendButtonElem.removeAttribute('disabled'); },
         disableNew() {
@@ -1169,7 +1169,7 @@ function createChatView({ config, renderStreamedResponseText, updateContentDiff 
             const align = () => {
                 if (!container.isConnected) return;
                 const navOffset = getNavOffset();
-                ensureScrollRoomForMessage(container, navOffset);
+                ensureScrollRoomForMessage(responsesElem, container, navOffset);
                 container.style.scrollMarginTop = `${Math.ceil(navOffset)}px`;
                 container.scrollIntoView({ block: 'start', inline: 'nearest', behavior: 'smooth' });
             };

@@ -2,21 +2,6 @@ import { Flash } from './flash.js';
 import { logError } from './error-log.js';
 import { Requests } from './requests.js';
 import { openImagePreviewModal, closeImagePreviewModal } from './image-preview-modal.js';
-import {
-    responsesElem,
-    messageElem,
-    sendButtonElem,
-    abortButtonElem,
-    scrollToBottom,
-    imageInputElem,
-    attachImageButtonElem,
-    attachmentInputElem,
-    attachFileButtonElem,
-    selectModelElem,
-    imagePreviewModalElem,
-    imagePreviewModalImageElem,
-    imagePreviewModalCloseElem,
-} from './app-elements.js';
 
 const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
 
@@ -30,11 +15,12 @@ function fileToDataURL(file) {
 }
 
 class ConversationController {
-    constructor({ view, storage, chat, config }) {
+    constructor({ view, storage, chat, config, elements }) {
         this.view = view;
         this.storage = storage;
         this.chat = chat;
         this.config = config;
+        this.elements = elements;
         this.isSubmitting = false;
         this.isStreaming = false;
         this.messages = [];
@@ -53,6 +39,7 @@ class ConversationController {
     }
 
     setEditFormSubmissionEnabled(enabled) {
+        const { responsesElem } = this.elements;
         const editSendButtons = responsesElem.querySelectorAll('.edit-form .edit-send');
         editSendButtons.forEach((button) => {
             button.disabled = !enabled;
@@ -82,6 +69,12 @@ class ConversationController {
     }
 
     updateAttachmentUI() {
+        const {
+            attachImageButtonElem,
+            imageInputElem,
+            attachFileButtonElem,
+            attachmentInputElem,
+        } = this.elements;
         const supportsImages = this.selectedModelSupportsImages();
         const supportsAttachments = this.selectedModelSupportsAttachments();
         attachImageButtonElem.classList.toggle('hidden', !supportsImages);
@@ -100,6 +93,7 @@ class ConversationController {
     }
 
     updateSendButtonState() {
+        const { messageElem } = this.elements;
         const hasText = messageElem.value.trim().length > 0;
         const hasImages = this.selectedModelSupportsImages() && this.pendingImages.length > 0;
         const hasAttachments = this.selectedModelSupportsAttachments() && this.pendingAttachments.length > 0;
@@ -136,14 +130,17 @@ class ConversationController {
     }
 
     openImagePreviewModal(dataUrl, name) {
+        const { imagePreviewModalElem, imagePreviewModalImageElem } = this.elements;
         openImagePreviewModal(imagePreviewModalElem, imagePreviewModalImageElem, dataUrl, name);
     }
 
     getBottomSentinel() {
+        const { responsesElem } = this.elements;
         return responsesElem.querySelector('.responses-anchor-spacer');
     }
 
     ensureBottomSentinelObserver() {
+        const { scrollToBottom } = this.elements;
         if (!scrollToBottom || typeof IntersectionObserver === 'undefined') {
             return;
         }
@@ -171,10 +168,12 @@ class ConversationController {
     }
 
     closeImagePreviewModal() {
+        const { imagePreviewModalElem, imagePreviewModalImageElem } = this.elements;
         closeImagePreviewModal(imagePreviewModalElem, imagePreviewModalImageElem);
     }
 
     clearPendingImages() {
+        const { imageInputElem } = this.elements;
         this.pendingImages = [];
         imageInputElem.value = '';
         this.closeImagePreviewModal();
@@ -183,6 +182,7 @@ class ConversationController {
     }
 
     clearPendingAttachments() {
+        const { attachmentInputElem } = this.elements;
         this.pendingAttachments = [];
         attachmentInputElem.value = '';
         this.renderPendingUploads();
@@ -190,6 +190,7 @@ class ConversationController {
     }
 
     async handleImageSelection(files) {
+        const { imageInputElem } = this.elements;
         if (!this.selectedModelSupportsImages()) {
             this.clearPendingImages();
             imageInputElem.value = '';
@@ -232,6 +233,7 @@ class ConversationController {
     }
 
     async handleAttachmentSelection(files) {
+        const { attachmentInputElem } = this.elements;
         if (!this.selectedModelSupportsAttachments()) {
             this.clearPendingAttachments();
             attachmentInputElem.value = '';
@@ -261,6 +263,20 @@ class ConversationController {
     }
 
     wireUI() {
+        const {
+            responsesElem,
+            messageElem,
+            sendButtonElem,
+            abortButtonElem,
+            scrollToBottom,
+            imageInputElem,
+            attachImageButtonElem,
+            attachmentInputElem,
+            attachFileButtonElem,
+            selectModelElem,
+            imagePreviewModalElem,
+            imagePreviewModalCloseElem,
+        } = this.elements;
         this.ensureBottomSentinelObserver();
 
         sendButtonElem.addEventListener('click', async () => {
@@ -360,6 +376,7 @@ class ConversationController {
     }
 
     checkScroll() {
+        const { responsesElem, scrollToBottom } = this.elements;
         if (!scrollToBottom) return;
         const isEditingMessage = Boolean(responsesElem.querySelector('.edit-form'));
 
@@ -404,6 +421,7 @@ class ConversationController {
     }
 
     async sendUserMessage() {
+        const { messageElem } = this.elements;
         if (this.isSubmitting || this.isStreaming) return;
         try {
             const userMessage = messageElem.value.trim();

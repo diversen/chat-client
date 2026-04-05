@@ -1,38 +1,35 @@
-// Elements
-const responsesElem = document.getElementById('responses');
-const messageElem = document.getElementById('message');
-const sendButtonElem = document.getElementById('send');
-const newButtonElem = document.getElementById('new');
-const abortButtonElem = document.getElementById('abort');
-const selectModelElem = document.getElementById('select-model');
-const loadingSpinner = document.querySelector('.loading-spinner');
-const scrollToBottom = document.getElementById('scroll-to-bottom');
-const promptElem = document.getElementById('prompt');
-const imageInputElem = document.getElementById('image-input');
-const pendingUploadsElem = document.getElementById('pending-uploads');
-const attachImageButtonElem = document.getElementById('attach-image');
-const attachmentInputElem = document.getElementById('attachment-input');
-const attachFileButtonElem = document.getElementById('attach-file');
-const imagePreviewModalElem = document.getElementById('image-preview-modal');
-const imagePreviewModalImageElem = document.getElementById('image-preview-modal-image');
-const imagePreviewModalCloseElem = document.getElementById('image-preview-modal-close');
+function getRequiredElement(selector, queryMethod = 'getElementById') {
+    const element = queryMethod === 'querySelector'
+        ? document.querySelector(selector)
+        : document.getElementById(selector);
 
-export {
-    responsesElem,
-    messageElem,
-    sendButtonElem,
-    newButtonElem,
-    abortButtonElem,
-    selectModelElem,
-    loadingSpinner,
-    scrollToBottom,
-    promptElem,
-    imageInputElem,
-    pendingUploadsElem,
-    attachImageButtonElem,
-    attachmentInputElem,
-    attachFileButtonElem,
-    imagePreviewModalElem,
-    imagePreviewModalImageElem,
-    imagePreviewModalCloseElem,
-};
+    if (!element) {
+        throw new Error(`Missing required chat element: ${selector}`);
+    }
+
+    return element;
+}
+
+function getChatElements() {
+    return {
+        responsesElem: getRequiredElement('responses'),
+        messageElem: getRequiredElement('message'),
+        sendButtonElem: getRequiredElement('send'),
+        newButtonElem: getRequiredElement('new'),
+        abortButtonElem: getRequiredElement('abort'),
+        selectModelElem: getRequiredElement('select-model'),
+        loadingSpinner: getRequiredElement('.loading-spinner', 'querySelector'),
+        scrollToBottom: getRequiredElement('scroll-to-bottom'),
+        promptElem: getRequiredElement('prompt'),
+        imageInputElem: getRequiredElement('image-input'),
+        pendingUploadsElem: getRequiredElement('pending-uploads'),
+        attachImageButtonElem: getRequiredElement('attach-image'),
+        attachmentInputElem: getRequiredElement('attachment-input'),
+        attachFileButtonElem: getRequiredElement('attach-file'),
+        imagePreviewModalElem: getRequiredElement('image-preview-modal'),
+        imagePreviewModalImageElem: getRequiredElement('image-preview-modal-image'),
+        imagePreviewModalCloseElem: getRequiredElement('image-preview-modal-close'),
+    };
+}
+
+export { getChatElements };

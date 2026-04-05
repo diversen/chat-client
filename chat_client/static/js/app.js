@@ -1,7 +1,5 @@
 import { getConfig } from './app-dialog.js';
-import {
-    loadingSpinner,
-} from './app-elements.js';
+import { getChatElements } from './app-elements.js';
 import { initAppEvents } from './app-events.js';
 import { dd } from './diff-dom.js';
 import { renderKatex, renderMarkdownWithKatex } from './katex-render.js';
@@ -9,7 +7,8 @@ import { storageService, chatService } from './chat-services.js';
 import { ConversationController } from './chat-controller.js';
 import { createChatView } from './chat-view.js';
 
-initAppEvents();
+const elements = getChatElements();
+initAppEvents(elements);
 const config = await getConfig();
 
 // Math rendering
@@ -138,6 +137,7 @@ async function updateContentDiff(contentElement, hiddenContentElem, streamedResp
 
 const view = createChatView({
     config,
+    elements,
     renderStreamedResponseText,
     updateContentDiff,
 });
@@ -150,6 +150,7 @@ const controller = new ConversationController({
     storage: storageService,
     chat: chatService,
     config,
+    elements,
 });
 
 /**
@@ -162,13 +163,13 @@ const dialogID = url.pathname.split('/').pop();
 
 if (promptID) {
     // If we’re starting from a prompt, create the dialog and clean the URL.
-    loadingSpinner.classList.remove('hidden');
+    elements.loadingSpinner.classList.remove('hidden');
     await controller.initializeFromPrompt(promptID);
-    loadingSpinner.classList.add('hidden');
+    elements.loadingSpinner.classList.add('hidden');
 } else if (dialogID) {
     // Only load an existing dialog if there is no promptID
     controller.dialogId = dialogID;
-    loadingSpinner.classList.remove('hidden');
+    elements.loadingSpinner.classList.remove('hidden');
     await controller.initializeDialog(controller.dialogId);
-    loadingSpinner.classList.add('hidden');
+    elements.loadingSpinner.classList.add('hidden');
 }
