@@ -151,6 +151,7 @@ function hideEditForm(container) {
 
 function renderEditMessageButton(container, onEdit) {
     const messageActions = container.querySelector('.message-actions');
+    messageActions.classList.remove('hidden');
 
     const editButton = document.createElement('a');
     editButton.href = '#';
@@ -617,7 +618,9 @@ function createChatView({ config, elements, renderStreamedResponseText, updateCo
             }
             contentElement.style.whiteSpace = 'pre-wrap';
             contentElement.innerText = message;
-            renderCopyMessageButton(container, message);
+            if (String(message || '').trim()) {
+                renderCopyMessageButton(container, message);
+            }
 
             if (editable && messageId) {
                 renderEditMessageButton(container, onEdit);

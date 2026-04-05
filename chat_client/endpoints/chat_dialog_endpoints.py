@@ -78,6 +78,12 @@ async def create_message(
                 raise exceptions_validation.UserValidate("Model is required when attaching images")
             if not supports_model_images(selected_model):
                 raise exceptions_validation.UserValidate(image_modality_error_message)
+            image_attachment_ids = [image.attachment_id for image in payload.images if int(image.attachment_id or 0) > 0]
+            if image_attachment_ids:
+                image_attachments = await attachment_repository.get_attachments(user_id, image_attachment_ids)
+                for attachment in image_attachments:
+                    if not str(attachment.get("content_type", "")).startswith("image/"):
+                        raise exceptions_validation.UserValidate("Only image files can be attached as vision inputs.")
         if payload.role == "user" and payload.attachments:
             selected_model = payload.model.strip()
             if not selected_model:

@@ -6,15 +6,6 @@ import { openImagePreviewModal, closeImagePreviewModal } from './image-preview-m
 const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
 const MAX_CONVERSATION_UPLOADS = 10;
 
-function fileToDataURL(file) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = () => reject(new Error(`Failed to read ${file.name}`));
-        reader.readAsDataURL(file);
-    });
-}
-
 class ConversationController {
     constructor({ view, storage, chat, config, elements }) {
         this.view = view;
@@ -116,7 +107,9 @@ class ConversationController {
                 window.open(`/api/chat/attachments/${attachmentId}/preview`, '_blank', 'noopener');
             },
             onRemovePendingImage: (imageId) => {
-                this.pendingImages = this.pendingImages.filter((pending) => pending.id !== imageId);
+                this.pendingImages = this.pendingImages.filter(
+                    (pending) => String(pending.attachment_id || pending.id) !== String(imageId),
+                );
                 this.renderPendingUploads();
                 this.updateSendButtonState();
             },
@@ -212,9 +205,8 @@ class ConversationController {
         const selectedFiles = Array.from(files || []);
         if (!selectedFiles.length) return;
 
-        const newImages = [];
         for (const file of selectedFiles) {
-            if (this.getConversationUploadCount() + newImages.length >= MAX_CONVERSATION_UPLOADS) {
+            if (this.getConversationUploadCount() >= MAX_CONVERSATION_UPLOADS) {
                 Flash.setMessage(`You can attach at most ${MAX_CONVERSATION_UPLOADS} images/files in a single conversation.`, 'notice');
                 break;
             }
@@ -227,21 +219,29 @@ class ConversationController {
                 continue;
             }
             try {
-                const dataUrl = await fileToDataURL(file);
-                newImages.push({
-                    id: `${Date.now()}-${Math.random()}`,
-                    name: file.name,
-                    type: file.type,
-                    size: file.size,
-                    dataUrl,
+                const uploaded = await this.storage.uploadAttachment(file, {
+                    dialogId: this.dialogId || '',
+                    pendingAttachmentIds: this.pendingAttachments
+                        .map((attachment) => attachment?.attachment_id)
+                        .filter((attachmentId) => attachmentId !== null && attachmentId !== undefined),
+                    pendingImageCount: this.pendingImages.length,
+                });
+                this.pendingImages.push({
+                    attachment_id: uploaded.attachment_id,
+                    name: uploaded.name || file.name,
+                    content_type: uploaded.content_type || file.type,
+                    size_bytes: uploaded.size_bytes || file.size,
+                    previewUrl: `/api/chat/attachments/${uploaded.attachment_id}/preview`,
                 });
             } catch (error) {
-                console.error('Error reading image:', error);
-                Flash.setMessage(`Skipped ${file.name}: could not read file`, 'notice');
+                console.error('Error uploading image:', error);
+                Flash.setMessage(
+                    Requests.getErrorMessage(error, `Skipped ${file.name}: could not upload image`),
+                    'notice',
+                );
             }
         }
 
-        this.pendingImages = this.pendingImages.concat(newImages);
         imageInputElem.value = '';
         this.renderPendingUploads();
         this.updateSendButtonState();
@@ -447,7 +447,12 @@ class ConversationController {
         try {
             const userMessage = messageElem.value.trim();
             const images = this.selectedModelSupportsImages()
-                ? this.pendingImages.map((img) => ({ data_url: img.dataUrl }))
+                ? this.pendingImages.map((img) => ({
+                    attachment_id: img.attachment_id,
+                    name: img.name,
+                    content_type: img.content_type,
+                    size_bytes: img.size_bytes,
+                }))
                 : [];
             const attachments = this.selectedModelSupportsAttachments()
                 ? this.pendingAttachments.map((attachment) => ({
@@ -461,14 +466,6 @@ class ConversationController {
             this.isSubmitting = true;
             this.updateSendButtonState();
             const message = { role: 'user', content: userMessage, images: images, attachments };
-            const attachmentSummary = attachments.length
-                ? `${attachments.length} file${attachments.length > 1 ? 's' : ''}`
-                : '';
-            const imageSummary = images.length
-                ? `${images.length} image${images.length > 1 ? 's' : ''}`
-                : '';
-            const summaryParts = [imageSummary, attachmentSummary].filter(Boolean);
-            const messageTextForStorage = userMessage || `[${summaryParts.join(', ')} attached]`;
             let createdNewDialog = false;
 
             if (!this.dialogId) {
@@ -493,7 +490,7 @@ class ConversationController {
 
             const userMessageId = await this.storage.createMessage(this.dialogId, {
                 role: 'user',
-                content: messageTextForStorage,
+                content: userMessage,
                 model: this.view.getSelectedModel(),
                 images,
                 attachments,
@@ -506,7 +503,7 @@ class ConversationController {
             this.clearPendingAttachments();
 
             const userContainer = this.view.renderStaticUserMessage(
-                messageTextForStorage,
+                userMessage,
                 userMessageId,
                 async (id, newContent, container) => {
                     await this.handleMessageUpdate(id, newContent, container);
@@ -528,7 +525,10 @@ class ConversationController {
                 window.location.href = error.redirect;
                 return;
             }
-            Flash.setMessage('An error occurred. Please try again.', 'error');
+            Flash.setMessage(
+                Requests.getErrorMessage(error, 'An error occurred. Please try again.'),
+                'error',
+            );
         } finally {
             this.isSubmitting = false;
             this.updateSendButtonState();

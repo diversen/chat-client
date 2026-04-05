@@ -10,7 +10,12 @@ from typing import Any
 from openai import OpenAIError
 from starlette.requests import Request
 
-from chat_client.core.attachments import format_attachment_note, list_attachment_paths
+from chat_client.core.attachments import (
+    attachment_to_image_data_url,
+    format_attachment_note,
+    list_attachment_paths,
+    parse_image_attachment_ref,
+)
 
 GENERIC_OPENAI_ERROR_MESSAGE = "An error occurred. Please try again later."
 IMAGE_MODALITY_ERROR_MESSAGE = "The selected model does not support image inputs. Remove attached images or choose a vision model."
@@ -345,6 +350,24 @@ def build_normalized_user_message(message: dict[str, Any]) -> dict[str, Any]:
         if not isinstance(image, dict):
             continue
         data_url = str(image.get("data_url", "")).strip()
+        attachment_id = image.get("attachment_id")
+        if not data_url and isinstance(attachment_id, (str, int)):
+            try:
+                normalized_attachment_id = int(attachment_id)
+            except (TypeError, ValueError):
+                normalized_attachment_id = 0
+            if normalized_attachment_id > 0:
+                data_url = attachment_to_image_data_url(
+                    {
+                        "attachment_id": normalized_attachment_id,
+                        "content_type": str(image.get("content_type", "") or ""),
+                        "storage_path": str(image.get("storage_path", "") or ""),
+                    }
+                )
+        else:
+            image_attachment_id = parse_image_attachment_ref(data_url)
+            if image_attachment_id is not None:
+                data_url = attachment_to_image_data_url(image)
         if not data_url.startswith("data:image/"):
             continue
         content_parts.append(

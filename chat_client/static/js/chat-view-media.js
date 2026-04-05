@@ -17,6 +17,44 @@ function getAttachmentPreviewUrl(attachmentId) {
     return `/api/chat/attachments/${attachmentId}/preview`;
 }
 
+function getImagePreviewSource(image = {}, removable = false) {
+    if (removable) {
+        const previewUrl = String(image?.previewUrl || '').trim();
+        if (previewUrl) return previewUrl;
+    }
+    const previewUrl = String(image?.preview_url || '').trim();
+    if (previewUrl) return previewUrl;
+    const attachmentId = image?.attachment_id;
+    if (attachmentId !== null && attachmentId !== undefined && String(attachmentId).trim()) {
+        return getAttachmentPreviewUrl(attachmentId);
+    }
+    return removable ? String(image?.dataUrl || '') : String(image?.data_url || '').trim();
+}
+
+function appendPreviewMeta(container, kindLabel, name, sizeText = '') {
+    const meta = document.createElement('div');
+    meta.className = 'upload-preview-meta';
+
+    const kindElement = document.createElement('span');
+    kindElement.className = 'upload-preview-kind';
+    kindElement.textContent = kindLabel;
+    meta.appendChild(kindElement);
+
+    const nameElement = document.createElement('span');
+    nameElement.className = 'upload-preview-name';
+    nameElement.textContent = name;
+    meta.appendChild(nameElement);
+
+    if (sizeText) {
+        const sizeElement = document.createElement('span');
+        sizeElement.className = 'upload-preview-size';
+        sizeElement.textContent = sizeText;
+        meta.appendChild(sizeElement);
+    }
+
+    container.appendChild(meta);
+}
+
 function createMessageImages(images = [], { onOpenImagePreview }) {
     if (!Array.isArray(images) || images.length === 0) return null;
 
@@ -24,8 +62,8 @@ function createMessageImages(images = [], { onOpenImagePreview }) {
     preview.className = 'image-preview';
 
     images.forEach((image, index) => {
-        const dataUrl = String(image?.data_url || '').trim();
-        if (!dataUrl.startsWith('data:image/')) return;
+        const previewSource = getImagePreviewSource(image);
+        if (!previewSource) return;
 
         const item = document.createElement('div');
         item.className = 'upload-preview-tile message-image-tile';
@@ -36,15 +74,17 @@ function createMessageImages(images = [], { onOpenImagePreview }) {
         tileButton.title = `Preview attached image ${index + 1}`;
         tileButton.setAttribute('aria-label', `Preview attached image ${index + 1}`);
         tileButton.addEventListener('click', () => {
-            onOpenImagePreview(dataUrl, tileButton.title);
+            onOpenImagePreview(previewSource, tileButton.title);
         });
 
+        const imageName = String(image?.name || `attached image ${index + 1}`);
         const thumbnail = document.createElement('img');
-        thumbnail.className = 'message-image-thumb';
-        thumbnail.alt = `Message image ${index + 1}`;
-        thumbnail.src = dataUrl;
+        thumbnail.className = 'upload-preview-thumb';
+        thumbnail.alt = imageName;
+        thumbnail.src = previewSource;
 
         tileButton.appendChild(thumbnail);
+        appendPreviewMeta(tileButton, 'Vision', imageName, formatAttachmentSize(image?.size_bytes || image?.size));
         item.appendChild(tileButton);
         preview.appendChild(item);
     });
@@ -69,7 +109,6 @@ function createMessageAttachments(attachments = [], options = {}) {
         if (isImageAttachment(attachment)) return;
         const attachmentId = String(attachment?.attachment_id || attachment?.id || '');
         const fileName = String(attachment?.name || 'attachment');
-        const fileExtension = (fileName.split('.').pop() || 'file').slice(0, 6).toUpperCase();
         const item = document.createElement('div');
         item.className = 'upload-preview-tile message-attachment-tile';
 
@@ -86,28 +125,8 @@ function createMessageAttachments(attachments = [], options = {}) {
         }
         tileButton.className = 'upload-preview-open';
 
-        const meta = document.createElement('div');
-        meta.className = 'upload-preview-meta';
-
-        const kind = document.createElement('span');
-        kind.className = 'upload-preview-kind';
-        kind.textContent = fileExtension;
-        meta.appendChild(kind);
-
-        const name = document.createElement('span');
-        name.className = 'upload-preview-name';
-        name.textContent = fileName;
-        meta.appendChild(name);
-
         const sizeText = formatAttachmentSize(attachment?.size_bytes || attachment?.size);
-        if (sizeText) {
-            const size = document.createElement('span');
-            size.className = 'upload-preview-size';
-            size.textContent = sizeText;
-            meta.appendChild(size);
-        }
-
-        tileButton.appendChild(meta);
+        appendPreviewMeta(tileButton, 'File', fileName, sizeText);
         item.appendChild(tileButton);
 
         if (removable) {
@@ -115,7 +134,7 @@ function createMessageAttachments(attachments = [], options = {}) {
             remove.type = 'button';
             remove.className = 'image-preview-remove';
             remove.textContent = '×';
-            remove.setAttribute('aria-label', `Remove ${name.textContent}`);
+            remove.setAttribute('aria-label', `Remove ${fileName}`);
             remove.addEventListener('click', () => {
                 if (typeof onRemove === 'function') {
                     onRemove(attachmentId);
@@ -149,6 +168,7 @@ function createMessageMediaPreview(images = [], attachments = [], options = {}) 
 
     images.forEach((image, index) => {
         const imageId = String(image?.id || '');
+        const imageAttachmentId = String(image?.attachment_id || imageId);
         const imageName = String(image?.name || `image ${index + 1}`);
         const item = document.createElement('div');
         item.className = removableImages ? 'upload-preview-tile' : 'upload-preview-tile message-image-tile';
@@ -160,44 +180,22 @@ function createMessageMediaPreview(images = [], attachments = [], options = {}) 
         tileButton.setAttribute('aria-label', removableImages ? `Preview ${imageName}` : `Preview attached image ${index + 1}`);
         tileButton.addEventListener('click', () => {
             if (typeof onOpenImagePreview === 'function') {
-                const dataUrl = removableImages ? String(image?.dataUrl || '') : String(image?.data_url || '').trim();
-                onOpenImagePreview(dataUrl, removableImages ? imageName : tileButton.title);
+                const previewSource = getImagePreviewSource(image, removableImages);
+                onOpenImagePreview(previewSource, removableImages ? imageName : tileButton.title);
             }
         });
 
-        const thumbnail = document.createElement('img');
-        thumbnail.className = removableImages ? 'upload-preview-thumb' : 'message-image-thumb';
-        thumbnail.alt = removableImages ? imageName : `Message image ${index + 1}`;
-        thumbnail.src = removableImages ? String(image?.dataUrl || '') : String(image?.data_url || '').trim();
-        if (!String(thumbnail.src).startsWith('data:image/')) {
+        const previewSource = getImagePreviewSource(image, removableImages);
+        if (!previewSource) {
             return;
         }
+        const thumbnail = document.createElement('img');
+        thumbnail.className = 'upload-preview-thumb';
+        thumbnail.alt = removableImages ? imageName : `Message image ${index + 1}`;
+        thumbnail.src = previewSource;
 
         tileButton.appendChild(thumbnail);
-        if (removableImages) {
-            const meta = document.createElement('div');
-            meta.className = 'upload-preview-meta';
-
-            const kindElement = document.createElement('span');
-            kindElement.className = 'upload-preview-kind';
-            kindElement.textContent = 'IMAGE';
-            meta.appendChild(kindElement);
-
-            const nameElement = document.createElement('span');
-            nameElement.className = 'upload-preview-name';
-            nameElement.textContent = imageName;
-            meta.appendChild(nameElement);
-
-            const sizeText = formatAttachmentSize(image?.size);
-            if (sizeText) {
-                const sizeElement = document.createElement('span');
-                sizeElement.className = 'upload-preview-size';
-                sizeElement.textContent = sizeText;
-                meta.appendChild(sizeElement);
-            }
-
-            tileButton.appendChild(meta);
-        }
+        appendPreviewMeta(tileButton, 'Vision', imageName, formatAttachmentSize(image?.size_bytes || image?.size));
 
         item.appendChild(tileButton);
 
@@ -210,7 +208,7 @@ function createMessageMediaPreview(images = [], attachments = [], options = {}) 
             remove.textContent = '×';
             remove.addEventListener('click', () => {
                 if (typeof onRemovePendingImage === 'function') {
-                    onRemovePendingImage(imageId);
+                    onRemovePendingImage(imageAttachmentId);
                 }
             });
             item.appendChild(remove);
@@ -242,35 +240,11 @@ function createMessageMediaPreview(images = [], attachments = [], options = {}) 
         });
 
         const thumbnail = document.createElement('img');
-        thumbnail.className = removableAttachments ? 'upload-preview-thumb' : 'message-image-thumb';
+        thumbnail.className = 'upload-preview-thumb';
         thumbnail.alt = removableAttachments ? imageName : `Message image ${index + 1}`;
         thumbnail.src = previewUrl;
         tileButton.appendChild(thumbnail);
-
-        if (removableAttachments) {
-            const meta = document.createElement('div');
-            meta.className = 'upload-preview-meta';
-
-            const kindElement = document.createElement('span');
-            kindElement.className = 'upload-preview-kind';
-            kindElement.textContent = 'IMAGE';
-            meta.appendChild(kindElement);
-
-            const nameElement = document.createElement('span');
-            nameElement.className = 'upload-preview-name';
-            nameElement.textContent = imageName;
-            meta.appendChild(nameElement);
-
-            const sizeText = formatAttachmentSize(attachment?.size_bytes || attachment?.size);
-            if (sizeText) {
-                const sizeElement = document.createElement('span');
-                sizeElement.className = 'upload-preview-size';
-                sizeElement.textContent = sizeText;
-                meta.appendChild(sizeElement);
-            }
-
-            tileButton.appendChild(meta);
-        }
+        appendPreviewMeta(tileButton, 'Attachment', imageName, formatAttachmentSize(attachment?.size_bytes || attachment?.size));
 
         item.appendChild(tileButton);
 

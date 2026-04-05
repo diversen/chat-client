@@ -3,7 +3,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 class UploadedImageRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    data_url: str
+    data_url: str = ""
+    attachment_id: int = 0
+    name: str = ""
+    content_type: str = ""
+    size_bytes: int = 0
 
 
 class UploadedAttachmentRequest(BaseModel):

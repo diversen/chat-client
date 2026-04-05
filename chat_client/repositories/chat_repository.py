@@ -1,4 +1,5 @@
 from chat_client.core import exceptions_validation
+from chat_client.core.attachments import make_image_attachment_ref
 from chat_client.repositories import attachment_repository
 from chat_client.repositories import image_repository
 
@@ -84,7 +85,7 @@ async def create_message(
     dialog_id: str,
     role: str,
     content: str,
-    images: list[dict[str, str]] | None = None,
+    images: list[dict[str, str | int]] | None = None,
     attachments: list[dict[str, str | int]] | None = None,
 ):
 
@@ -104,6 +105,36 @@ async def create_message(
             raise RuntimeError("Failed to create message id")
 
         for image in images or []:
+            attachment_id = image.get("attachment_id")
+            try:
+                normalized_attachment_id = int(attachment_id)
+            except (TypeError, ValueError):
+                normalized_attachment_id = 0
+
+            if normalized_attachment_id > 0:
+                attachment_stmt = select(Attachment).where(
+                    Attachment.attachment_id == normalized_attachment_id,
+                    Attachment.user_id == user_id,
+                )
+                attachment_result = await session.execute(attachment_stmt)
+                existing_attachment = attachment_result.scalar_one_or_none()
+                if existing_attachment is None:
+                    continue
+
+                new_image = Image(data_url=make_image_attachment_ref(normalized_attachment_id))
+                session.add(new_image)
+                await session.flush()
+                image_id = new_image.image_id
+                if image_id is None:
+                    continue
+                session.add(
+                    MessageImage(
+                        message_id=message_id,
+                        image_id=image_id,
+                    )
+                )
+                continue
+
             data_url = str(image.get("data_url", "")).strip()
             if not data_url.startswith("data:image/"):
                 continue

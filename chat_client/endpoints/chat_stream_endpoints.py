@@ -56,13 +56,31 @@ async def chat_response_stream(
                 **summarize_messages_for_log(raw_messages),
                 **log_context,
             )
-        attachment_ids: list[int] = []
-        seen_attachment_ids: set[int] = set()
+        tool_attachment_ids: list[int] = []
+        seen_tool_attachment_ids: set[int] = set()
+        image_attachment_ids: list[int] = []
+        seen_image_attachment_ids: set[int] = set()
         for candidate in raw_messages:
             if not isinstance(candidate, dict):
                 continue
             if str(candidate.get("role", "")).strip() != "user":
                 continue
+            images = candidate.get("images", [])
+            if isinstance(images, list):
+                for image in images:
+                    if not isinstance(image, dict):
+                        continue
+                    attachment_id = image.get("attachment_id")
+                    if not isinstance(attachment_id, (str, int)):
+                        continue
+                    try:
+                        normalized_attachment_id = int(attachment_id)
+                    except (TypeError, ValueError):
+                        continue
+                    if normalized_attachment_id in seen_image_attachment_ids:
+                        continue
+                    seen_image_attachment_ids.add(normalized_attachment_id)
+                    image_attachment_ids.append(normalized_attachment_id)
             attachments = candidate.get("attachments", [])
             if not isinstance(attachments, list) or not attachments:
                 continue
@@ -76,12 +94,42 @@ async def chat_response_stream(
                     normalized_attachment_id = int(attachment_id)
                 except (TypeError, ValueError):
                     continue
-                if normalized_attachment_id in seen_attachment_ids:
+                if normalized_attachment_id in seen_tool_attachment_ids:
                     continue
-                seen_attachment_ids.add(normalized_attachment_id)
-                attachment_ids.append(normalized_attachment_id)
-        if attachment_ids:
-            available_attachments = await get_attachments(logged_in, attachment_ids)
+                seen_tool_attachment_ids.add(normalized_attachment_id)
+                tool_attachment_ids.append(normalized_attachment_id)
+        image_attachments: list[dict[str, Any]] = []
+        if image_attachment_ids:
+            image_attachments = await get_attachments(logged_in, image_attachment_ids)
+        if tool_attachment_ids:
+            available_attachments = await get_attachments(logged_in, tool_attachment_ids)
+        if image_attachments:
+            attachments_by_id = {
+                int(attachment.get("attachment_id", 0)): attachment
+                for attachment in image_attachments
+                if int(attachment.get("attachment_id", 0)) > 0
+            }
+            for candidate in raw_messages:
+                if not isinstance(candidate, dict):
+                    continue
+                images = candidate.get("images", [])
+                if not isinstance(images, list):
+                    continue
+                for image in images:
+                    if not isinstance(image, dict):
+                        continue
+                    attachment_id = image.get("attachment_id")
+                    try:
+                        normalized_attachment_id = int(attachment_id)
+                    except (TypeError, ValueError):
+                        continue
+                    attachment = attachments_by_id.get(normalized_attachment_id)
+                    if not attachment:
+                        continue
+                    image.setdefault("name", str(attachment.get("name", "")))
+                    image.setdefault("content_type", str(attachment.get("content_type", "")))
+                    image.setdefault("size_bytes", int(attachment.get("size_bytes", 0)))
+                    image.setdefault("storage_path", str(attachment.get("storage_path", "")))
         if not supports_model_images(payload.model):
             raw_messages = strip_images_from_messages(raw_messages)
             log_chat_event(

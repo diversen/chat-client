@@ -2,6 +2,7 @@ import re
 import shutil
 import tempfile
 import os
+import base64
 from collections.abc import Iterable
 from contextlib import contextmanager
 from pathlib import Path
@@ -12,6 +13,7 @@ import data.config as config
 DEFAULT_ATTACHMENT_STORAGE_DIRNAME = "attachments"
 DEFAULT_MAX_ATTACHMENT_SIZE_BYTES = 10 * 1024 * 1024
 DEFAULT_TOOL_MOUNT_DIR = "/mnt/data"
+IMAGE_ATTACHMENT_REF_PREFIX = "attachment://"
 FILENAME_SAFE_PATTERN = re.compile(r"[^A-Za-z0-9._-]+")
 
 ALLOWED_ATTACHMENT_EXTENSIONS = {
@@ -141,6 +143,32 @@ def serialize_attachment_response(attachment: dict[str, Any]) -> dict[str, Any]:
         "content_type": str(attachment.get("content_type", "")),
         "size_bytes": int(attachment.get("size_bytes", 0)),
     }
+
+
+def make_image_attachment_ref(attachment_id: int) -> str:
+    return f"{IMAGE_ATTACHMENT_REF_PREFIX}{int(attachment_id)}"
+
+
+def parse_image_attachment_ref(value: str) -> int | None:
+    raw = str(value or "").strip()
+    if not raw.startswith(IMAGE_ATTACHMENT_REF_PREFIX):
+        return None
+    try:
+        attachment_id = int(raw[len(IMAGE_ATTACHMENT_REF_PREFIX):])
+    except (TypeError, ValueError):
+        return None
+    return attachment_id if attachment_id > 0 else None
+
+
+def attachment_to_image_data_url(attachment: dict[str, Any]) -> str:
+    storage_path = Path(str(attachment.get("storage_path", "") or "")).expanduser()
+    if not storage_path.is_file():
+        return ""
+    content_type = str(attachment.get("content_type", "") or "").split(";", 1)[0].strip().lower()
+    if not content_type.startswith("image/"):
+        return ""
+    encoded = base64.b64encode(storage_path.read_bytes()).decode("ascii")
+    return f"data:{content_type};base64,{encoded}"
 
 
 def _choose_unique_name(name: str, used_names: set[str]) -> str:
