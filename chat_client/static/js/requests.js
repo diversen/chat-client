@@ -1,12 +1,4 @@
-/**
- * Simple Requests module for making async requests: 
- * Posting a FormData object
- * Posting a JSON object
- * Getting JSON from a URL
- */
-
 class Requests {
-    
     static REQUEST_TIMEOUT = 10;
 
     /**
@@ -23,13 +15,16 @@ class Requests {
     /**
      * Helper function to fetch with timeout
      */
-    static async _fetchWithTimeout(url, options) {
+    static async _fetchWithTimeout(url, options = {}) {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), Requests.REQUEST_TIMEOUT * 1000);
-        options.signal = controller.signal;
+        const timeoutId = window.setTimeout(() => controller.abort(), Requests.REQUEST_TIMEOUT * 1000);
+        const requestOptions = {
+            ...options,
+            signal: controller.signal,
+        };
 
         try {
-            const response = await fetch(url, options);
+            const response = await fetch(url, requestOptions);
             clearTimeout(timeoutId);
             const responseText = await response.text();
             let responseJson = null;
@@ -44,7 +39,7 @@ class Requests {
             if (!response.ok) {
                 const message =
                     responseJson?.message ||
-                    `${options.method} request failed: ${response.status} ${response.statusText}`;
+                    `${requestOptions.method} request failed: ${response.status} ${response.statusText}`;
                 const error = new Error(message);
                 error.status = response.status;
                 if (responseJson?.redirect) {
@@ -67,7 +62,7 @@ class Requests {
             throw new Error('Server returned an invalid JSON response.');
         } catch (error) {
             if (error.name === 'AbortError') {
-                throw new Error(`${options.method} request aborted due to timeout`);
+                throw new Error(`${requestOptions.method} request aborted due to timeout`);
             }
             throw error;
         }
@@ -78,11 +73,11 @@ class Requests {
      */
     static async asyncPost(url, formData, method = 'POST') {
         return Requests._fetchWithTimeout(url, {
-            method: method,
+            method,
             headers: {
                 'Accept': 'application/json',
             },
-            body: formData
+            body: formData,
         });
     }
 
@@ -90,17 +85,13 @@ class Requests {
      * POST JSON async. Send a JSON object or a JSON string.
      */
     static async asyncPostJson(url, jsonData = {}, method = 'POST') {
-        if (typeof jsonData !== 'string') {
-            jsonData = JSON.stringify(jsonData);
-        }
-
         return Requests._fetchWithTimeout(url, {
-            method: method,
+            method,
             headers: {
                 'Accept': 'application/json',
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
             },
-            body: jsonData
+            body: typeof jsonData === 'string' ? jsonData : JSON.stringify(jsonData),
         });
     }
 
@@ -109,10 +100,10 @@ class Requests {
      */
     static async asyncGetJson(url, method = 'GET') {
         return Requests._fetchWithTimeout(url, {
-            method: method,
+            method,
             headers: {
                 'Accept': 'application/json',
-            }
+            },
         });
     }
 }

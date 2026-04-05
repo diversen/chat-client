@@ -1,7 +1,7 @@
 import { Requests } from '/static/js/requests.js';
 
 async function getConfig() {
-    return await Requests.asyncGetJson('/api/chat/config');
+    return Requests.asyncGetJson('/api/chat/config');
 }
 
 /**
@@ -10,30 +10,16 @@ async function getConfig() {
  * POST 'title' to '/api/chat/dialogs'
  */
 async function createDialog(title) {
-
-    const data = await Requests.asyncPostJson('/api/chat/dialogs', { title: title });
-
-    if (data.error) {
-        throw new Error(data.message);
-    }
-
+    const data = await Requests.asyncPostJson('/api/chat/dialogs', { title });
     const currentDialogID = data.dialog_id;
-    console.log('Created dialog with ID:', currentDialogID);
     const url = new URL(window.location.href);
-    url.pathname = `/chat/${currentDialogID}`
-    window.history.replaceState({}, "", url);
-    return currentDialogID
-
+    url.pathname = `/chat/${currentDialogID}`;
+    window.history.replaceState({}, '', url);
+    return currentDialogID;
 }
 
 async function generateDialogTitle(dialogID) {
-    const data = await Requests.asyncPostJson(`/api/chat/dialogs/${dialogID}/title`, {});
-
-    if (data.error) {
-        throw new Error(data.message);
-    }
-
-    return data;
+    return Requests.asyncPostJson(`/api/chat/dialogs/${dialogID}/title`, {});
 }
 
 /**
@@ -41,16 +27,7 @@ async function generateDialogTitle(dialogID) {
  * /api/chat/dialogs/{dialog_id}/messages
  */
 async function getMessages(dialogID) {
-
-    const data = await Requests.asyncGetJson(`/api/chat/dialogs/${dialogID}/messages`);
-    console.log(data)
-
-    if (data.error) {
-        throw new Error(data.message);
-    }
-
-    return data
-
+    return Requests.asyncGetJson(`/api/chat/dialogs/${dialogID}/messages`);
 }
 
 /**
@@ -58,37 +35,18 @@ async function getMessages(dialogID) {
  * Returns the message_id of the created message
  */
 async function createMessage(dialogID, message) {
-
-    console.log('Creating message:', message);
     const data = await Requests.asyncPostJson(`/api/chat/dialogs/${dialogID}/messages`, message);
-
-    if (data.error) {
-        throw new Error(data.message);
-    }
-
     return data.message_id;
 }
 
 async function createAssistantTurnEvents(dialogID, payload) {
-    const data = await Requests.asyncPostJson(`/api/chat/dialogs/${dialogID}/assistant-turn-events`, payload);
-
-    if (data.error) {
-        throw new Error(data.message);
-    }
-
-    return data;
+    return Requests.asyncPostJson(`/api/chat/dialogs/${dialogID}/assistant-turn-events`, payload);
 }
 
 async function uploadAttachment(file) {
     const formData = new FormData();
     formData.append('file', file);
-    const data = await Requests.asyncPost('/api/chat/attachments', formData);
-
-    if (data.error) {
-        throw new Error(data.message);
-    }
-
-    return data;
+    return Requests.asyncPost('/api/chat/attachments', formData);
 }
 
 /**
@@ -96,14 +54,7 @@ async function uploadAttachment(file) {
  * POST updated content to /api/chat/messages/{message_id}
  */
 async function updateMessage(messageId, content) {
-    console.log('Updating message:', messageId, content);
-    const data = await Requests.asyncPostJson(`/api/chat/messages/${messageId}`, { content: content });
-
-    if (data.error) {
-        throw new Error(data.message);
-    }
-
-    return data;
+    return Requests.asyncPostJson(`/api/chat/messages/${messageId}`, { content });
 }
 
 export { createDialog, generateDialogTitle, getMessages, createMessage, createAssistantTurnEvents, getConfig, updateMessage, uploadAttachment };
