@@ -1,6 +1,7 @@
 import { getConfig } from './app-dialog.js';
 import { getChatElements } from './app-elements.js';
 import { initAppEvents } from './app-events.js';
+import { attachImageIcon, attachFileIcon, sendIcon, abortIcon } from './app-icons.js';
 import { dd } from './diff-dom.js';
 import { renderKatex, renderMarkdownWithKatex } from './katex-render.js';
 import { storageService, chatService } from './chat-services.js';
@@ -8,6 +9,10 @@ import { ConversationController } from './chat-controller.js';
 import { createChatView } from './chat-view.js';
 
 const elements = getChatElements();
+elements.attachImageButtonElem.innerHTML = attachImageIcon;
+elements.attachFileButtonElem.innerHTML = attachFileIcon;
+elements.sendButtonElem.innerHTML = sendIcon;
+elements.abortButtonElem.innerHTML = abortIcon;
 initAppEvents(elements);
 const config = await getConfig();
 
