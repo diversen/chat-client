@@ -738,11 +738,19 @@ function createChatView({ config, elements, renderStreamedResponseText, updateCo
             let segmentIndex = 0;
 
             const createTextSegment = (kind, showLoader = false, options = {}) => {
-                const segment = createAssistantSegmentShell(null, kind, showLoader);
+                const segmentKind = String(kind || '').toLowerCase();
+                const displayKind = String(options.displayKind || kind || 'Thinking');
+                const segment = createAssistantSegmentShell(null, displayKind, showLoader);
                 const behavior = getSegmentBehavior(kind);
                 const isTransient = Boolean(options.transient);
+                let isPromoted = !isTransient;
+                const provisionalStepIndex = Boolean(options.previewStep) ? segmentIndex + 1 : null;
                 if (Boolean(options.hideStep)) {
                     segment.setStepVisible(false);
+                }
+                if (Number.isFinite(provisionalStepIndex) && provisionalStepIndex > 0) {
+                    segment.setStepVisible(true);
+                    segment.setSegmentIndex(provisionalStepIndex);
                 }
                 if (!isTransient) {
                     segmentIndex += 1;
@@ -800,7 +808,26 @@ function createChatView({ config, elements, renderStreamedResponseText, updateCo
 
                 return {
                     ...segment,
-                    segmentKind: kind.toLowerCase(),
+                    segmentKind,
+                    promote(options = {}) {
+                        if (isPromoted) {
+                            return;
+                        }
+                        if (Boolean(options.showStep)) {
+                            segment.setStepVisible(true);
+                        }
+                        if (String(options.kind || '').trim()) {
+                            segment.setSegmentKind(options.kind);
+                        }
+                        if (Number.isFinite(provisionalStepIndex) && provisionalStepIndex > 0) {
+                            segmentIndex = Math.max(segmentIndex, provisionalStepIndex);
+                            segment.setSegmentIndex(provisionalStepIndex);
+                        } else {
+                            segmentIndex += 1;
+                            segment.setSegmentIndex(segmentIndex);
+                        }
+                        isPromoted = true;
+                    },
                     async appendText(text, force = false) {
                         streamedResponseText += text;
                         if (force) {

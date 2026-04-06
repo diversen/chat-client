@@ -638,6 +638,40 @@ class ConversationController {
             }
             return segment;
         };
+        const ensureLoadingAnswerContainer = async () => {
+            const segment = await ensureAssistantContainer('Answer', {
+                showLoader: true,
+                transient: true,
+                previewStep: true,
+                displayKind: 'Waiting for model',
+            });
+            segment.setLoading(true);
+            segment.clearStatus();
+            return segment;
+        };
+        const activateToolStatusSegment = async (toolName = 'tool') => {
+            const activeUi = await ensureAssistantContainer('Tool', {
+                showLoader: true,
+                transient: true,
+                hideStep: true,
+            });
+            activeUi.setLoading(true);
+            activeUi.setStatus(`Calling tool: ${String(toolName || 'tool')}...`);
+            return activeUi;
+        };
+        const activateThinkingSegment = async () => {
+            const activeUi = await ensureAssistantContainer('Thinking');
+            activeUi.setLoading(true);
+            activeUi.clearStatus();
+            return activeUi;
+        };
+        const activateAnswerSegment = async () => {
+            const activeUi = await ensureAssistantContainer('Answer');
+            activeUi.promote?.({ kind: 'Answer', showStep: true });
+            activeUi.setLoading(false);
+            activeUi.clearStatus();
+            return activeUi;
+        };
         const classifyFinalizedSegment = (finalized) => {
             const kind = String(finalized?.kind || '').toLowerCase();
             const text = String(finalized?.text || '');
@@ -679,6 +713,7 @@ class ConversationController {
         };
 
         try {
+            await ensureLoadingAnswerContainer();
             for await (const chunk of this.chat.stream({
                 model: modelName,
                 dialog_id: this.dialogId || '',
@@ -689,10 +724,7 @@ class ConversationController {
                     if (currentSegment && currentSegment.segmentKind !== 'tool') {
                         await finalizeAssistantContainer();
                     }
-                    const activeUi = await ensureAssistantContainer('Tool', { showLoader: true, transient: true, hideStep: true });
-                    activeUi.setLoading(true);
-                    const toolName = String(chunk.toolStatus.tool_name || 'tool');
-                    activeUi.setStatus(`Calling tool: ${toolName}...`);
+                    await activateToolStatusSegment(chunk.toolStatus.tool_name);
                     continue;
                 }
                 if (chunk.toolCall) {
@@ -706,18 +738,14 @@ class ConversationController {
                 }
 
                 if (chunk.reasoningOpenClose || chunk.reasoning) {
-                    const activeUi = await ensureAssistantContainer('Thinking');
-                    activeUi.setLoading(true);
-                    activeUi.clearStatus();
+                    const activeUi = await activateThinkingSegment();
                     if (chunk.reasoning) {
                         void activeUi.appendText(chunk.reasoning);
                     }
                 }
 
                 if (chunk.content) {
-                    const activeUi = await ensureAssistantContainer('Answer');
-                    activeUi.setLoading(false);
-                    activeUi.clearStatus();
+                    const activeUi = await activateAnswerSegment();
                     void activeUi.appendText(chunk.content, Boolean(chunk.done));
                 }
             }
