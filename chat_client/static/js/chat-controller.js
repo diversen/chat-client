@@ -23,6 +23,7 @@ class ConversationController {
         this.pendingAttachments = [];
         this.bottomSentinel = null;
         this.bottomSentinelVisible = false;
+        this.bottomSentinelMeasured = false;
         this.bottomSentinelObserver = null;
 
         this.wireUI();
@@ -144,6 +145,7 @@ class ConversationController {
             this.bottomSentinelObserver = new IntersectionObserver((entries) => {
                 const entry = entries[entries.length - 1];
                 if (!entry || entry.target !== this.bottomSentinel) return;
+                this.bottomSentinelMeasured = true;
                 this.bottomSentinelVisible = entry.isIntersecting;
                 this.checkScroll();
             });
@@ -159,6 +161,7 @@ class ConversationController {
         }
 
         this.bottomSentinel = sentinel;
+        this.bottomSentinelMeasured = false;
         this.bottomSentinelObserver.observe(sentinel);
     }
 
@@ -182,6 +185,12 @@ class ConversationController {
         attachmentInputElem.value = '';
         this.renderPendingUploads();
         this.updateSendButtonState();
+    }
+
+    setScrollToBottomVisible(isVisible) {
+        const { scrollToBottom } = this.elements;
+        if (!scrollToBottom) return;
+        scrollToBottom.classList.toggle('is-visible', Boolean(isVisible));
     }
 
     getConversationUploadCount() {
@@ -284,23 +293,8 @@ class ConversationController {
         this.updateSendButtonState();
     }
 
-    wireUI() {
-        const {
-            responsesElem,
-            messageFormElem,
-            messageElem,
-            sendButtonElem,
-            abortButtonElem,
-            scrollToBottom,
-            imageInputElem,
-            attachImageButtonElem,
-            attachmentInputElem,
-            attachFileButtonElem,
-            selectModelElem,
-            imagePreviewModalElem,
-            imagePreviewModalCloseElem,
-        } = this.elements;
-        this.ensureBottomSentinelObserver();
+    bindFormEvents() {
+        const { messageFormElem, sendButtonElem, abortButtonElem } = this.elements;
 
         messageFormElem.addEventListener('submit', (event) => {
             event.preventDefault();
@@ -309,6 +303,15 @@ class ConversationController {
         sendButtonElem.addEventListener('click', async () => {
             await this.sendUserMessage();
         });
+
+        abortButtonElem.addEventListener('click', () => {
+            this.abortController.abort();
+            this.abortController = new AbortController();
+        });
+    }
+
+    bindMessageEvents() {
+        const { responsesElem, messageElem } = this.elements;
 
         messageElem.addEventListener('input', () => {
             this.view.resizeInput();
@@ -323,6 +326,32 @@ class ConversationController {
             });
             this.checkScroll();
         });
+
+        messageElem.addEventListener('keydown', async (event) => {
+            if (event.key !== 'Enter') return;
+            if (event.ctrlKey) {
+                event.preventDefault();
+                const start = messageElem.selectionStart;
+                const end = messageElem.selectionEnd;
+                messageElem.value = messageElem.value.substring(0, start) + '\n' + messageElem.value.substring(end);
+                messageElem.selectionStart = messageElem.selectionEnd = start + 1;
+                this.view.resizeInput();
+                this.updateSendButtonState();
+                return;
+            }
+            event.preventDefault();
+            await this.sendUserMessage();
+        });
+    }
+
+    bindAttachmentEvents() {
+        const {
+            imageInputElem,
+            attachImageButtonElem,
+            attachmentInputElem,
+            attachFileButtonElem,
+            selectModelElem,
+        } = this.elements;
 
         attachImageButtonElem.addEventListener('click', () => {
             if (!this.selectedModelSupportsImages()) {
@@ -354,6 +383,10 @@ class ConversationController {
         attachmentInputElem.addEventListener('change', async (event) => {
             await this.handleAttachmentSelection(event.target.files);
         });
+    }
+
+    bindModalEvents() {
+        const { imagePreviewModalElem, imagePreviewModalCloseElem } = this.elements;
 
         if (imagePreviewModalCloseElem) {
             imagePreviewModalCloseElem.addEventListener('click', () => {
@@ -374,27 +407,18 @@ class ConversationController {
                 this.closeImagePreviewModal();
             }
         });
+    }
 
-        abortButtonElem.addEventListener('click', () => {
-            this.abortController.abort();
-            this.abortController = new AbortController();
+    bindScrollEvents() {
+        const { responsesElem, scrollToBottom } = this.elements;
+
+        scrollToBottom.addEventListener('click', () => {
+            window.scrollTo({
+                top: document.documentElement.scrollHeight,
+                behavior: 'smooth',
+            });
         });
 
-        messageElem.addEventListener('keydown', async (e) => {
-            if (e.key !== 'Enter') return;
-            if (e.ctrlKey) {
-                e.preventDefault();
-                const start = messageElem.selectionStart;
-                const end = messageElem.selectionEnd;
-                messageElem.value = messageElem.value.substring(0, start) + '\n' + messageElem.value.substring(end);
-                messageElem.selectionStart = messageElem.selectionEnd = start + 1;
-                this.view.resizeInput();
-                this.updateSendButtonState();
-                return;
-            }
-            e.preventDefault();
-            await this.sendUserMessage();
-        });
         new MutationObserver(() => {
             this.ensureBottomSentinelObserver();
             this.checkScroll();
@@ -402,31 +426,43 @@ class ConversationController {
         }).observe(responsesElem, { childList: true, subtree: true });
     }
 
+    wireUI() {
+        this.ensureBottomSentinelObserver();
+        this.bindFormEvents();
+        this.bindMessageEvents();
+        this.bindAttachmentEvents();
+        this.bindModalEvents();
+        this.bindScrollEvents();
+    }
+
     checkScroll() {
-        const { responsesElem, scrollToBottom } = this.elements;
-        if (!scrollToBottom) return;
+        const { responsesElem } = this.elements;
         const isEditingMessage = Boolean(responsesElem.querySelector('.edit-form'));
 
         const doc = document.documentElement;
         const hasScrollbar = doc.scrollHeight > window.innerHeight;
         if (!hasScrollbar || isEditingMessage) {
-            scrollToBottom.style.display = 'none';
+            this.setScrollToBottomVisible(false);
             return;
         }
 
         if (this.bottomSentinel && this.bottomSentinelObserver) {
-            scrollToBottom.style.display = this.bottomSentinelVisible ? 'none' : 'flex';
+            if (!this.bottomSentinelMeasured) {
+                this.setScrollToBottomVisible(false);
+                return;
+            }
+            this.setScrollToBottomVisible(!this.bottomSentinelVisible);
             return;
         }
 
         const distanceFromBottom = Math.max(0, doc.scrollHeight - (window.innerHeight + window.scrollY));
         const hideThreshold = 12;
         if (distanceFromBottom <= hideThreshold) {
-            scrollToBottom.style.display = 'none';
+            this.setScrollToBottomVisible(false);
             return;
         }
 
-        scrollToBottom.style.display = 'flex';
+        this.setScrollToBottomVisible(true);
     }
 
     validateUserMessage(userMessage) {
