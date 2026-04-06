@@ -1,2 +1,2 @@
-__version__ = "2.3.66"
+__version__ = "2.3.67"
 __program__ = "chat-client"
