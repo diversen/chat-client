@@ -24,6 +24,7 @@ class ConversationController {
         this.bottomSentinel = null;
         this.bottomSentinelVisible = false;
         this.bottomSentinelMeasured = false;
+        this.bottomSentinelObserverMargin = null;
         this.bottomSentinelObserver = null;
 
         this.wireUI();
@@ -136,9 +137,21 @@ class ConversationController {
     }
 
     ensureBottomSentinelObserver() {
-        const { scrollToBottom } = this.elements;
+        const { scrollToBottom, promptElem } = this.elements;
         if (!scrollToBottom || typeof IntersectionObserver === 'undefined') {
             return;
+        }
+
+        const promptHeight = Math.ceil(promptElem?.getBoundingClientRect().height || 0);
+        const observerMargin = `0px 0px -${promptHeight}px 0px`;
+
+        if (this.bottomSentinelObserver && this.bottomSentinelObserverMargin !== observerMargin) {
+            if (this.bottomSentinel) {
+                this.bottomSentinelObserver.unobserve(this.bottomSentinel);
+            }
+            this.bottomSentinelObserver.disconnect();
+            this.bottomSentinelObserver = null;
+            this.bottomSentinelMeasured = false;
         }
 
         if (!this.bottomSentinelObserver) {
@@ -148,7 +161,10 @@ class ConversationController {
                 this.bottomSentinelMeasured = true;
                 this.bottomSentinelVisible = entry.isIntersecting;
                 this.checkScroll();
+            }, {
+                rootMargin: observerMargin,
             });
+            this.bottomSentinelObserverMargin = observerMargin;
         }
 
         const sentinel = this.getBottomSentinel();
