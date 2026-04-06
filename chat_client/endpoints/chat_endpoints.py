@@ -413,7 +413,7 @@ def _generate_dialog_title(user_content: str, model: str) -> str:
             model=selected_model,
             raw_title="",
         )
-        return _normalize_generated_dialog_title("")
+        return _derive_dialog_title_from_user_message(normalized_user_content)
     first_choice = choices[0]
     message = getattr(first_choice, "message", None)
     raw_content = getattr(message, "content", "") if message is not None else ""
@@ -423,7 +423,10 @@ def _generate_dialog_title(user_content: str, model: str) -> str:
         model=selected_model,
         raw_title=str(raw_content or ""),
     )
-    return _normalize_generated_dialog_title(str(raw_content or ""))
+    normalized_title = _normalize_generated_dialog_title(str(raw_content or ""))
+    if _is_pending_dialog_title(normalized_title):
+        return _derive_dialog_title_from_user_message(normalized_user_content)
+    return normalized_title
 
 
 async def _chat_response_stream(
@@ -580,6 +583,8 @@ async def create_dialog(request: Request):
         parse_json_payload=parse_json_payload,
         create_dialog_request=CreateDialogRequest,
         chat_repository=chat_repository,
+        is_pending_dialog_title=_is_pending_dialog_title,
+        derive_dialog_title_from_user_message=_derive_dialog_title_from_user_message,
         exceptions_validation=exceptions_validation,
         json_success=json_success,
         json_error=json_error,

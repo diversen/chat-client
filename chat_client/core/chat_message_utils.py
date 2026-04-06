@@ -6,7 +6,8 @@ from typing import Any
 from chat_client.core import chat_service
 
 TITLE_FALLBACK_MAX_LENGTH = 80
-PENDING_DIALOG_TITLES = {"New Chat"}
+DEFAULT_PENDING_DIALOG_TITLE = "New Chat"
+PENDING_DIALOG_TITLES = {DEFAULT_PENDING_DIALOG_TITLE}
 TITLE_FALLBACK_WORD_LIMIT = 25
 
 
@@ -181,15 +182,15 @@ def normalize_generated_dialog_title(value: str) -> str:
     normalized = " ".join(normalized.split())
     if len(normalized) > TITLE_FALLBACK_MAX_LENGTH:
         normalized = normalized[:TITLE_FALLBACK_MAX_LENGTH].rstrip(" ,.;:-")
-    return normalized or "New Chat"
+    return normalized or DEFAULT_PENDING_DIALOG_TITLE
 
 
 def derive_dialog_title_from_user_message(user_content: str) -> str:
     normalized = unescape(str(user_content or "").strip())
     normalized = re.sub(r"<[^>]+>", " ", normalized)
     normalized = re.sub(r"[^\w\s]", " ", normalized, flags=re.UNICODE)
-    normalized = re.sub(r"[_\d]+", " ", normalized)
-    words = [word for word in normalized.split() if any(char.isalpha() for char in word)]
+    normalized = re.sub(r"_+", " ", normalized)
+    words = [word for word in normalized.split() if any(char.isalnum() for char in word)]
     if TITLE_FALLBACK_WORD_LIMIT > 0:
         words = words[:TITLE_FALLBACK_WORD_LIMIT]
     fallback_title = " ".join(words)

@@ -528,11 +528,11 @@ class TestChatEndpoints(BaseTestCase):
             patch("chat_client.endpoints.chat_endpoints.OpenAI", return_value=mock_client),
         ):
             title = _generate_dialog_title(
-                "How do I mount a network drive on Linux?",
+                "Summarize release notes for version 2.1",
                 "test-model",
             )
 
-        assert title == "New Chat"
+        assert title == "Summarize release notes for version 2 1"
 
     def test_derive_dialog_title_from_user_message_strips_markup_and_symbols(self):
         from chat_client.endpoints.chat_endpoints import _derive_dialog_title_from_user_message
@@ -541,7 +541,7 @@ class TestChatEndpoints(BaseTestCase):
             "<p>By listing the first six prime numbers: $2, 3, 5, 7, 11$, and $13$, we can see</p>"
         )
 
-        assert title == "By listing the first six prime numbers and we can see"
+        assert title == "By listing the first six prime numbers 2 3 5 7 11 and 13 we can see"
 
     def test_extract_first_user_message_uses_first_user_message(self):
         from chat_client.endpoints.chat_endpoints import _extract_first_user_message
@@ -965,6 +965,27 @@ class TestChatEndpoints(BaseTestCase):
         data = response.json()
         assert data["error"] is False
         assert data["dialog_id"] == "test-dialog-id"
+        mock_create.assert_called_once_with(1, "Test Dialog")
+
+    @patch("chat_client.repositories.chat_repository.create_dialog")
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_create_dialog_derives_title_from_initial_message_when_placeholder_is_used(self, mock_logged_in, mock_create):
+        mock_logged_in.return_value = 1
+        mock_create.return_value = "test-dialog-id"
+
+        response = self.client.post(
+            "/api/chat/dialogs",
+            json={
+                "title": "New Chat",
+                "initial_message": "Summarize release notes for version 2.1",
+            },
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["error"] is False
+        assert data["dialog_id"] == "test-dialog-id"
+        mock_create.assert_called_once_with(1, "Summarize release notes for version 2 1")
 
     @patch("chat_client.repositories.chat_repository.create_dialog")
     @patch("chat_client.core.user_session.is_logged_in")

@@ -30,6 +30,8 @@ async def create_dialog(
     parse_json_payload,
     create_dialog_request,
     chat_repository,
+    is_pending_dialog_title,
+    derive_dialog_title_from_user_message,
     exceptions_validation,
     json_success,
     json_error,
@@ -38,7 +40,11 @@ async def create_dialog(
     try:
         user_id = await require_user_id_json(request, message="You must be logged in to save a dialog")
         payload = await parse_json_payload(request, create_dialog_request)
-        dialog_id = await chat_repository.create_dialog(user_id, payload.title)
+        title = str(payload.title or "").strip()
+        initial_message = str(payload.initial_message or "").strip()
+        if initial_message and (not title or is_pending_dialog_title(title)):
+            title = derive_dialog_title_from_user_message(initial_message)
+        dialog_id = await chat_repository.create_dialog(user_id, title)
         return json_success(dialog_id=dialog_id, message="Dialog saved")
     except exceptions_validation.JSONError:
         raise

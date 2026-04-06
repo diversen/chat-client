@@ -36,6 +36,7 @@ class ChatStreamRequest(BaseModel):
 class CreateDialogRequest(BaseModel):
     model_config = ConfigDict(extra="ignore")
     title: str
+    initial_message: str = ""
 
 
 class CreateMessageRequest(BaseModel):

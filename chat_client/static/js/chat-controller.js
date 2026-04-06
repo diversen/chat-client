@@ -469,8 +469,7 @@ class ConversationController {
             let createdNewDialog = false;
 
             if (!this.dialogId) {
-                const title = 'New Chat';
-                this.dialogId = await this.storage.createDialog(title);
+                this.dialogId = await this.storage.createDialog('', userMessage);
                 createdNewDialog = true;
 
                 // If this chat started from a custom prompt, persist that prompt

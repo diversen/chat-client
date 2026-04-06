@@ -5,12 +5,10 @@ async function getConfig() {
 }
 
 /**
- * Send user message to the server
- * Dialog starts with a placeholder title and can be renamed later
- * POST 'title' to '/api/chat/dialogs'
+ * Create a dialog. The server can derive the initial title from the first user message.
  */
-async function createDialog(title) {
-    const data = await Requests.asyncPostJson('/api/chat/dialogs', { title });
+async function createDialog(title, initialMessage = '') {
+    const data = await Requests.asyncPostJson('/api/chat/dialogs', { title, initial_message: initialMessage });
     const currentDialogID = data.dialog_id;
     const url = new URL(window.location.href);
     url.pathname = `/chat/${currentDialogID}`;
