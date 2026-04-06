@@ -166,13 +166,18 @@ const url = new URL(window.location.href);
 const promptID = url.searchParams.get('id');
 const dialogID = url.pathname.split('/').pop();
 
-if (promptID) {
-    // If we’re starting from a prompt, create the dialog and clean the URL.
-    await controller.initializeFromPrompt(promptID);
-} else if (dialogID) {
-    // Only load an existing dialog if there is no promptID
-    controller.dialogId = dialogID;
-    elements.loadingSpinner.classList.remove('hidden');
-    await controller.initializeDialog(controller.dialogId);
+try {
+    if (promptID) {
+        // If we’re starting from a prompt, create the dialog and clean the URL.
+        await controller.initializeFromPrompt(promptID);
+    } else if (dialogID) {
+        // Only load an existing dialog if there is no promptID
+        controller.dialogId = dialogID;
+        elements.loadingSpinner.classList.remove('hidden');
+        await controller.initializeDialog(controller.dialogId);
+        elements.loadingSpinner.classList.add('hidden');
+    }
+} finally {
+    controller.setInitializing(false);
     elements.loadingSpinner.classList.add('hidden');
 }

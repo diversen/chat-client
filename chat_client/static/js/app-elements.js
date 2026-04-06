@@ -13,6 +13,7 @@ function getRequiredElement(selector, queryMethod = 'getElementById') {
 function getChatElements() {
     return {
         responsesElem: getRequiredElement('responses'),
+        messageFormElem: getRequiredElement('message-form'),
         messageElem: getRequiredElement('message'),
         sendButtonElem: getRequiredElement('send'),
         newButtonElem: getRequiredElement('new'),

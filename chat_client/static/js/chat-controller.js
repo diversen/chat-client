@@ -13,6 +13,7 @@ class ConversationController {
         this.chat = chat;
         this.config = config;
         this.elements = elements;
+        this.isInitializing = true;
         this.isSubmitting = false;
         this.isStreaming = false;
         this.messages = [];
@@ -89,7 +90,7 @@ class ConversationController {
         const hasText = messageElem.value.trim().length > 0;
         const hasImages = this.selectedModelSupportsImages() && this.pendingImages.length > 0;
         const hasAttachments = this.selectedModelSupportsAttachments() && this.pendingAttachments.length > 0;
-        const canSend = !this.isSubmitting && !this.isStreaming && (hasText || hasImages || hasAttachments);
+        const canSend = !this.isInitializing && !this.isSubmitting && !this.isStreaming && (hasText || hasImages || hasAttachments);
 
         if (canSend) {
             this.view.enableSend();
@@ -286,6 +287,7 @@ class ConversationController {
     wireUI() {
         const {
             responsesElem,
+            messageFormElem,
             messageElem,
             sendButtonElem,
             abortButtonElem,
@@ -299,6 +301,10 @@ class ConversationController {
             imagePreviewModalCloseElem,
         } = this.elements;
         this.ensureBottomSentinelObserver();
+
+        messageFormElem.addEventListener('submit', (event) => {
+            event.preventDefault();
+        });
 
         sendButtonElem.addEventListener('click', async () => {
             await this.sendUserMessage();
@@ -426,7 +432,12 @@ class ConversationController {
     validateUserMessage(userMessage) {
         const hasImages = this.selectedModelSupportsImages() && this.pendingImages.length > 0;
         const hasAttachments = this.selectedModelSupportsAttachments() && this.pendingAttachments.length > 0;
-        return !!(this.isSubmitting === false && this.isStreaming === false && (userMessage || hasImages || hasAttachments));
+        return !!(
+            this.isInitializing === false
+            && this.isSubmitting === false
+            && this.isStreaming === false
+            && (userMessage || hasImages || hasAttachments)
+        );
     }
 
     getInitialPromptRole() {
@@ -439,6 +450,11 @@ class ConversationController {
             return globalThis.crypto.randomUUID();
         }
         return `turn-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    }
+
+    setInitializing(isInitializing) {
+        this.isInitializing = Boolean(isInitializing);
+        this.updateSendButtonState();
     }
 
     async sendUserMessage() {
