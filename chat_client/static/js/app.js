@@ -168,9 +168,7 @@ const dialogID = url.pathname.split('/').pop();
 
 if (promptID) {
     // If we’re starting from a prompt, create the dialog and clean the URL.
-    elements.loadingSpinner.classList.remove('hidden');
     await controller.initializeFromPrompt(promptID);
-    elements.loadingSpinner.classList.add('hidden');
 } else if (dialogID) {
     // Only load an existing dialog if there is no promptID
     controller.dialogId = dialogID;
