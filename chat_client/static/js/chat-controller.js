@@ -5,6 +5,8 @@ import { openImagePreviewModal, closeImagePreviewModal } from './image-preview-m
 
 const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
 const MAX_CONVERSATION_UPLOADS = 10;
+const TITLE_FALLBACK_MAX_LENGTH = 80;
+const TITLE_FALLBACK_WORD_LIMIT = 25;
 
 class ConversationController {
     constructor({ view, storage, chat, config, elements }) {
@@ -441,6 +443,25 @@ class ConversationController {
         return `turn-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     }
 
+    deriveDialogTitleFromUserMessage(userContent) {
+        const normalizedInput = String(userContent || '').trim();
+        let normalized = normalizedInput
+            .replace(/<[^>]+>/g, ' ')
+            .replace(/[^\w\s]/gu, ' ')
+            .replace(/_+/g, ' ');
+        let words = normalized
+            .split(/\s+/)
+            .filter((word) => word && [...word].some((char) => /[\p{L}\p{N}]/u.test(char)));
+        if (TITLE_FALLBACK_WORD_LIMIT > 0) {
+            words = words.slice(0, TITLE_FALLBACK_WORD_LIMIT);
+        }
+        let title = words.join(' ').trim().replace(/\s+/g, ' ');
+        if (title.length > TITLE_FALLBACK_MAX_LENGTH) {
+            title = title.slice(0, TITLE_FALLBACK_MAX_LENGTH).replace(/[ ,.;:-]+$/u, '');
+        }
+        return title || 'New Chat';
+    }
+
     async sendUserMessage() {
         const { messageElem } = this.elements;
         if (this.isSubmitting || this.isStreaming) return;
@@ -469,7 +490,7 @@ class ConversationController {
             let createdNewDialog = false;
 
             if (!this.dialogId) {
-                const title = 'New Chat';
+                const title = this.deriveDialogTitleFromUserMessage(userMessage);
                 this.dialogId = await this.storage.createDialog(title);
                 createdNewDialog = true;
 
@@ -515,7 +536,7 @@ class ConversationController {
             await this.view.scrollMessageToTop(userContainer);
 
             await this.renderAssistantMessage({
-                shouldGenerateTitle: createdNewDialog && Boolean(userMessage),
+                shouldGenerateTitle: false,
                 model: this.view.getSelectedModel(),
             });
         } catch (error) {

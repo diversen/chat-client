@@ -541,7 +541,14 @@ class TestChatEndpoints(BaseTestCase):
             "<p>By listing the first six prime numbers: $2, 3, 5, 7, 11$, and $13$, we can see</p>"
         )
 
-        assert title == "By listing the first six prime numbers and we can see"
+        assert title == "By listing the first six prime numbers 2 3 5 7 11 and 13 we can see"
+
+    def test_derive_dialog_title_from_user_message_allows_numeric_title(self):
+        from chat_client.endpoints.chat_endpoints import _derive_dialog_title_from_user_message
+
+        title = _derive_dialog_title_from_user_message("2026 roadmap")
+
+        assert title == "2026 roadmap"
 
     def test_extract_first_user_message_uses_first_user_message(self):
         from chat_client.endpoints.chat_endpoints import _extract_first_user_message

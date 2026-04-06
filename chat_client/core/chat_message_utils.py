@@ -188,8 +188,8 @@ def derive_dialog_title_from_user_message(user_content: str) -> str:
     normalized = unescape(str(user_content or "").strip())
     normalized = re.sub(r"<[^>]+>", " ", normalized)
     normalized = re.sub(r"[^\w\s]", " ", normalized, flags=re.UNICODE)
-    normalized = re.sub(r"[_\d]+", " ", normalized)
-    words = [word for word in normalized.split() if any(char.isalpha() for char in word)]
+    normalized = re.sub(r"_+", " ", normalized)
+    words = [word for word in normalized.split() if any(char.isalnum() for char in word)]
     if TITLE_FALLBACK_WORD_LIMIT > 0:
         words = words[:TITLE_FALLBACK_WORD_LIMIT]
     fallback_title = " ".join(words)
