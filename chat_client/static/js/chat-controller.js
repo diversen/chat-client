@@ -452,9 +452,7 @@ class ConversationController {
         let words = normalized
             .split(/\s+/)
             .filter((word) => word && [...word].some((char) => /[\p{L}\p{N}]/u.test(char)));
-        if (TITLE_FALLBACK_WORD_LIMIT > 0) {
-            words = words.slice(0, TITLE_FALLBACK_WORD_LIMIT);
-        }
+        words = words.slice(0, TITLE_FALLBACK_WORD_LIMIT);
         let title = words.join(' ').trim().replace(/\s+/g, ' ');
         if (title.length > TITLE_FALLBACK_MAX_LENGTH) {
             title = title.slice(0, TITLE_FALLBACK_MAX_LENGTH).replace(/[ ,.;:-]+$/u, '');
