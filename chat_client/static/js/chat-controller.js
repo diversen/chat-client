@@ -447,11 +447,11 @@ class ConversationController {
         const normalizedInput = String(userContent || '').trim();
         let normalized = normalizedInput
             .replace(/<[^>]+>/g, ' ')
-            .replace(/[^\w\s]/gu, ' ')
+            .replace(/[^\p{L}\p{N}_\s]/gu, ' ')
             .replace(/_+/g, ' ');
         let words = normalized
             .split(/\s+/)
-            .filter((word) => word && [...word].some((char) => /[\p{L}\p{N}]/u.test(char)));
+            .filter((word) => word && /[\p{L}\p{N}]/u.test(word));
         words = words.slice(0, TITLE_FALLBACK_WORD_LIMIT);
         let title = words.join(' ').trim().replace(/\s+/g, ' ');
         if (title.length > TITLE_FALLBACK_MAX_LENGTH) {
