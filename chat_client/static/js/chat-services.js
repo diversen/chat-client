@@ -1,4 +1,4 @@
-import { createDialog, generateDialogTitle, getMessages, createMessage, createAssistantTurnEvents, updateMessage, uploadAttachment } from './app-dialog.js';
+import { createDialog, generateDialogTitle, getMessages, createMessage, createAssistantTurnEvents, updateMessage, uploadAttachment } from '/static/js/app-dialog.js';
 
 const storageService = {
     createDialog,

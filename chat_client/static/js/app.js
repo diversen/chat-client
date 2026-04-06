@@ -1,12 +1,12 @@
-import { getConfig } from './app-dialog.js';
-import { getChatElements } from './app-elements.js';
-import { initAppEvents } from './app-events.js';
-import { attachImageIcon, attachFileIcon, sendIcon, abortIcon } from './app-icons.js';
-import { dd } from './diff-dom.js';
-import { renderKatex, renderMarkdownWithKatex } from './katex-render.js';
-import { storageService, chatService } from './chat-services.js';
-import { ConversationController } from './chat-controller.js';
-import { createChatView } from './chat-view.js';
+import { getConfig } from '/static/js/app-dialog.js';
+import { getChatElements } from '/static/js/app-elements.js';
+import { initAppEvents } from '/static/js/app-events.js';
+import { attachImageIcon, attachFileIcon, sendIcon, abortIcon } from '/static/js/app-icons.js';
+import { dd } from '/static/js/diff-dom.js';
+import { renderKatex, renderMarkdownWithKatex } from '/static/js/katex-render.js';
+import { storageService, chatService } from '/static/js/chat-services.js';
+import { ConversationController } from '/static/js/chat-controller.js';
+import { createChatView } from '/static/js/chat-view.js';
 
 const elements = getChatElements();
 elements.attachImageButtonElem.innerHTML = attachImageIcon;

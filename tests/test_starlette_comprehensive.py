@@ -73,12 +73,13 @@ class TestStarletteBackend:
             # Test message operations
             with patch("chat_client.core.user_session.is_logged_in", return_value=1):
                 # Create message
-                with patch("chat_client.repositories.chat_repository.create_message", return_value=456):
-                    response = client.post("/api/chat/dialogs/dialog-123/messages", json={"content": "Test message", "role": "user"})
-                    assert response.status_code == 200
-                    data = response.json()
-                    assert data["message_id"] == 456
-                    print("  ✓ Create message works")
+                with patch("chat_client.repositories.chat_repository.get_messages", return_value=[]):
+                    with patch("chat_client.repositories.chat_repository.create_message", return_value=456):
+                        response = client.post("/api/chat/dialogs/dialog-123/messages", json={"content": "Test message", "role": "user"})
+                        assert response.status_code == 200
+                        data = response.json()
+                        assert data["message_id"] == 456
+                        print("  ✓ Create message works")
 
                 # Get messages
                 with patch(

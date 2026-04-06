@@ -1,4 +1,4 @@
-import { copyIcon, checkIcon } from './app-icons.js';
+import { copyIcon, checkIcon } from '/static/js/app-icons.js';
 
 async function addCopyButtons(contentElem, _config) {
 

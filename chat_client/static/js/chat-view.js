@@ -1,12 +1,12 @@
-import { addCopyButtons } from './app-copy-buttons.js';
-import { Flash } from './flash.js';
-import { copyIcon, checkIcon, editIcon } from './app-icons.js';
-import { mdNoHTML } from './markdown.js';
-import { openImagePreviewModal } from './image-preview-modal.js';
+import { addCopyButtons } from '/static/js/app-copy-buttons.js';
+import { Flash } from '/static/js/flash.js';
+import { copyIcon, checkIcon, editIcon } from '/static/js/app-icons.js';
+import { mdNoHTML } from '/static/js/markdown.js';
+import { openImagePreviewModal } from '/static/js/image-preview-modal.js';
 import {
     createMessageMediaPreview,
     createPendingUploadsPreview,
-} from './chat-view-media.js';
+} from '/static/js/chat-view-media.js';
 
 const ANCHOR_SPACER_CLASS = 'responses-anchor-spacer';
 const MIN_ANCHOR_SPACER_HEIGHT_PX = 20;

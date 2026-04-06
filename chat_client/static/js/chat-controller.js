@@ -1,7 +1,7 @@
-import { Flash } from './flash.js';
-import { logError } from './error-log.js';
-import { Requests } from './requests.js';
-import { openImagePreviewModal, closeImagePreviewModal } from './image-preview-modal.js';
+import { Flash } from '/static/js/flash.js';
+import { logError } from '/static/js/error-log.js';
+import { Requests } from '/static/js/requests.js';
+import { openImagePreviewModal, closeImagePreviewModal } from '/static/js/image-preview-modal.js';
 
 const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
 const MAX_CONVERSATION_UPLOADS = 10;

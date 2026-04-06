@@ -1,5 +1,5 @@
-import { mdNoHTML } from './markdown.js';
-import { modifyStreamedText } from './utils.js';
+import { mdNoHTML } from '/static/js/markdown.js';
+import { modifyStreamedText } from '/static/js/utils.js';
 
 const KATEX_DELIMITERS = [
     { left: "$$", right: "$$", display: true },
