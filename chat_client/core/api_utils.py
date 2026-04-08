@@ -6,7 +6,7 @@ from openai import OpenAI
 
 OLLAMA_CAPABILITY_TIMEOUT_SECONDS = 5.0
 
-_OLLAMA_CAPABILITY_CACHE: dict[tuple[str, str], dict[str, bool]] = {}
+_OLLAMA_MODEL_METADATA_CACHE: dict[tuple[str, str], dict[str, Any]] = {}
 
 
 def get_provider_models(provider: dict):
@@ -56,6 +56,35 @@ def _extract_ollama_capability_flags(show_payload: dict[str, Any], model_name: s
             "thinking" in normalized_capabilities or "reasoning" in normalized_capabilities or "thinking" in normalized_name
         ),
     }
+
+
+def _extract_ollama_context_length(show_payload: dict[str, Any]) -> int | None:
+    model_info = show_payload.get("model_info")
+    if isinstance(model_info, dict):
+        for key, value in model_info.items():
+            normalized_key = str(key or "").strip().lower()
+            if normalized_key.endswith(".context_length"):
+                try:
+                    context_length = int(value)
+                except (TypeError, ValueError):
+                    continue
+                if context_length > 0:
+                    return context_length
+
+    parameters = str(show_payload.get("parameters", "") or "")
+    for raw_line in parameters.splitlines():
+        line = raw_line.strip()
+        if not line.lower().startswith("num_ctx"):
+            continue
+        _, _, value = line.partition(" ")
+        try:
+            context_length = int(value.strip())
+        except (TypeError, ValueError):
+            continue
+        if context_length > 0:
+            return context_length
+
+    return None
 
 
 def _ollama_post(
@@ -117,9 +146,9 @@ def _ollama_model_accepts_tools(
     return True
 
 
-def get_ollama_model_capabilities(provider: dict[str, Any], model_name: str) -> dict[str, bool]:
+def get_ollama_model_metadata(provider: dict[str, Any], model_name: str) -> dict[str, Any]:
     """
-    Best-effort Ollama capability detection.
+    Best-effort Ollama metadata detection.
 
     `supports_tools` means the model safely accepts a `tools` payload.
     `supports_thinking` is informational only and should not be used to gate requests.
@@ -133,16 +162,17 @@ def get_ollama_model_capabilities(provider: dict[str, Any], model_name: str) -> 
         return {}
 
     cache_key = (api_base_url, normalized_model_name)
-    cached = _OLLAMA_CAPABILITY_CACHE.get(cache_key)
+    cached = _OLLAMA_MODEL_METADATA_CACHE.get(cache_key)
     if cached is not None:
         return dict(cached)
 
     timeout_seconds = float(provider.get("timeout_seconds", OLLAMA_CAPABILITY_TIMEOUT_SECONDS) or OLLAMA_CAPABILITY_TIMEOUT_SECONDS)
     api_key = str(provider.get("api_key", "") or "")
-    capabilities = {
+    metadata: dict[str, Any] = {
         "supports_images": False,
         "supports_tools": False,
         "supports_thinking": "thinking" in normalized_model_name.lower(),
+        "context_length": None,
     }
 
     try:
@@ -153,18 +183,28 @@ def get_ollama_model_capabilities(provider: dict[str, Any], model_name: str) -> 
             api_key=api_key,
             timeout_seconds=timeout_seconds,
         )
-        capabilities.update(_extract_ollama_capability_flags(show_payload, normalized_model_name))
+        metadata.update(_extract_ollama_capability_flags(show_payload, normalized_model_name))
+        metadata["context_length"] = _extract_ollama_context_length(show_payload)
     except Exception:
-        _OLLAMA_CAPABILITY_CACHE[cache_key] = dict(capabilities)
-        return dict(capabilities)
+        _OLLAMA_MODEL_METADATA_CACHE[cache_key] = dict(metadata)
+        return dict(metadata)
 
-    if not capabilities["supports_tools"]:
-        capabilities["supports_tools"] = _ollama_model_accepts_tools(
+    if not metadata["supports_tools"]:
+        metadata["supports_tools"] = _ollama_model_accepts_tools(
             api_base_url,
             model_name=normalized_model_name,
             api_key=api_key,
             timeout_seconds=timeout_seconds,
         )
 
-    _OLLAMA_CAPABILITY_CACHE[cache_key] = dict(capabilities)
-    return dict(capabilities)
+    _OLLAMA_MODEL_METADATA_CACHE[cache_key] = dict(metadata)
+    return dict(metadata)
+
+
+def get_ollama_model_capabilities(provider: dict[str, Any], model_name: str) -> dict[str, bool]:
+    metadata = get_ollama_model_metadata(provider, model_name)
+    return {
+        "supports_images": bool(metadata.get("supports_images")),
+        "supports_tools": bool(metadata.get("supports_tools")),
+        "supports_thinking": bool(metadata.get("supports_thinking")),
+    }

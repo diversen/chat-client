@@ -2,9 +2,9 @@ import json
 import logging
 from typing import Any, Callable
 
-from chat_client.core.api_utils import get_ollama_model_capabilities
+from chat_client.core.api_utils import get_ollama_model_metadata
 
-_MODEL_CAPABILITIES_CACHE: dict[str, dict[str, dict[str, bool]]] = {}
+_MODEL_CAPABILITIES_CACHE: dict[str, dict[str, dict[str, Any]]] = {}
 
 
 def resolve_model_provider_name(models: dict[str, Any], model_name: str) -> str:
@@ -62,7 +62,7 @@ def build_model_capabilities(
     system_message_denylist: list[str] | None,
     provider_info_resolver: Callable[[str], dict[str, Any]],
     cache_token: Any = None,
-) -> dict[str, dict[str, bool]]:
+) -> dict[str, dict[str, Any]]:
     cache_key = _build_cache_key(
         models=models,
         vision_models=vision_models,
@@ -83,11 +83,11 @@ def build_model_capabilities(
         else:
             configured_tool_models = set(tool_models)
 
-    capabilities: dict[str, dict[str, bool]] = {}
+    capabilities: dict[str, dict[str, Any]] = {}
     for model_name in models.keys():
-        detected_capabilities: dict[str, bool] = {}
+        detected_capabilities: dict[str, Any] = {}
         if resolve_model_provider_name(models, model_name) == "ollama":
-            detected_capabilities = get_ollama_model_capabilities(provider_info_resolver(model_name), model_name)
+            detected_capabilities = get_ollama_model_metadata(provider_info_resolver(model_name), model_name)
 
         supports_images = model_name in configured_vision_models or bool(detected_capabilities.get("supports_images"))
         supports_tools = model_name in configured_tool_models or bool(detected_capabilities.get("supports_tools"))
@@ -98,6 +98,7 @@ def build_model_capabilities(
             "supports_attachments": supports_tools,
             "supports_thinking": bool(detected_capabilities.get("supports_thinking")),
             "supports_system_messages": supports_system_messages,
+            "context_length": detected_capabilities.get("context_length"),
         }
     _MODEL_CAPABILITIES_CACHE[cache_key] = {model_name: dict(details) for model_name, details in capabilities.items()}
     return {model_name: dict(details) for model_name, details in capabilities.items()}
@@ -174,7 +175,7 @@ def warm_and_log_model_capabilities(
     system_message_denylist: list[str] | None,
     provider_info_resolver: Callable[[str], dict[str, Any]],
     cache_token: Any = None,
-) -> dict[str, dict[str, bool]]:
+) -> dict[str, dict[str, Any]]:
     capabilities = build_model_capabilities(
         models=models,
         vision_models=vision_models,

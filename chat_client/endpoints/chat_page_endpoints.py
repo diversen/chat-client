@@ -66,6 +66,12 @@ async def list_chat_models(
     *,
     list_models_impl,
     get_model_names,
+    get_model_entries,
     json_success,
 ):
-    return await list_models_impl(request, get_model_names=get_model_names, json_success=json_success)
+    return await list_models_impl(
+        request,
+        get_model_names=get_model_names,
+        get_model_entries=get_model_entries,
+        json_success=json_success,
+    )

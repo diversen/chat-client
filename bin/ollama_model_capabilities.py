@@ -10,7 +10,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from chat_client.core.api_utils import get_ollama_model_capabilities, get_provider_models
+from chat_client.core.api_utils import get_ollama_model_metadata, get_provider_models
 
 
 def _load_default_provider() -> dict:
@@ -83,7 +83,7 @@ def main() -> int:
         print("No models provided and no Ollama models were discovered.", file=sys.stderr)
         return 2
 
-    results = {model: get_ollama_model_capabilities(provider, model) for model in models}
+    results = {model: get_ollama_model_metadata(provider, model) for model in models}
 
     if args.json:
         print(json.dumps(results, indent=2, sort_keys=True))
@@ -93,6 +93,7 @@ def main() -> int:
         capabilities = results[model]
         print(
             f"{model:<32} "
+            f"context={str(capabilities.get('context_length') or '-'):<8} "
             f"images={'yes' if capabilities.get('supports_images') else 'no':<3} "
             f"tools={'yes' if capabilities.get('supports_tools') else 'no':<3} "
             f"thinking={'yes' if capabilities.get('supports_thinking') else 'no':<3}"

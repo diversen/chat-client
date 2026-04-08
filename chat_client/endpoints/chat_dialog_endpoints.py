@@ -18,9 +18,10 @@ async def get_chat_config(request: Request, *, config, system_message_denylist, 
     return json_success(**config_values)
 
 
-async def list_chat_models(request: Request, *, get_model_names, json_success):
+async def list_chat_models(request: Request, *, get_model_names, get_model_entries, json_success):
     model_names = await get_model_names()
-    return json_success(model_names=model_names)
+    model_entries = await get_model_entries()
+    return json_success(model_names=model_names, models=model_entries)
 
 
 async def create_dialog(

@@ -38,6 +38,7 @@ from chat_client.core.http import (
     parse_json_payload,
     require_user_id_json,
 )
+from chat_client.core.api_utils import get_ollama_model_metadata
 from chat_client.schemas.chat import (
     ChatStreamRequest,
     CreateAssistantTurnEventsRequest,
@@ -566,11 +567,24 @@ async def _get_model_names():
     return list(MODELS.keys())
 
 
+async def _get_model_entries():
+    entries: list[dict[str, Any]] = []
+    for model_name in MODELS.keys():
+        entry: dict[str, Any] = {"name": model_name}
+        if model_capabilities.resolve_model_provider_name(MODELS, model_name) == "ollama":
+            metadata = get_ollama_model_metadata(_resolve_provider_info(model_name), model_name)
+            if metadata.get("context_length") is not None:
+                entry["context_length"] = metadata["context_length"]
+        entries.append(entry)
+    return entries
+
+
 async def list_chat_models(request: Request):
     return await chat_page_endpoints.list_chat_models(
         request,
         list_models_impl=chat_dialog_endpoints.list_chat_models,
         get_model_names=_get_model_names,
+        get_model_entries=_get_model_entries,
         json_success=json_success,
     )
 

@@ -627,6 +627,7 @@ class TestChatEndpoints(BaseTestCase):
                 "supports_attachments": False,
                 "supports_thinking": False,
                 "supports_system_messages": True,
+                "context_length": None,
             },
             "tool-model": {
                 "supports_images": False,
@@ -634,6 +635,7 @@ class TestChatEndpoints(BaseTestCase):
                 "supports_attachments": True,
                 "supports_thinking": False,
                 "supports_system_messages": True,
+                "context_length": None,
             },
             "combo-model": {
                 "supports_images": False,
@@ -641,16 +643,29 @@ class TestChatEndpoints(BaseTestCase):
                 "supports_attachments": False,
                 "supports_thinking": False,
                 "supports_system_messages": True,
+                "context_length": None,
             },
         }
 
     def test_list_models(self):
         """Test GET /api/chat/models (available models)"""
-        response = self.client.get("/api/chat/models")
+        with (
+            patch("chat_client.endpoints.chat_endpoints.MODELS", {"qwen3:latest": "ollama", "gpt-5-nano": "openai"}),
+            patch(
+                "chat_client.endpoints.chat_endpoints.get_ollama_model_metadata",
+                return_value={"context_length": 32768, "supports_images": False, "supports_tools": True, "supports_thinking": False},
+            ),
+        ):
+            response = self.client.get("/api/chat/models")
         assert response.status_code == 200
         data = response.json()
         assert "model_names" in data
         assert isinstance(data["model_names"], list)
+        assert data["model_names"] == ["qwen3:latest", "gpt-5-nano"]
+        assert data["models"] == [
+            {"name": "qwen3:latest", "context_length": 32768},
+            {"name": "gpt-5-nano"},
+        ]
 
     @patch("chat_client.core.user_session.is_logged_in")
     def test_chat_response_stream_not_authenticated(self, mock_logged_in):

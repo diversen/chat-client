@@ -43,10 +43,10 @@ class DummyClient:
 
 
 def test_get_ollama_model_capabilities_reads_show_capabilities():
-    api_utils._OLLAMA_CAPABILITY_CACHE.clear()
+    api_utils._OLLAMA_MODEL_METADATA_CACHE.clear()
     client = DummyClient(
         [
-            DummyResponse({"capabilities": ["vision", "thinking"]}),
+            DummyResponse({"capabilities": ["vision", "thinking"], "model_info": {"llama.context_length": 8192}}),
             DummyResponse({"message": {"content": "ok"}}),
         ]
     )
@@ -67,7 +67,7 @@ def test_get_ollama_model_capabilities_reads_show_capabilities():
 
 
 def test_get_ollama_model_capabilities_returns_false_tools_when_probe_fails():
-    api_utils._OLLAMA_CAPABILITY_CACHE.clear()
+    api_utils._OLLAMA_MODEL_METADATA_CACHE.clear()
     client = DummyClient(
         [
             DummyResponse({"capabilities": []}),
@@ -89,4 +89,26 @@ def test_get_ollama_model_capabilities_returns_false_tools_when_probe_fails():
         "supports_images": False,
         "supports_tools": False,
         "supports_thinking": False,
+    }
+
+
+def test_get_ollama_model_metadata_includes_context_length():
+    api_utils._OLLAMA_MODEL_METADATA_CACHE.clear()
+    client = DummyClient(
+        [
+            DummyResponse({"capabilities": ["tools"], "model_info": {"qwen2.context_length": 32768}}),
+        ]
+    )
+
+    with patch("chat_client.core.api_utils.httpx.Client", return_value=client):
+        metadata = api_utils.get_ollama_model_metadata(
+            {"base_url": "http://127.0.0.1:11434/v1", "api_key": "ollama"},
+            "qwen3:latest",
+        )
+
+    assert metadata == {
+        "supports_images": False,
+        "supports_tools": True,
+        "supports_thinking": False,
+        "context_length": 32768,
     }
