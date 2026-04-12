@@ -13,20 +13,13 @@ from chat_client.tools.python_runtime import PythonRuntimeError, build_user_code
 
 def test_python_tool_evaluates_expression():
     with patch("chat_client.tools.python_runtime.subprocess.run") as run_mock:
-        run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="3\n", stderr="")
-        assert python_hardened("1 + 2") == "3"
+        run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
+        assert python_hardened("1 + 2") == NO_RESULT_ERROR
 
 
-def test_user_code_wrapper_prints_final_expression_result():
-    globals_dict: dict[str, object] = {}
-    exec(compile(build_user_code_wrapper("x = 2\nx + 3"), "<test>", "exec"), globals_dict)
-    assert globals_dict["_chat_client_last_expression_value"] == 5
-
-
-def test_user_code_wrapper_keeps_none_results_silent(capsys: pytest.CaptureFixture[str]):
-    exec(compile(build_user_code_wrapper("items = []\nitems.append(1)"), "<test>", "exec"), {})
-    captured = capsys.readouterr()
-    assert captured.out == ""
+def test_user_code_wrapper_returns_code_unchanged():
+    code = "x = 2\nx + 3"
+    assert build_user_code_wrapper(code) == code
 
 
 def test_python_tool_allows_imports():
@@ -202,9 +195,9 @@ def test_python_tool_uses_configured_timeout():
     config_module = types.SimpleNamespace(PYTHON_TOOL_TIMEOUT_SECONDS=30)
     with patch.dict("sys.modules", {"data.config": config_module}):
         with patch("chat_client.tools.python_runtime.subprocess.run") as run_mock:
-            run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="3\n", stderr="")
+            run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
             result = python_hardened("1 + 2")
-            assert result == "3"
+            assert result == NO_RESULT_ERROR
             assert run_mock.call_args.kwargs["timeout"] == 30.0
 
 
@@ -212,7 +205,7 @@ def test_python_tool_zero_timeout_means_infinite():
     config_module = types.SimpleNamespace(PYTHON_TOOL_TIMEOUT_SECONDS=0)
     with patch.dict("sys.modules", {"data.config": config_module}):
         with patch("chat_client.tools.python_runtime.subprocess.run") as run_mock:
-            run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="3\n", stderr="")
+            run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="", stderr="")
             result = python_hardened("1 + 2")
-            assert result == "3"
+            assert result == NO_RESULT_ERROR
             assert run_mock.call_args.kwargs["timeout"] is None
