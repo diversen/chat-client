@@ -117,10 +117,10 @@ LOCAL_TOOL_DEFINITIONS = [
     {
         "name": "python_tool",
         "description": (
-            "Run Python code in a sandboxed container. "
+            'Run Python code in a sandboxed container. '
             'Use this tool only with a JSON object of the form {"code": "..."} where '
-            "the code value is a single Python script string. Call the tool name exactly "
-            'as "python_tool".'
+            'the code value is a single Python script string. Call the tool name exactly '
+            'as "python_tool". Print out the final result on the last line like this `print(result)`'
         ),
         "input_schema": {
             "type": "object",
