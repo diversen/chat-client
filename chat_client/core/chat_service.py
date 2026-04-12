@@ -251,6 +251,25 @@ def _close_stream(stream: Any, logger: logging.Logger) -> None:
         logger.exception("Failed to close provider stream")
 
 
+def _create_sync_stream(create_fn: Callable[..., Any], create_kwargs: dict[str, Any]) -> Any:
+    """
+    Run the provider stream creation in a worker thread so connection setup
+    cannot block the event loop.
+    """
+    return create_fn(**create_kwargs)
+
+
+def _next_stream_chunk(iterator: Any) -> tuple[bool, Any]:
+    """
+    Advance a synchronous stream iterator without leaking StopIteration across
+    the thread boundary.
+    """
+    try:
+        return False, next(iterator)
+    except StopIteration:
+        return True, None
+
+
 def _extract_error_messages(value: Any) -> list[str]:
     messages: list[str] = []
     if isinstance(value, dict):
@@ -775,7 +794,7 @@ async def chat_response_stream(
                 **base_log_context,
             )
 
-            stream_response = client.chat.completions.create(**create_kwargs)
+            stream_response = await asyncio.to_thread(_create_sync_stream, client.chat.completions.create, create_kwargs)
             disconnected = False
             assistant_content_parts: list[str] = []
             finish_reason: Any = None
@@ -797,7 +816,11 @@ async def chat_response_stream(
             }
 
             try:
-                for chunk in stream_response:
+                stream_iterator = iter(stream_response)
+                while True:
+                    finished, chunk = await asyncio.to_thread(_next_stream_chunk, stream_iterator)
+                    if finished:
+                        break
                     if await request.is_disconnected():
                         disconnected = True
                         break
