@@ -67,7 +67,7 @@ CHAT_MAX_LOOP_ROUNDS = 50
 
 # Number of extra attempts allowed when a streamed response ends without visible answer content.
 # Set to 0 to disable retries.
-CHAT_EMPTY_ANSWER_RETRY_COUNT = 1
+CHAT_EMPTY_ANSWER_RETRY_COUNT = 3
 
 # When True, also retry responses that end with finish_reason="stop" but still produce no answer content.
 # When False, only incomplete no-finish streams are retried.
