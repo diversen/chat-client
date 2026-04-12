@@ -11,7 +11,7 @@ from chat_client.core.attachments import resolve_tool_mount_dir
 MAX_CODE_LENGTH = 8_000
 DEFAULT_PYTHON_TOOL_TIMEOUT_SECONDS = 10.0
 PYTHON_TOOL_DOCKER_IMAGE = "chat-client-python-tool"
-NO_RESULT_ERROR = "[stderr]\nNo result produced. Please print the answer or end with an expression."
+NO_RESULT_ERROR = "[stderr]\nNo result produced. Please print the answer."
 ATTACHMENT_SOURCE_MOUNT_DIR = "/mnt/input"
 ATTACHMENT_TMPFS_SPEC = "rw,size=65m"
 
