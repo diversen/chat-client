@@ -10,7 +10,9 @@
 - User accounts and chat history
 - Prompt management
 - Image uploads for vision-capable models
+- Attachment uploading for tool usage
 - Tool calling through local tools or MCP
+- Vision, Thinking and tool usage. 
 
 See [docs/mcp.md](docs/mcp.md) for MCP notes.
 
@@ -27,25 +29,15 @@ Initialize config and data:
 chat-client
 ```
 
-This creates `data/config.py` and the database if they do not already exist. It may also prompt you to create the first user.
+This creates `data/config.py` and the database if they do not already exist. It also prompt you to create the first user.
 
-Edit `data/config.py` to configure your providers and models, then start the app:
+Edit `data/config.py` to configure your providers and models. It defaults to all models running on a local `ollama` server. Then start the app:
 
 ```bash
 chat-client server-dev
 ```
 
 Open <http://localhost:1972>.
-
-## Local Development
-
-```bash
-uv venv
-source .venv/bin/activate
-uv pip install -e .
-chat-client init-system
-chat-client server-dev
-```
 
 ## Tests
 
