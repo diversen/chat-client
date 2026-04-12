@@ -8,13 +8,25 @@ import pytest
 
 from chat_client.core.attachments import prepare_tool_attachment_mount
 from chat_client.tools.python_tool import NO_RESULT_ERROR, python_hardened, python_relaxed
-from chat_client.tools.python_runtime import PythonRuntimeError
+from chat_client.tools.python_runtime import PythonRuntimeError, build_user_code_wrapper
 
 
 def test_python_tool_evaluates_expression():
     with patch("chat_client.tools.python_runtime.subprocess.run") as run_mock:
         run_mock.return_value = subprocess.CompletedProcess(args=[], returncode=0, stdout="3\n", stderr="")
         assert python_hardened("1 + 2") == "3"
+
+
+def test_user_code_wrapper_prints_final_expression_result():
+    globals_dict: dict[str, object] = {}
+    exec(compile(build_user_code_wrapper("x = 2\nx + 3"), "<test>", "exec"), globals_dict)
+    assert globals_dict["_chat_client_last_expression_value"] == 5
+
+
+def test_user_code_wrapper_keeps_none_results_silent(capsys: pytest.CaptureFixture[str]):
+    exec(compile(build_user_code_wrapper("items = []\nitems.append(1)"), "<test>", "exec"), {})
+    captured = capsys.readouterr()
+    assert captured.out == ""
 
 
 def test_python_tool_allows_imports():

@@ -3,6 +3,7 @@ import os
 import subprocess
 import tempfile
 import uuid
+from textwrap import dedent
 from contextlib import nullcontext
 
 from chat_client.core.attachments import resolve_tool_mount_dir
@@ -69,6 +70,61 @@ def _chat_client_populate_workspace():
 
 _chat_client_populate_workspace()
 """.strip()
+
+
+def build_user_code_wrapper(code: str) -> str:
+    return dedent(
+        f"""
+        import ast as _chat_client_ast
+
+        _chat_client_source = {code!r}
+        _chat_client_tree = _chat_client_ast.parse(
+            _chat_client_source,
+            filename="/sandbox/script.py",
+            mode="exec",
+        )
+
+        if _chat_client_tree.body and isinstance(_chat_client_tree.body[-1], _chat_client_ast.Expr):
+            _chat_client_last_expr = _chat_client_tree.body[-1]
+            _chat_client_result_name = "_chat_client_last_expression_value"
+            _chat_client_tree.body[-1:] = [
+                _chat_client_ast.copy_location(
+                    _chat_client_ast.Assign(
+                        targets=[_chat_client_ast.Name(id=_chat_client_result_name, ctx=_chat_client_ast.Store())],
+                        value=_chat_client_last_expr.value,
+                    ),
+                    _chat_client_last_expr,
+                ),
+                _chat_client_ast.copy_location(
+                    _chat_client_ast.If(
+                        test=_chat_client_ast.Compare(
+                            left=_chat_client_ast.Name(id=_chat_client_result_name, ctx=_chat_client_ast.Load()),
+                            ops=[_chat_client_ast.IsNot()],
+                            comparators=[_chat_client_ast.Constant(value=None)],
+                        ),
+                        body=[
+                            _chat_client_ast.Expr(
+                                value=_chat_client_ast.Call(
+                                    func=_chat_client_ast.Name(id="print", ctx=_chat_client_ast.Load()),
+                                    args=[_chat_client_ast.Name(id=_chat_client_result_name, ctx=_chat_client_ast.Load())],
+                                    keywords=[],
+                                )
+                            )
+                        ],
+                        orelse=[],
+                    ),
+                    _chat_client_last_expr,
+                ),
+            ]
+
+        _chat_client_tree = _chat_client_ast.fix_missing_locations(_chat_client_tree)
+        exec(compile(_chat_client_tree, filename="/sandbox/script.py", mode="exec"))
+        """
+    ).strip()
+
+
+def build_runtime_script(code: str) -> str:
+    return f"{build_runtime_prelude()}\n\n{build_user_code_wrapper(code)}"
 
 
 def resolve_docker_image(docker_image: str | None) -> str:
@@ -139,7 +195,7 @@ def run_python_in_docker(
             if not resolved_attachment_host_dir:
                 raise ValueError("attachment_host_dir is required")
             with tempfile.NamedTemporaryFile(mode="w", suffix=".py", encoding="utf-8", delete=False) as code_file:
-                wrapped_code = f"{build_runtime_prelude()}\n\n{code}"
+                wrapped_code = build_runtime_script(code)
                 code_file.write(wrapped_code)
                 code_file_path = code_file.name
         os.chmod(code_file_path, 0o644)
