@@ -19,9 +19,9 @@ const config = await getConfig();
 // Math rendering
 const useKatex = config.use_katex;
 const STREAM_RENDER_CONFIG = {
-    runHighlightOnUpdate: false,
+    runHighlightOnUpdate: true,
     runHighlightOnFinalize: true,
-    runKatexOnUpdate: false,
+    runKatexOnUpdate: true,
     runKatexOnFinalize: true,
 };
 
