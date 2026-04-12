@@ -1,101 +1,83 @@
-# chat client
+# chat-client
 
-Use the simple `chat-client` to chat with a local or remote LLM.
-	
+`chat-client` is a small Starlette web app for chatting with OpenAI-compatible LLM backends such as Ollama, OpenAI, Gemini-compatible endpoints, and similar servers.
+
 [![chat-client](docs/screenshot.png)](docs/screenshot.png)
-
-Simple python tool utilizing a sqlite3 backend and a minimal HTML / JavaScript frontend.
 
 ## Features
 
-* User authentication and registration
-* Highlight code
-* Highlight KaTeX math
-* Dark, light, system mode
-* Chat history
-* Chat management (edit, continue, or delete chats)
-* Copy dialog message to clipboard
-* Upload images. Supports vision models.
-* Custom system prompts
-* Tool calling using MCP (Model Context Protocol) protocol. 
+- Server-rendered UI with SQLite storage
+- User accounts and chat history
+- Prompt management
+- Image uploads for vision-capable models
+- Tool calling through local tools or MCP
 
-See [docs/mcp.md](docs/mcp.md) for the current MCP config notes.
+See [docs/mcp.md](docs/mcp.md) for MCP notes.
 
-## Python Tool Sandbox
+## Install
 
-The built-in `python_hardened` tool runs code in a hardened Docker container and requires Docker to be installed.
+Install the latest version:
 
-There is also a `python_relaxed` tool for local testing. It still runs in Docker, but it skips AST safety checks and does not disable container network access.
+<!-- LATEST-VERSION-UV -->
+	uv tool install git+https://github.com/diversen/chat-client@v2.3.69
 
-The Python tool uses the hardcoded Docker image `chat-client-python-tool`, built from the pinned science runtime with `numpy`, `sympy`, and `pandas`.
-Build it before using the tool:
+Initialize config and data:
+
+```bash
+chat-client
+```
+
+This creates `data/config.py` and the database if they do not already exist. It may also prompt you to create the first user.
+
+Edit `data/config.py` to configure your providers and models, then start the app:
+
+```bash
+chat-client server-dev
+```
+
+Open <http://localhost:1972>.
+
+## Local Development
+
+```bash
+uv venv
+source .venv/bin/activate
+uv pip install -e .
+chat-client init-system
+chat-client server-dev
+```
+
+## Tests
+
+Backend tests:
+
+```bash
+python tests/run_all_tests.py
+```
+
+E2E tests:
+
+```bash
+npm install
+npx playwright install
+npm run e2e
+```
+
+See [tests/README.md](tests/README.md) for test notes.
+
+## Python Tool
+
+The built-in Python tool runs in Docker. Build the image before using it:
 
 ```bash
 sandbox/build_python_tool.sh
 ```
 
-Set the execution timeout in `data/config.py`:
+You can configure its timeout in `data/config.py` with `PYTHON_TOOL_TIMEOUT_SECONDS`.
 
-```python
-PYTHON_TOOL_TIMEOUT_SECONDS = 10
-```
-
-Use `0` for no timeout.
-
-## Demo
-
-Try the demo at: https://chat.10kilobyte.com
-
-Use the credentials `demo:demo` to log in.
-
-Or create a user and login.
-
-You can then use the chat-client to interface with `gemma3:270m`, which is running fairly well on CPU. 
-
-## Backends
-
-Access to any chat service that can use the OpenAI API. This can be a local or remote instance of a LLM server. The server should support the OpenAI API.
-
-You can connect to local models served by `ollama` or `vllm` instances. Or serve models from remote APIs like `openai` or `google`.
-
-## Install
-
-Install latest version of chat-client:
-
-<!-- LATEST-VERSION-UV -->
-	uv tool install git+https://github.com/diversen/chat-client@v2.3.69
-
-Initialize the configuration and data dir:
-
-```bash
-# On first run, `chat-client` creates `data/config.py`, initializes the
-# database, and can prompt for an initial user when run interactively.
-chat-client
-
-# Optional manual setup command. Safe to run again.
-chat-client init-system
-
-# Optional manual user creation
-chat-client create-user
-```
-
-Edit the `data/config.py` file to set the LLM provider and a model you want to use. Then start the server:
-
-```
-chat-client server-dev
-```
-
-Access the `chat-client` at http://localhost:1972
-
-All data is stored in `./data/` directory of the running instance. E.g. `log files` and sqlite3 `database`. You should checkout the `./data/config.py` file and change the configuration to fit your needs. 
-
-## Upgrade using uv
-
-Upgrade to latest version
+## Upgrade
 
 <!-- LATEST-VERSION-UV-FORCE -->
 	uv tool install git+https://github.com/diversen/chat-client@v2.3.69 --force
-
-And then restart the running server instance. 
 
 MIT © [Dennis Iversen](https://github.com/diversen)

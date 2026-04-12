@@ -11,11 +11,9 @@ uv pip install -e .
 chat-client init-system
 ```
 
-## Backend tests
+## Backend
 
 No server needs to be started.
-No user needs to be created manually.
-Ollama must be running and reachable at the configured endpoint (default `http://localhost:11434/v1`), otherwise app import can exit before tests run.
 
 ```bash
 python tests/test_starlette_simple.py
@@ -23,27 +21,19 @@ python tests/test_starlette_comprehensive.py
 python tests/run_all_tests.py
 ```
 
-## E2E tests
+## E2E
 
-Install the Node/Playwright dependencies first. If `npm run e2e` fails with `playwright: not found`, run:
+Install Node and Playwright dependencies first:
 
 ```bash
 npm install
 npx playwright install
 ```
 
-For `npm run e2e`, start the app yourself and make sure the e2e user exists.
+Managed mode starts its own server and bootstraps its own test user:
 
 ```bash
-# Start app for local e2e mode
-chat-client server-dev
-
-# In another terminal, create the user used by E2E_EMAIL/E2E_PASSWORD if needed
-chat-client create-user
-
-# Use an already running server at http://localhost:8000
-E2E_EMAIL=test E2E_PASSWORD=test npm run e2e
-
-# Or let Playwright start its own server
-npm run e2e:managed
+npm run e2e
 ```
+
+For more E2E details, see `tests/e2e/README.md`.

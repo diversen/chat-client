@@ -1,19 +1,22 @@
 # AGENTS
 
-## Project Snapshot
-- `chat-client` is a Python 3.10+ Starlette web app with server-rendered templates and static JS/CSS.
-- Main app entrypoint: `chat_client/main.py` (`app` object).
-- CLI entrypoint: `chat_client/cli.py` (`chat-client` command).
-- Data and runtime config are under `data/` (especially `data/config.py` and `data/database.db`).
+## Project
 
-## Code Map
-- `chat_client/endpoints/`: route handlers (`chat`, `user`, `prompt`, `error`).
-- `chat_client/repositories/`: data access layer.
-- `chat_client/core/`: middleware, sessions, templates, shared utilities.
-- `chat_client/templates/` and `chat_client/static/`: UI.
-- `tests/`: Starlette backend tests (simple + comprehensive scripts).
+- `chat-client` is a Python 3.10+ Starlette app with server-rendered templates and static JS/CSS.
+- App entrypoint: `chat_client/main.py`
+- CLI entrypoint: `chat_client/cli.py` via `chat-client`
+- Runtime data and config live under `data/`
 
-## Local Setup
+## Layout
+
+- `chat_client/endpoints/`: route handlers
+- `chat_client/repositories/`: database access
+- `chat_client/core/`: shared app logic
+- `chat_client/templates/` and `chat_client/static/`: UI
+- `tests/`: backend and Playwright tests
+
+## Setup
+
 ```bash
 uv venv
 source .venv/bin/activate
@@ -21,18 +24,17 @@ uv pip install -e .
 chat-client init-system
 ```
 
-## Run
+## Commands
+
 - Dev server: `chat-client server-dev`
-- Prod-style server: `chat-client server-prod`
+- Prod server: `chat-client server-prod`
+- Checks: `bin/check_code.sh`
+- Backend tests: `python tests/run_all_tests.py`
+- Smoke test: `python tests/test_starlette_simple.py`
 
-## Checks
-- Format/lint/type-check: `bin/check_code.sh`
-- Run tests: `python tests/run_all_tests.py`
-- Faster smoke test: `python tests/test_starlette_simple.py`
-- E2E tests require Node dependencies. If `npm run e2e` fails with `playwright: not found`, run `npm install` and `npx playwright install` from the project root first.
+## Notes
 
-## Editing Guidelines
-- Keep endpoint logic thin; prefer repository/core helpers for reusable behavior.
-- Avoid committing secrets or real API keys to `data/config.py`.
-- Do not edit Alembic migration history unless the task is explicitly about migrations.
-- If behavior changes, update or add tests in `tests/` alongside the affected endpoint area.
+- Keep endpoint handlers thin; move reusable logic into `core` or `repositories`.
+- Do not commit secrets to `data/config.py`.
+- Do not edit migration history unless the task is explicitly about migrations.
+- If behavior changes, update tests in `tests/`.
