@@ -414,6 +414,7 @@ function createAssistantSegmentShell(messageId = null, initialKind = 'Thinking',
     const segmentKindElement = document.createElement('span');
     segmentKindElement.className = 'assistant-segment-kind';
     segmentKindElement.textContent = String(initialKind || 'Thinking');
+    let currentKindLabel = String(initialKind || 'Thinking').trim() || 'Thinking';
     const loader = document.createElement('div');
     loader.className = 'loading-model';
     if (!showLoader) {
@@ -458,7 +459,8 @@ function createAssistantSegmentShell(messageId = null, initialKind = 'Thinking',
         },
         setSegmentKind(kind) {
             const safeKind = String(kind || '').trim();
-            segmentKindElement.textContent = safeKind || 'Thinking';
+            currentKindLabel = safeKind || 'Thinking';
+            segmentKindElement.textContent = currentKindLabel;
         },
         setLoading(isLoading) {
             loader.classList.toggle('hidden', !isLoading);
@@ -477,7 +479,7 @@ function createAssistantSegmentShell(messageId = null, initialKind = 'Thinking',
             segmentHeader.setAttribute('role', 'button');
             segmentHeader.setAttribute('tabindex', '0');
             segmentHeader.setAttribute('aria-expanded', String(Boolean(isOpen)));
-            segmentHeader.title = `Show/hide ${String(initialKind || 'segment').toLowerCase()} details`;
+            segmentHeader.title = `Show/hide ${currentKindLabel.toLowerCase()} details`;
         },
         contentElement: bodyElement,
         contentWrapperElement: contentElement,
@@ -503,10 +505,10 @@ function createChatView({ config, elements, renderStreamedResponseText, updateCo
         const segmentKind = getSegmentKindKey(kind);
         return {
             kind: segmentKind,
-            isCollapsible: segmentKind === 'thinking' || segmentKind === 'tool',
-            defaultOpen: segmentKind === 'tool'
-                    ? toolCallsOpenByDefault
-                    : false,
+            isCollapsible: segmentKind === 'thinking' || segmentKind === 'tool' || segmentKind === 'answer',
+            defaultOpen: segmentKind === 'answer'
+                ? true
+                : (segmentKind === 'tool' ? toolCallsOpenByDefault : false),
         };
     };
     const setupCollapsibleSegment = (segment, bodyElement, kind, openState) => {
@@ -707,6 +709,7 @@ function createChatView({ config, elements, renderStreamedResponseText, updateCo
                     text: contentText,
                     messageId: item?.message_id || null,
                     stepIndex: hasContent ? nextStepIndex() : segmentIndex + 1,
+                    openState: hasContent ? nextSegmentOpenState() : undefined,
                 });
             }
 
@@ -818,6 +821,11 @@ function createChatView({ config, elements, renderStreamedResponseText, updateCo
                         }
                         if (String(options.kind || '').trim()) {
                             segment.setSegmentKind(options.kind);
+                            if (behavior.isCollapsible) {
+                                segment.setCollapsible(
+                                    String(segment.segmentHeader.getAttribute('aria-expanded') || '').toLowerCase() === 'true',
+                                );
+                            }
                         }
                         if (Number.isFinite(provisionalStepIndex) && provisionalStepIndex > 0) {
                             segmentIndex = Math.max(segmentIndex, provisionalStepIndex);

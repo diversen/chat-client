@@ -736,7 +736,7 @@ class ConversationController {
         const activateAnswerSegment = async () => {
             const activeUi = await ensureAssistantContainer('Answer');
             activeUi.promote?.({ kind: 'Answer', showStep: true });
-            activeUi.setLoading(false);
+            activeUi.setLoading(true);
             activeUi.clearStatus();
             return activeUi;
         };
