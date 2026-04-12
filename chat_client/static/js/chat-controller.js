@@ -721,7 +721,7 @@ class ConversationController {
             const activeUi = await ensureAssistantContainer('Tool', {
                 showLoader: true,
                 transient: true,
-                hideStep: true,
+                previewStep: true,
             });
             activeUi.setLoading(true);
             activeUi.setStatus(`Calling tool: ${String(toolName || 'tool')}...`);
