@@ -4,9 +4,11 @@ WORKDIR /sandbox
 
 # Install approved science libraries (pinned versions).
 RUN python3 -m pip install --no-cache-dir \
-    numpy==2.2.3 \
-    sympy==1.13.3 \
-    pandas==2.2.3
+    numpy \
+    sympy \
+    pandas \
+    mpmath
+    
 
 # Use existing non-root uid/gid on Debian-based images.
 USER 65534:65534
