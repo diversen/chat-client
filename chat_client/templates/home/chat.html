@@ -31,7 +31,7 @@
                 <button id="attach-file" title="Attach files" type="button"></button>
 
                 {# model_names is a list of model names. Present them as a select dropdown #}
-                <select aria-label="Select Model" id="select-model" class="hidden">
+                <select aria-label="Select Model" id="select-model">
                     {% for model_name in model_names %}
                     {% if model_name == default_model %}
                     <option value="{{ model_name }}" selected>{{ model_name }}</option>

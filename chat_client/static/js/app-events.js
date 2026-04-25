@@ -33,7 +33,6 @@ function applyInitialUIState({ messageElem, selectModelElem, selectedModelNameEl
             selectModelElem.value = selectedModel;
         }
     }
-    selectModelElem.style.display = 'block';
     renderSelectedModelName({ selectModelElem, selectedModelNameElem });
 
     messageElem.style.display = 'unset';
