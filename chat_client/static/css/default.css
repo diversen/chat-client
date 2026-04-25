@@ -199,8 +199,12 @@ nav svg {
 
 .model-picker-display {
     display: inline-flex;
+    align-items: center;
+    justify-content: center;
     box-sizing: border-box;
     padding: 0;
+    width: 40px;
+    height: 40px;
 }
 
 #select-model {
@@ -574,22 +578,12 @@ pre code.copyable-code {
 
 .actions svg {
     fill: var(--selection);
-    width: 40px;
-    height: 40px;
-}
-
-.action-icon-shell {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
+    width: 30px;
+    height: 30px;
 }
 
 #abort svg {
     fill: var(--flash-error-color);
-    width: 40px;
-    height: 40px;
 }
 
 .actions button:disabled svg {
