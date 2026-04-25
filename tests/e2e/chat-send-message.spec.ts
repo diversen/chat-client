@@ -137,3 +137,54 @@ test('renders valid KaTeX, preserves prose dollars, and highlights invalid expre
   await expect(katexError).toHaveCount(1);
   await expect(katexError).toContainText(String.raw`$\prod_{i=2}^{12} (i^i)_\prod$`);
 });
+
+test('scroll-to-bottom hides after reaching the bottom', async ({ page }) => {
+  ensureManagedTestUser();
+
+  let chatRequestCount = 0;
+
+  await page.route('**/chat', async (route) => {
+    chatRequestCount += 1;
+    const assistantText = chatRequestCount === 1
+      ? Array.from({ length: 100 }, (_, index) => `Line ${index + 1}`).join('\n')
+      : 'follow-up';
+    const sseBody = [
+      `data: ${JSON.stringify({ choices: [{ delta: { content: assistantText } }] })}`,
+      'data: [DONE]',
+      '',
+    ].join('\n');
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/event-stream',
+      body: sseBody,
+    });
+  });
+
+  await login(page);
+
+  await page.fill('#message', 'Generate a long reply');
+  await page.click('#send');
+  await expect(page.locator('.assistant-message .content').last()).toContainText('Line 100');
+
+  await page.fill('#message', 'follow-up');
+  await page.click('#send');
+  await expect(page.locator('.assistant-message .content').last()).toContainText('follow-up');
+
+  await page.evaluate(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  });
+
+  const scrollToBottom = page.locator('#scroll-to-bottom');
+  await expect(scrollToBottom).toBeVisible();
+
+  await scrollToBottom.click();
+
+  await expect.poll(async () => {
+    return await page.evaluate(() => {
+      const button = document.querySelector('#scroll-to-bottom');
+      if (!button) return null;
+      return window.getComputedStyle(button).display;
+    });
+  }).toBe('none');
+});
