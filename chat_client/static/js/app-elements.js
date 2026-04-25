@@ -19,6 +19,7 @@ function getChatElements() {
         newButtonElem: getRequiredElement('new'),
         abortButtonElem: getRequiredElement('abort'),
         selectModelElem: getRequiredElement('select-model'),
+        selectedModelNameElem: getRequiredElement('selected-model-name'),
         loadingSpinner: getRequiredElement('.loading-spinner', 'querySelector'),
         scrollToBottom: getRequiredElement('scroll-to-bottom'),
         promptElem: getRequiredElement('prompt'),
