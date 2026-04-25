@@ -2,6 +2,7 @@ import { getConfig } from '/static/js/app-dialog.js';
 import { getChatElements } from '/static/js/app-elements.js';
 import { initAppEvents } from '/static/js/app-events.js';
 import { attachImageIcon, attachFileIcon, sendIcon, abortIcon } from '/static/js/app-icons.js';
+import { createModelSelection } from '/static/js/model-selection.js';
 import { dd } from '/static/js/diff-dom.js';
 import { renderKatex, renderMarkdownWithKatex } from '/static/js/katex-render.js';
 import { storageService, chatService } from '/static/js/chat-services.js';
@@ -13,7 +14,8 @@ elements.attachImageButtonElem.innerHTML = attachImageIcon;
 elements.attachFileButtonElem.innerHTML = attachFileIcon;
 elements.sendButtonElem.innerHTML = sendIcon;
 elements.abortButtonElem.innerHTML = abortIcon;
-initAppEvents(elements);
+const modelSelection = createModelSelection(elements);
+initAppEvents({ ...elements, modelSelection });
 const config = await getConfig();
 
 // Math rendering
@@ -143,6 +145,7 @@ async function updateContentDiff(contentElement, hiddenContentElem, streamedResp
 const view = createChatView({
     config,
     elements,
+    modelSelection,
     renderStreamedResponseText,
     updateContentDiff,
 });
@@ -156,6 +159,7 @@ const controller = new ConversationController({
     chat: chatService,
     config,
     elements,
+    modelSelection,
 });
 
 /**

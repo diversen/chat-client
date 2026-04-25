@@ -20,38 +20,22 @@ function updateScrollToBottomPosition({ scrollToBottom, promptElem }) {
     scrollToBottom.style.left = `${Math.min(Math.max(0, left), maxLeft)}px`;
 }
 
-function renderSelectedModelName({ selectModelElem, selectedModelNameElem }) {
-    const selectedModel = String(selectModelElem.value || '').trim();
-    selectedModelNameElem.textContent = selectedModel;
-}
-
-function applyInitialUIState({ messageElem, selectModelElem, selectedModelNameElem }) {
-    const selectedModel = localStorage.getItem('selectedModel');
-    if (selectedModel) {
-        const modelOptions = Array.from(selectModelElem.options).map((option) => option.value);
-        if (modelOptions.includes(selectedModel)) {
-            selectModelElem.value = selectedModel;
-        }
-    }
-    renderSelectedModelName({ selectModelElem, selectedModelNameElem });
-
+function applyInitialUIState({ messageElem, modelSelection }) {
+    modelSelection.initialize();
     messageElem.style.display = 'unset';
     if (window.location.pathname === '/' || !isLikelyPhoneDevice()) {
         messageElem.focus();
     }
 }
 
-function initAppEvents({ messageElem, selectModelElem, selectedModelNameElem, scrollToBottom, promptElem }) {
-    selectModelElem.addEventListener('change', () => {
-        const selectedModel = selectModelElem.value;
-        localStorage.setItem('selectedModel', selectedModel);
-        renderSelectedModelName({ selectModelElem, selectedModelNameElem });
+function initAppEvents({ messageElem, scrollToBottom, promptElem, modelSelection }) {
+    modelSelection.subscribe(() => {
         messageElem.focus();
     });
 
     const updateScrollButtonLayout = () => updateScrollToBottomPosition({ scrollToBottom, promptElem });
     const initializeUI = () => {
-        applyInitialUIState({ messageElem, selectModelElem, selectedModelNameElem });
+        applyInitialUIState({ messageElem, modelSelection });
         updateScrollButtonLayout();
     };
 

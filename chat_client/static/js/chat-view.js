@@ -487,14 +487,13 @@ function createAssistantSegmentShell(messageId = null, initialKind = 'Thinking',
     };
 }
 
-function createChatView({ config, elements, renderStreamedResponseText, updateContentDiff }) {
+function createChatView({ config, elements, modelSelection, renderStreamedResponseText, updateContentDiff }) {
     const {
         responsesElem,
         messageElem,
         sendButtonElem,
         newButtonElem,
         abortButtonElem,
-        selectModelElem,
         pendingUploadsElem,
         imagePreviewModalElem,
         imagePreviewModalImageElem,
@@ -941,7 +940,7 @@ function createChatView({ config, elements, renderStreamedResponseText, updateCo
         },
         disableAbort() { abortButtonElem.setAttribute('disabled', true); },
         enableAbort() { abortButtonElem.removeAttribute('disabled'); },
-        getSelectedModel() { return selectModelElem.value; },
+        getSelectedModel() { return modelSelection.getSelectedModel(); },
         hideEditForm(container) { hideEditForm(container); },
         async scrollMessageToTop(container) {
             if (!container) return;

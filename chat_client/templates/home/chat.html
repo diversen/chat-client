@@ -30,16 +30,22 @@
                 <button id="attach-image" title="Attach images" type="button" class="hidden"></button>
                 <button id="attach-file" title="Attach files" type="button"></button>
 
-                {# model_names is a list of model names. Present them as a select dropdown #}
-                <select aria-label="Select Model" id="select-model">
-                    {% for model_name in model_names %}
-                    {% if model_name == default_model %}
-                    <option value="{{ model_name }}" selected>{{ model_name }}</option>
-                    {% else %}
-                    <option value="{{ model_name }}">{{ model_name }}</option>
-                    {% endif %}
-                    {% endfor %}
-                </select>
+                <div class="model-picker">
+                    <div class="model-picker-display" aria-hidden="true">
+                        <img class="model-picker-icon" src="/static/assets/gesture_select.svg" alt="">
+                        <span id="selected-model-name-compact" class="model-picker-current"></span>
+                    </div>
+                    {# model_names is a list of model names. Present them as a select dropdown #}
+                    <select aria-label="Select Model" id="select-model">
+                        {% for model_name in model_names %}
+                        {% if model_name == default_model %}
+                        <option value="{{ model_name }}" selected>{{ model_name }}</option>
+                        {% else %}
+                        <option value="{{ model_name }}">{{ model_name }}</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                </div>
                 
             </div>
             <div class="actions-right">

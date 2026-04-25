@@ -7,12 +7,13 @@ const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
 const MAX_CONVERSATION_UPLOADS = 10;
 
 class ConversationController {
-    constructor({ view, storage, chat, config, elements }) {
+    constructor({ view, storage, chat, config, elements, modelSelection }) {
         this.view = view;
         this.storage = storage;
         this.chat = chat;
         this.config = config;
         this.elements = elements;
+        this.modelSelection = modelSelection;
         this.isInitializing = true;
         this.isSubmitting = false;
         this.isStreaming = false;
@@ -42,7 +43,7 @@ class ConversationController {
     }
 
     getSelectedModelCapabilities() {
-        const selectedModel = this.view.getSelectedModel();
+        const selectedModel = this.modelSelection.getSelectedModel();
         const modelCapabilities = this.config?.model_capabilities;
         if (modelCapabilities && typeof modelCapabilities === 'object' && modelCapabilities[selectedModel]) {
             return modelCapabilities[selectedModel];
@@ -366,7 +367,6 @@ class ConversationController {
             attachImageButtonElem,
             attachmentInputElem,
             attachFileButtonElem,
-            selectModelElem,
         } = this.elements;
 
         attachImageButtonElem.addEventListener('click', () => {
@@ -384,13 +384,6 @@ class ConversationController {
             }
             attachmentInputElem.click();
         });
-
-        if (selectModelElem) {
-            selectModelElem.addEventListener('change', () => {
-                this.updateAttachmentUI();
-                this.updateSendButtonState();
-            });
-        }
 
         imageInputElem.addEventListener('change', async (event) => {
             await this.handleImageSelection(event.target.files);
@@ -444,6 +437,10 @@ class ConversationController {
 
     wireUI() {
         this.ensureBottomSentinelObserver();
+        this.modelSelection.subscribe(() => {
+            this.updateAttachmentUI();
+            this.updateSendButtonState();
+        });
         this.bindFormEvents();
         this.bindMessageEvents();
         this.bindAttachmentEvents();
@@ -558,7 +555,7 @@ class ConversationController {
             const userMessageId = await this.storage.createMessage(this.dialogId, {
                 role: 'user',
                 content: userMessage,
-                model: this.view.getSelectedModel(),
+                model: this.modelSelection.getSelectedModel(),
                 images,
                 attachments,
             });
@@ -583,7 +580,7 @@ class ConversationController {
 
             await this.renderAssistantMessage({
                 shouldGenerateTitle: createdNewDialog && Boolean(userMessage),
-                model: this.view.getSelectedModel(),
+                model: this.modelSelection.getSelectedModel(),
             });
         } catch (error) {
             await logError(error, 'Error in sendUserMessage');
@@ -644,7 +641,7 @@ class ConversationController {
 
     async renderAssistantMessage(options = {}) {
         const shouldGenerateTitle = Boolean(options?.shouldGenerateTitle);
-        const modelName = String(options?.model || this.view.getSelectedModel() || '');
+        const modelName = String(options?.model || this.modelSelection.getSelectedModel() || '');
         this.view.disableNew();
         this.view.enableAbort();
         this.isStreaming = true;
