@@ -9,13 +9,6 @@ function getRequiredElement(selector, queryMethod = 'getElementById') {
 
     return element;
 }
-
-function getOptionalElement(selector, queryMethod = 'getElementById') {
-    return queryMethod === 'querySelector'
-        ? document.querySelector(selector)
-        : document.getElementById(selector);
-}
-
 function getChatElements() {
     return {
         responsesElem: getRequiredElement('responses'),
@@ -26,7 +19,6 @@ function getChatElements() {
         abortButtonElem: getRequiredElement('abort'),
         selectModelElem: getRequiredElement('select-model'),
         selectedModelNameElem: getRequiredElement('selected-model-name'),
-        selectedModelCompactNameElem: getOptionalElement('selected-model-name-compact'),
         loadingSpinner: getRequiredElement('.loading-spinner', 'querySelector'),
         scrollToBottom: getRequiredElement('scroll-to-bottom'),
         promptElem: getRequiredElement('prompt'),
@@ -35,6 +27,7 @@ function getChatElements() {
         attachImageButtonElem: getRequiredElement('attach-image'),
         attachmentInputElem: getRequiredElement('attachment-input'),
         attachFileButtonElem: getRequiredElement('attach-file'),
+        modelPickerDisplayElem: getRequiredElement('.model-picker-display', 'querySelector'),
         imagePreviewModalElem: getRequiredElement('image-preview-modal'),
         imagePreviewModalImageElem: getRequiredElement('image-preview-modal-image'),
         imagePreviewModalCloseElem: getRequiredElement('image-preview-modal-close'),

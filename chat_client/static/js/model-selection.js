@@ -2,18 +2,14 @@ function getModelOptions(selectModelElem) {
     return Array.from(selectModelElem?.options || []).map((option) => String(option.value || '').trim());
 }
 
-function createModelSelection({ selectModelElem, selectedModelNameElem, selectedModelCompactNameElem }) {
-    let initialized = false;
+function createModelSelection({ selectModelElem, selectedModelNameElem }) {
+    let isBound = false;
     const subscribers = new Set();
 
     const renderSelectedModel = (modelName) => {
         const safeModelName = String(modelName || '').trim();
-        if (selectedModelNameElem) {
-            selectedModelNameElem.textContent = safeModelName;
-        }
-        if (selectedModelCompactNameElem) {
-            selectedModelCompactNameElem.textContent = safeModelName;
-        }
+        if (!selectedModelNameElem) return;
+        selectedModelNameElem.textContent = safeModelName;
     };
 
     const notifySubscribers = (modelName, details) => {
@@ -51,7 +47,7 @@ function createModelSelection({ selectModelElem, selectedModelNameElem, selected
         return true;
     };
 
-    const applyStoredModel = () => {
+    const restoreStoredModel = () => {
         const storedModel = localStorage.getItem('selectedModel');
         if (!storedModel) return;
         setSelectedModel(storedModel, {
@@ -67,15 +63,13 @@ function createModelSelection({ selectModelElem, selectedModelNameElem, selected
         });
     };
 
-    const initialize = () => {
-        if (!selectModelElem || initialized) {
-            renderSelectedModel(getSelectedModel());
-            return;
-        }
-
-        initialized = true;
-        applyStoredModel();
+    const render = () => {
         renderSelectedModel(getSelectedModel());
+    };
+
+    const bind = () => {
+        if (!selectModelElem || isBound) return;
+        isBound = true;
         selectModelElem.addEventListener('change', handleSelectChange);
     };
 
@@ -87,7 +81,9 @@ function createModelSelection({ selectModelElem, selectedModelNameElem, selected
     };
 
     return {
-        initialize,
+        bind,
+        render,
+        restoreStoredModel,
         subscribe,
         getSelectedModel,
         setSelectedModel,

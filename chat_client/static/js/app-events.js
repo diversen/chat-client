@@ -21,7 +21,9 @@ function updateScrollToBottomPosition({ scrollToBottom, promptElem }) {
 }
 
 function applyInitialUIState({ messageElem, modelSelection }) {
-    modelSelection.initialize();
+    modelSelection.restoreStoredModel();
+    modelSelection.render();
+    modelSelection.bind();
     messageElem.style.display = 'unset';
     if (window.location.pathname === '/' || !isLikelyPhoneDevice()) {
         messageElem.focus();

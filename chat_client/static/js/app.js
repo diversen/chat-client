@@ -1,7 +1,7 @@
 import { getConfig } from '/static/js/app-dialog.js';
 import { getChatElements } from '/static/js/app-elements.js';
 import { initAppEvents } from '/static/js/app-events.js';
-import { attachImageIcon, attachFileIcon, sendIcon, abortIcon } from '/static/js/app-icons.js';
+import { attachImageIcon, attachFileIcon, selectModelIcon, sendIcon, abortIcon } from '/static/js/app-icons.js';
 import { createModelSelection } from '/static/js/model-selection.js';
 import { dd } from '/static/js/diff-dom.js';
 import { renderKatex, renderMarkdownWithKatex } from '/static/js/katex-render.js';
@@ -12,6 +12,7 @@ import { createChatView } from '/static/js/chat-view.js';
 const elements = getChatElements();
 elements.attachImageButtonElem.innerHTML = attachImageIcon;
 elements.attachFileButtonElem.innerHTML = attachFileIcon;
+elements.modelPickerDisplayElem.innerHTML = selectModelIcon;
 elements.sendButtonElem.innerHTML = sendIcon;
 elements.abortButtonElem.innerHTML = abortIcon;
 const modelSelection = createModelSelection(elements);

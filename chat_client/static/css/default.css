@@ -178,20 +178,6 @@ nav svg {
     display: none;
 }
 
-.model-picker-icon {
-    width: 18px;
-    height: 18px;
-    flex: 0 0 auto;
-    opacity: 0.9;
-}
-
-.model-picker-current {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
 .pending-uploads {
     display: grid;
     gap: 8px;
@@ -536,6 +522,14 @@ pre code.copyable-code {
     height: 40px;
 }
 
+.action-icon-shell {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+}
+
 #abort svg {
     fill: var(--flash-error-color);
     width: 40px;
@@ -593,10 +587,6 @@ pre code {
 
 /** on models sm: 576px */
 @media (max-width: 575px) {
-    .selected-model-name {
-        display: none;
-    }
-
     .actions {
         gap: 8px;
         align-items: center;
@@ -608,26 +598,13 @@ pre code {
     }
 
     .model-picker {
-        flex: 1 1 auto;
-        min-width: 0;
-        max-width: 140px;
+        flex: 0 0 auto;
     }
 
     .model-picker-display {
         display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        min-width: 0;
-        width: 100%;
-        height: 40px;
         box-sizing: border-box;
-        padding: 0 12px 0 10px;
-        border: 1px solid var(--border);
-        border-radius: 999px;
-        background: var(--background-alt);
-        color: var(--text-main);
-        font-size: 0.84rem;
-        line-height: 1;
+        padding: 0;
     }
 
     #select-model {
