@@ -128,6 +128,112 @@ def test_update_message_deletes_newer_tool_call_events():
     asyncio.run(_run())
 
 
+def test_update_message_marks_first_user_message_for_dialog_title_refresh():
+    async def _run():
+        temp_dir = tempfile.mkdtemp()
+        db_path = Path(temp_dir) / "test_chat_repository_first_user_message.db"
+        engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}", echo=False)
+        session_factory = async_sessionmaker(engine, expire_on_commit=False)
+
+        data_module = ModuleType("data")
+        config_module = ModuleType("data.config")
+        config_module.DATABASE = db_path
+        data_module.config = config_module
+        sys.modules["data"] = data_module
+        sys.modules["data.config"] = config_module
+
+        from chat_client.repositories import chat_repository
+
+        original_session_factory = chat_repository.async_session
+        chat_repository.async_session = session_factory
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+
+            async with session_factory() as session:
+                user = User(
+                    email="repo-test-first-user@example.com",
+                    password_hash="x",
+                    random="y",
+                )
+                session.add(user)
+                await session.commit()
+                await session.refresh(user)
+                user_id = int(user.user_id)
+
+            dialog_id = await chat_repository.create_dialog(user_id, "Original title")
+            first_message_id = await chat_repository.create_message(user_id, dialog_id, "user", "Original")
+            await chat_repository.create_message(user_id, dialog_id, "assistant", "Assistant reply")
+
+            result = await chat_repository.update_message(user_id, int(first_message_id), "Edited")
+
+            assert result["dialog_id"] == dialog_id
+            assert result["was_first_user_message"] is True
+        finally:
+            chat_repository.async_session = original_session_factory
+            sys.modules.pop("data.config", None)
+            sys.modules.pop("data", None)
+            await engine.dispose()
+            if db_path.exists():
+                db_path.unlink()
+            Path(temp_dir).rmdir()
+
+    asyncio.run(_run())
+
+
+def test_update_message_does_not_mark_later_user_message_for_dialog_title_refresh():
+    async def _run():
+        temp_dir = tempfile.mkdtemp()
+        db_path = Path(temp_dir) / "test_chat_repository_later_user_message.db"
+        engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}", echo=False)
+        session_factory = async_sessionmaker(engine, expire_on_commit=False)
+
+        data_module = ModuleType("data")
+        config_module = ModuleType("data.config")
+        config_module.DATABASE = db_path
+        data_module.config = config_module
+        sys.modules["data"] = data_module
+        sys.modules["data.config"] = config_module
+
+        from chat_client.repositories import chat_repository
+
+        original_session_factory = chat_repository.async_session
+        chat_repository.async_session = session_factory
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+
+            async with session_factory() as session:
+                user = User(
+                    email="repo-test-later-user@example.com",
+                    password_hash="x",
+                    random="y",
+                )
+                session.add(user)
+                await session.commit()
+                await session.refresh(user)
+                user_id = int(user.user_id)
+
+            dialog_id = await chat_repository.create_dialog(user_id, "Original title")
+            await chat_repository.create_message(user_id, dialog_id, "user", "First")
+            later_message_id = await chat_repository.create_message(user_id, dialog_id, "user", "Second")
+
+            result = await chat_repository.update_message(user_id, int(later_message_id), "Edited second")
+
+            assert result["dialog_id"] == dialog_id
+            assert result["was_first_user_message"] is False
+        finally:
+            chat_repository.async_session = original_session_factory
+            sys.modules.pop("data.config", None)
+            sys.modules.pop("data", None)
+            await engine.dispose()
+            if db_path.exists():
+                db_path.unlink()
+            Path(temp_dir).rmdir()
+
+    asyncio.run(_run())
+
+
 def test_get_messages_returns_assistant_turn_items():
     async def _run():
         temp_dir = tempfile.mkdtemp()

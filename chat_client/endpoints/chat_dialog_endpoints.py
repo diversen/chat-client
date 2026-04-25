@@ -323,6 +323,7 @@ async def update_message(
     parse_json_payload,
     update_message_request,
     chat_repository,
+    derive_dialog_title_from_user_message,
     exceptions_validation,
     json_success,
     json_error,
@@ -339,6 +340,13 @@ async def update_message(
         message_id = int(raw_message_id)
         payload = await parse_json_payload(request, update_message_request)
         result = await chat_repository.update_message(user_id, message_id, payload.content)
+        if result.get("was_first_user_message") and result.get("dialog_id"):
+            title_result = await chat_repository.update_dialog_title(
+                user_id,
+                str(result["dialog_id"]),
+                derive_dialog_title_from_user_message(payload.content),
+            )
+            result["dialog_title"] = title_result["title"]
         return json_success(**result)
     except exceptions_validation.JSONError:
         raise

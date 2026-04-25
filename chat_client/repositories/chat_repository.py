@@ -461,6 +461,18 @@ async def update_message(user_id: int, message_id: int, new_content: str):
         if not message:
             raise exceptions_validation.UserValidate("Message not found or not owned by user")
 
+        earlier_user_message_exists_stmt = select(
+            exists().where(
+                Message.dialog_id == message.dialog_id,
+                Message.user_id == user_id,
+                Message.role == "user",
+                Message.active == 1,
+                Message.sequence_index < message.sequence_index,
+            )
+        )
+        earlier_user_message_exists = bool((await session.execute(earlier_user_message_exists_stmt)).scalar())
+        was_first_user_message = message.role == "user" and not earlier_user_message_exists
+
         # Update the message content
         message.content = new_content
 
@@ -493,4 +505,10 @@ async def update_message(user_id: int, message_id: int, new_content: str):
 
         await session.commit()
 
-        return {"message_id": message_id, "content": new_content, "updated": True}
+        return {
+            "message_id": message_id,
+            "dialog_id": str(message.dialog_id),
+            "content": new_content,
+            "updated": True,
+            "was_first_user_message": was_first_user_message,
+        }

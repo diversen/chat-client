@@ -1454,6 +1454,62 @@ class TestChatEndpoints(BaseTestCase):
         assert data["error"] is False
         assert data["message_id"] == 1
 
+    @patch("chat_client.repositories.chat_repository.update_dialog_title")
+    @patch("chat_client.endpoints.chat_endpoints._derive_dialog_title_from_user_message")
+    @patch("chat_client.repositories.chat_repository.update_message")
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_update_message_updates_dialog_title_when_first_user_message_is_edited(
+        self,
+        mock_logged_in,
+        mock_update_message,
+        mock_derive_dialog_title,
+        mock_update_dialog_title,
+    ):
+        mock_logged_in.return_value = 1
+        mock_update_message.return_value = {
+            "message_id": 1,
+            "dialog_id": "test-dialog",
+            "was_first_user_message": True,
+        }
+        mock_derive_dialog_title.return_value = "Updated topic"
+        mock_update_dialog_title.return_value = {"dialog_id": "test-dialog", "title": "Updated topic"}
+
+        response = self.client.post("/api/chat/messages/1", json={"content": "Updated first message"})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["error"] is False
+        assert data["dialog_title"] == "Updated topic"
+        mock_derive_dialog_title.assert_called_once_with("Updated first message")
+        mock_update_dialog_title.assert_called_once_with(1, "test-dialog", "Updated topic")
+
+    @patch("chat_client.repositories.chat_repository.update_dialog_title")
+    @patch("chat_client.endpoints.chat_endpoints._derive_dialog_title_from_user_message")
+    @patch("chat_client.repositories.chat_repository.update_message")
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_update_message_does_not_update_dialog_title_when_message_is_not_first_user_message(
+        self,
+        mock_logged_in,
+        mock_update_message,
+        mock_derive_dialog_title,
+        mock_update_dialog_title,
+    ):
+        mock_logged_in.return_value = 1
+        mock_update_message.return_value = {
+            "message_id": 2,
+            "dialog_id": "test-dialog",
+            "was_first_user_message": False,
+        }
+
+        response = self.client.post("/api/chat/messages/2", json={"content": "Updated later message"})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["error"] is False
+        assert "dialog_title" not in data
+        mock_derive_dialog_title.assert_not_called()
+        mock_update_dialog_title.assert_not_called()
+
     @patch("chat_client.core.user_session.is_logged_in")
     def test_delete_dialog_not_authenticated(self, mock_logged_in):
         """Test POST /api/chat/dialogs/{dialog_id} delete when not authenticated"""

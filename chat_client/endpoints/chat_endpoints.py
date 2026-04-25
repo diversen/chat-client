@@ -704,6 +704,7 @@ async def update_message(request: Request):
         parse_json_payload=parse_json_payload,
         update_message_request=UpdateMessageRequest,
         chat_repository=chat_repository,
+        derive_dialog_title_from_user_message=_derive_dialog_title_from_user_message,
         exceptions_validation=exceptions_validation,
         json_success=json_success,
         json_error=json_error,
