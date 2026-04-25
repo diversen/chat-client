@@ -4,6 +4,8 @@
 
 [![chat-client](docs/screenshot.png)](docs/screenshot.png)
 
+Demo: <https://chat.10kilobyte.com> (`demo` / `demo`)
+
 ## Features
 
 - Server-rendered UI with SQLite storage
