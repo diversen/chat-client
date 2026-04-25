@@ -167,6 +167,28 @@ nav svg {
     }
 }
 
+/* Prompt action row and model picker */
+.actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.actions-left {
+    display: flex;
+    justify-content: left;
+    gap: 10px;
+    min-width: 0;
+    align-items: center;
+}
+
+.actions-right {
+    display: flex;
+    justify-content: right;
+    gap: 10px;
+}
+
 .model-picker {
     position: relative;
     display: inline-flex;
@@ -179,6 +201,37 @@ nav svg {
     display: inline-flex;
     box-sizing: border-box;
     padding: 0;
+}
+
+#select-model {
+    min-width: 0;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    max-width: none;
+    opacity: 0;
+    cursor: pointer;
+}
+
+.model-picker:focus-within .model-picker-display {
+    outline: 2px solid var(--nav-background);
+    outline-offset: 2px;
+}
+
+#select-model::-webkit-scrollbar {
+    display: none;
+}
+
+@media (max-width: 575px) {
+    .actions {
+        gap: 8px;
+        align-items: center;
+    }
+
+    .actions-left,
+    .actions-right {
+        gap: 8px;
+    }
 }
 
 .pending-uploads {
@@ -546,27 +599,6 @@ pre code.copyable-code {
     /* Optional: makes the button look faded */
 }
 
-.actions {
-    display: flex;
-    justify-content: space-between;
-    gap: 10px;
-    margin-top: 10px;
-}
-
-.actions-left {
-    display: flex;
-    justify-content: left;
-    gap: 10px;
-    min-width: 0;
-    align-items: center;
-}
-
-.actions-right {
-    display: flex;
-    justify-content: right;
-    gap: 10px;
-}
-
 .page-chat textarea {
     resize: none;
 }
@@ -587,40 +619,6 @@ pre code {
 .menu-open {
     display: none;
 }
-
-/** on models sm: 576px */
-@media (max-width: 575px) {
-    .actions {
-        gap: 8px;
-        align-items: center;
-    }
-
-    .actions-left,
-    .actions-right {
-        gap: 8px;
-    }
-}
-
-#select-model {
-    min-width: 0;
-    position: absolute;
-    inset: 0;
-    width: 100%;
-    max-width: none;
-    opacity: 0;
-    cursor: pointer;
-}
-
-.model-picker:focus-within .model-picker-display {
-    outline: 2px solid var(--nav-background);
-    outline-offset: 2px;
-}
-
-#select-model::-webkit-scrollbar {
-    display: none;
-
-}
-
 
 #scroll-to-bottom {
     justify-content: center;
