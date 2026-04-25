@@ -428,6 +428,10 @@ class ConversationController {
             });
         });
 
+        window.addEventListener('scroll', () => {
+            this.checkScroll();
+        }, { passive: true });
+
         new MutationObserver(() => {
             this.ensureBottomSentinelObserver();
             this.checkScroll();
@@ -459,6 +463,17 @@ class ConversationController {
             return;
         }
 
+        const spacerHeight = this.bottomSentinel
+            ? Math.ceil(this.bottomSentinel.getBoundingClientRect().height || 0)
+            : 0;
+        const contentBottom = Math.max(0, doc.scrollHeight - spacerHeight);
+        const distanceFromContentBottom = Math.max(0, contentBottom - (window.innerHeight + window.scrollY));
+        const hideThreshold = 12;
+        if (distanceFromContentBottom <= hideThreshold) {
+            this.setScrollToBottomVisible(false);
+            return;
+        }
+
         if (this.bottomSentinel && this.bottomSentinelObserver) {
             if (!this.bottomSentinelMeasured) {
                 this.setScrollToBottomVisible(false);
@@ -469,7 +484,6 @@ class ConversationController {
         }
 
         const distanceFromBottom = Math.max(0, doc.scrollHeight - (window.innerHeight + window.scrollY));
-        const hideThreshold = 12;
         if (distanceFromBottom <= hideThreshold) {
             this.setScrollToBottomVisible(false);
             return;
