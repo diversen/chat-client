@@ -15,6 +15,14 @@ logger: logging.Logger = logging.getLogger(__name__)
 DIALOGS_PER_PAGE = 20
 
 
+async def _touch_dialog_in_session(session, user_id: int, dialog_id: str) -> None:
+    await session.execute(
+        update(Dialog)
+        .where(Dialog.dialog_id == dialog_id, Dialog.user_id == user_id)
+        .values(updated=func.current_timestamp())
+    )
+
+
 async def _next_dialog_sequence_index(session, user_id: int, dialog_id: str) -> int:
     return await _next_dialog_sequence_index_in_session(session, user_id, dialog_id)
 
@@ -72,6 +80,7 @@ async def update_dialog_title(user_id: int, dialog_id: str, title: str):
             raise exceptions_validation.UserValidate("Dialog not found or not owned by user")
 
         dialog.title = normalized_title
+        dialog.updated = func.current_timestamp()
         await session.commit()
 
         return {
@@ -177,6 +186,7 @@ async def create_message(
                 )
             )
 
+        await _touch_dialog_in_session(session, user_id, dialog_id)
         await session.commit()
         await session.refresh(new_message)
 
@@ -332,6 +342,7 @@ async def create_assistant_turn_events(
             )
             session.add(assistant_turn_event)
             next_sequence_index += 1
+        await _touch_dialog_in_session(session, user_id, dialog_id)
         await session.commit()
 
 
@@ -357,6 +368,7 @@ async def create_tool_call_event(
             error_text=error_text,
         )
         session.add(event)
+        await _touch_dialog_in_session(session, user_id, dialog_id)
         await session.commit()
 
 
@@ -401,7 +413,7 @@ async def get_dialogs_info(user_id: int, current_page: int = 1, query: str = "")
         stmt = (
             select(Dialog)
             .where(*filters)
-            .order_by(Dialog.created.desc(), Dialog.dialog_id.desc())
+            .order_by(Dialog.updated.desc(), Dialog.dialog_id.desc())
             .limit(DIALOGS_PER_PAGE)
             .offset((current_page - 1) * DIALOGS_PER_PAGE)
         )
@@ -423,11 +435,13 @@ async def get_dialogs_info(user_id: int, current_page: int = 1, query: str = "")
         dialogs_list = []
         for d in dialogs:
             assert d.created is not None  # helps both Mypy and sanity
+            assert d.updated is not None
             dialogs_list.append(
                 {
                     "dialog_id": str(d.dialog_id),
                     "title": d.title,
                     "created": d.created.isoformat(),
+                    "updated": d.updated.isoformat(),
                 }
             )
 
@@ -503,6 +517,7 @@ async def update_message(user_id: int, message_id: int, new_content: str):
         )
         await session.execute(delete_assistant_turn_events_stmt)
 
+        await _touch_dialog_in_session(session, user_id, str(message.dialog_id))
         await session.commit()
 
         return {

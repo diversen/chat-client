@@ -91,6 +91,7 @@ class Dialog(Base):
     __tablename__ = "dialog"
     __table_args__ = (
         Index("dialog_user_id", "user_id"),
+        Index("dialog_user_id_updated", "user_id", "updated"),
         {"sqlite_autoincrement": True},
     )
 
@@ -98,6 +99,9 @@ class Dialog(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
     title: Mapped[str] = mapped_column(Text, nullable=False)
     created: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False, init=False
+    )
+    updated: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False, init=False
     )
     public: Mapped[int] = mapped_column(default=0)
