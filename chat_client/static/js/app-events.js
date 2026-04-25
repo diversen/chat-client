@@ -20,36 +20,49 @@ function updateScrollToBottomPosition({ scrollToBottom, promptElem }) {
     scrollToBottom.style.left = `${Math.min(Math.max(0, left), maxLeft)}px`;
 }
 
-function applyInitialUIState({ messageElem, modelSelection }) {
+function shouldFocusMessageInput() {
+    return window.location.pathname === '/' || !isLikelyPhoneDevice();
+}
+
+function initializeChatUI({ messageElem, modelSelection }) {
     modelSelection.restoreStoredModel();
     modelSelection.render();
     modelSelection.bind();
     messageElem.style.display = 'unset';
-    if (window.location.pathname === '/' || !isLikelyPhoneDevice()) {
+    if (shouldFocusMessageInput()) {
         messageElem.focus();
     }
 }
 
-function initAppEvents({ messageElem, scrollToBottom, promptElem, modelSelection }) {
+function bindPromptFocusBehavior({ messageElem, modelSelection }) {
     modelSelection.subscribe(() => {
         messageElem.focus();
     });
+}
 
+function bindScrollToBottomLayout({ scrollToBottom, promptElem }) {
     const updateScrollButtonLayout = () => updateScrollToBottomPosition({ scrollToBottom, promptElem });
-    const initializeUI = () => {
-        applyInitialUIState({ messageElem, modelSelection });
-        updateScrollButtonLayout();
-    };
-
-    window.addEventListener('load', initializeUI);
-    window.addEventListener('pageshow', initializeUI);
-    initializeUI();
     window.addEventListener('resize', updateScrollButtonLayout);
 
     if (typeof ResizeObserver !== 'undefined') {
         const promptResizeObserver = new ResizeObserver(updateScrollButtonLayout);
         promptResizeObserver.observe(promptElem);
     }
+
+    return updateScrollButtonLayout;
+}
+
+function initAppEvents({ messageElem, scrollToBottom, promptElem, modelSelection }) {
+    bindPromptFocusBehavior({ messageElem, modelSelection });
+    const updateScrollButtonLayout = bindScrollToBottomLayout({ scrollToBottom, promptElem });
+    const initializeUI = () => {
+        initializeChatUI({ messageElem, modelSelection });
+        updateScrollButtonLayout();
+    };
+
+    window.addEventListener('load', initializeUI);
+    window.addEventListener('pageshow', initializeUI);
+    initializeUI();
 }
 
 export { initAppEvents };
