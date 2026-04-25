@@ -172,10 +172,13 @@ nav svg {
     display: inline-flex;
     align-items: center;
     min-width: 0;
+    flex: 0 0 auto;
 }
 
 .model-picker-display {
-    display: none;
+    display: inline-flex;
+    box-sizing: border-box;
+    padding: 0;
 }
 
 .pending-uploads {
@@ -596,29 +599,16 @@ pre code {
     .actions-right {
         gap: 8px;
     }
-
-    .model-picker {
-        flex: 0 0 auto;
-    }
-
-    .model-picker-display {
-        display: inline-flex;
-        box-sizing: border-box;
-        padding: 0;
-    }
-
-    #select-model {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        max-width: none;
-        opacity: 0;
-        cursor: pointer;
-    }
 }
 
 #select-model {
     min-width: 0;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    max-width: none;
+    opacity: 0;
+    cursor: pointer;
 }
 
 .model-picker:focus-within .model-picker-display {
