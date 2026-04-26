@@ -1074,7 +1074,7 @@ a.delete svg {
 .katex-display { overflow: auto hidden }
 
 .katex-error {
-    color: #b42318;
+    color: var(--flash-error-color);
     background: rgba(180, 35, 24, 0.12);
     border: 1px solid rgba(180, 35, 24, 0.28);
     border-radius: 0.2rem;
