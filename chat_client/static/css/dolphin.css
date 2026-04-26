@@ -249,7 +249,7 @@ legend {
 }
 
 button:focus {
-  background-color: var(--background-alt);
+  background-color: var(--focus);
 }
 
 input:focus,
@@ -319,7 +319,6 @@ table {
   border-collapse: collapse;
   margin-bottom: 10px;
   width: 100%;
-  min-width: min(600px, 100%);
   table-layout: fixed;
 }
 
@@ -335,22 +334,24 @@ th {
   word-wrap: break-word;
 }
 
-tbody td,
-tbody th {
-  border-bottom: 1px solid var(--border);
-}
-
-tbody tr:last-child td,
-tbody tr:last-child th {
-  border-bottom: 0;
-}
-
 thead {
   border-bottom: 1px solid var(--border);
 }
 
 tfoot {
   border-top: 1px solid var(--border);
+}
+
+tbody tr:nth-child(even) {
+  background-color: var(--background);
+}
+
+tbody tr:nth-child(even) button {
+  background-color: var(--background-alt);
+}
+
+tbody tr:nth-child(even) button:hover {
+  background-color: var(--background-body);
 }
 
 footer {
