@@ -584,6 +584,40 @@ class TestChatEndpoints(BaseTestCase):
         assert response.status_code == 200
         assert "Chat" in response.text
 
+    @patch("chat_client.endpoints.chat_endpoints._build_model_capabilities")
+    @patch("chat_client.repositories.prompt_repository.list_prompts")
+    @patch("chat_client.endpoints.chat_endpoints._get_model_names")
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_chat_page_hides_unsupported_attachment_actions_on_initial_render(
+        self,
+        mock_logged_in,
+        mock_models,
+        mock_prompts,
+        mock_build_model_capabilities,
+    ):
+        mock_logged_in.return_value = 1
+        mock_models.return_value = ["test-model"]
+        mock_prompts.return_value = []
+        mock_build_model_capabilities.return_value = {
+            "test-model": {
+                "supports_images": False,
+                "supports_tools": False,
+                "supports_attachments": False,
+                "supports_reasoning": False,
+                "supports_thinking": False,
+                "supports_thinking_control": False,
+                "supports_system_messages": True,
+                "context_length": None,
+            }
+        }
+
+        with patch("chat_client.endpoints.chat_endpoints.config.DEFAULT_MODEL", "test-model"):
+            response = self.client.get("/")
+
+        assert response.status_code == 200
+        assert 'id="attach-image" title="Attach images" type="button" class="hidden"' in response.text
+        assert 'id="attach-file" title="Attach files" type="button" class="hidden"' in response.text
+
     @patch("chat_client.repositories.prompt_repository.list_prompts")
     @patch("chat_client.endpoints.chat_endpoints._get_model_names")
     @patch("chat_client.core.user_session.is_logged_in")

@@ -49,8 +49,8 @@
                         <option value="high">High</option>
                     </select>
                 </div>
-                <button id="attach-image" title="Attach images" type="button" class="hidden"></button>
-                <button id="attach-file" title="Attach files" type="button"></button>
+                <button id="attach-image" title="Attach images" type="button"{% if not default_model_supports_images %} class="hidden"{% endif %}></button>
+                <button id="attach-file" title="Attach files" type="button"{% if not default_model_supports_attachments %} class="hidden"{% endif %}></button>
             </div>
             <div class="actions-right">
                 <button id="send" title="Send message" type="button" disabled></button>

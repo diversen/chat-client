@@ -321,6 +321,7 @@ async def chat_page(request: Request):
         list_prompts=prompt_repository.list_prompts,
         get_context=base_context.get_context,
         default_model=getattr(config, "DEFAULT_MODEL", ""),
+        build_model_capabilities=_build_model_capabilities,
     )
 
 

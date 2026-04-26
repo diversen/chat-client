@@ -16,6 +16,7 @@ async def chat_page(
     list_prompts,
     get_context,
     default_model: str,
+    build_model_capabilities,
 ):
     user_id_or_response = await get_user_id_or_redirect(
         request,
@@ -27,11 +28,15 @@ async def chat_page(
 
     model_names = await get_model_names()
     prompts = await list_prompts(user_id)
+    model_capabilities = build_model_capabilities()
+    default_model_capabilities = model_capabilities.get(default_model, {})
 
     context = {
         "chat": True,
         "model_names": model_names,
         "default_model": default_model,
+        "default_model_supports_images": bool(default_model_capabilities.get("supports_images")),
+        "default_model_supports_attachments": bool(default_model_capabilities.get("supports_attachments")),
         "request": request,
         "title": "Chat",
         "prompts": prompts,
