@@ -23,7 +23,7 @@ See [docs/mcp.md](docs/mcp.md) for MCP notes.
 Install the latest version:
 
 <!-- LATEST-VERSION-UV -->
-	uv tool install git+https://github.com/diversen/chat-client@v2.3.72
+	uv tool install git+https://github.com/diversen/chat-client@v2.3.73
 
 Initialize config and data:
 
@@ -72,6 +72,6 @@ You can configure its timeout in `data/config.py` with `PYTHON_TOOL_TIMEOUT_SECO
 ## Upgrade
 
 <!-- LATEST-VERSION-UV-FORCE -->
-	uv tool install git+https://github.com/diversen/chat-client@v2.3.72 --force
+	uv tool install git+https://github.com/diversen/chat-client@v2.3.73 --force
 
 MIT © [Dennis Iversen](https://github.com/diversen)
