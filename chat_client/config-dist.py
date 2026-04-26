@@ -96,21 +96,28 @@ PROVIDERS = {
 }
 
 MODELS: dict[str, str] = {
-    # "gpt-5-nano": "openai",
+    # "gpt-5.4-nano": "openai",
+    # "gpt-5.4-mini": "openai",
     # "gemma-3-27b-it": "gemini",
 }
 
 # Optional pricing table used for exact cost calculations stored alongside usage events.
 # Rates are per 1M tokens and should match your provider's published pricing at the time of use.
-MODEL_PRICING: dict[str, dict[str, dict[str, str]]] = {
-    # "openai": {
-    #     "gpt-5": {
-    #         "input_per_million": "1.25",
-    #         "cached_input_per_million": "0.125",
-    #         "output_per_million": "10.00",
-    #         "currency": "USD",
-    #     },
-    # }
+MODEL_PRICING = {
+    "openai": {
+        "gpt-5.4-mini": {
+            "input_per_million": "0.75",
+            "cached_input_per_million": "0.075",
+            "output_per_million": "4.50",
+            "currency": "USD",
+        },
+        "gpt-5.4-nano": {
+            "input_per_million": "0.20",
+            "cached_input_per_million": "0.02",
+            "output_per_million": "1.25",
+            "currency": "USD",
+        },
+    },
 }
 
 # Enable vision models (models that can process both text and images)
