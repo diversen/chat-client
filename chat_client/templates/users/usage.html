@@ -37,40 +37,10 @@
             <h4>Usage by dialog</h4>
             <div class="usage-section-meta">Listed by most recent usage</div>
         </div>
-
-        {% if usage_dialogs %}
-        <div class="usage-dialog-list">
-            {% for dialog in usage_dialogs %}
-            <article class="usage-dialog-item" data-dialog-item>
-                <button
-                    type="button"
-                    class="usage-dialog-toggle"
-                    data-dialog-toggle
-                    data-dialog-id="{{ dialog.dialog_id }}"
-                    aria-expanded="false"
-                >
-                    <span class="usage-dialog-main">
-                        <span class="usage-dialog-title">{{ dialog.title or 'Untitled dialog' }}</span>
-                        <span class="usage-dialog-time">Last used {{ dialog.last_created }}</span>
-                    </span>
-                    <span class="usage-dialog-summary">
-                        <span>{{ dialog.cost_amount }} {{ dialog.currency }}</span>
-                        <span>{{ dialog.request_count }} requests</span>
-                        <span>{{ dialog.total_tokens }} tokens</span>
-                    </span>
-                    <span class="usage-dialog-action">Show details</span>
-                </button>
-                <div class="usage-dialog-details" data-dialog-details hidden>
-                    <div class="usage-dialog-loading" data-dialog-loading hidden>Loading usage details…</div>
-                    <div class="usage-dialog-error" data-dialog-error hidden></div>
-                    <div class="usage-dialog-details-content" data-dialog-content hidden></div>
-                </div>
-            </article>
-            {% endfor %}
-        </div>
-        {% else %}
-        <div class="usage-empty-state">No usage has been recorded yet.</div>
-        {% endif %}
+        <div id="usage-dialogs-container" class="usage-dialog-list"></div>
+        <div id="usage-loading" class="loading-spinner hidden"></div>
+        <button id="load-more-usage-dialogs" class="hidden" type="button">Load more</button>
+        <div id="no-usage-dialogs" class="usage-empty-state hidden">No usage has been recorded yet.</div>
     </section>
 </main>
 
@@ -156,10 +126,6 @@
         color: inherit;
         text-align: left;
         padding: 16px;
-        display: grid;
-        grid-template-columns: minmax(0, 2fr) minmax(0, 1.3fr) auto;
-        gap: 12px;
-        align-items: center;
         cursor: pointer;
     }
 
@@ -168,8 +134,7 @@
         background: rgba(var(--nav-background-rgb), 0.04);
     }
 
-    .usage-dialog-main,
-    .usage-dialog-summary {
+    .usage-dialog-info {
         display: flex;
         flex-direction: column;
         gap: 4px;
@@ -190,11 +155,17 @@
         color: var(--text-muted);
     }
 
+    .usage-dialog-summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 14px;
+    }
+
     .usage-dialog-action {
         font-size: 0.92rem;
         font-weight: 600;
         color: var(--link);
-        white-space: nowrap;
+        margin-top: 2px;
     }
 
     .usage-dialog-details {
@@ -202,14 +173,12 @@
         overflow: visible;
     }
 
-    .usage-dialog-loading,
     .usage-dialog-error {
         border: 1px solid var(--border);
         border-radius: 8px;
         background: rgba(var(--nav-background-rgb), 0.03);
     }
 
-    .usage-dialog-loading,
     .usage-dialog-error {
         padding: 12px;
         font-size: 0.95rem;
@@ -242,6 +211,7 @@
         text-align: left;
         border-bottom: 1px solid var(--border);
         font-size: 0.94rem;
+        white-space: nowrap;
     }
 
     .usage-turn-table th {
@@ -249,6 +219,11 @@
         letter-spacing: 0.03em;
         text-transform: uppercase;
         color: var(--text-muted);
+    }
+
+    .usage-turn-table td {
+        vertical-align: top;
+        width: 1%;
     }
 
     .usage-turn-table tbody tr:last-child td {
@@ -260,20 +235,35 @@
         color: var(--text-muted);
     }
 
-    @media (max-width: 800px) {
-        .usage-dialog-toggle {
-            grid-template-columns: 1fr;
-        }
+    #usage-loading {
+        margin: 16px auto;
+    }
 
-        .usage-dialog-action {
-            justify-self: start;
-        }
+    #load-more-usage-dialogs {
+        margin: 0 16px 16px;
+    }
+
+    @media (max-width: 800px) {
     }
 </style>
 
-<script>
+<script type="module">
+    import { Flash } from '/static/js/flash.js';
+    import { Requests } from '/static/js/requests.js';
+
     (() => {
-        const dialogItems = document.querySelectorAll('[data-dialog-item]');
+        const container = document.getElementById('usage-dialogs-container');
+        const loading = document.getElementById('usage-loading');
+        const loadMoreButton = document.getElementById('load-more-usage-dialogs');
+        const noUsageDialogs = document.getElementById('no-usage-dialogs');
+
+        if (!(container instanceof HTMLElement) || !(loading instanceof HTMLElement) || !(loadMoreButton instanceof HTMLButtonElement) || !(noUsageDialogs instanceof HTMLElement)) {
+            return;
+        }
+
+        let currentPage = 1;
+        let isLoadingDialogs = false;
+        let hasMoreDialogs = true;
 
         function escapeHtml(value) {
             return String(value)
@@ -290,17 +280,17 @@
             }
 
             const rows = turns
-                .map((turn) => {
-                    const turnId = String(turn.turn_id || '');
-                    const created = String(turn.first_created || '');
-                    const requestCount = Number(turn.request_count || 0);
-                    const inputTokens = Number(turn.input_tokens || 0);
-                    const cachedInputTokens = Number(turn.cached_input_tokens || 0);
-                    const outputTokens = Number(turn.output_tokens || 0);
-                    const reasoningTokens = Number(turn.reasoning_tokens || 0);
-                    const totalTokens = Number(turn.total_tokens || 0);
-                    const costAmount = String(turn.cost_amount || '0');
-                    const currency = String(turn.currency || 'USD');
+                .map((row) => {
+                    const turnId = String(row.turn_id || '');
+                    const created = String(row.first_created || '');
+                    const requestCount = Number(row.request_count || 0);
+                    const inputTokens = Number(row.input_tokens || 0);
+                    const cachedInputTokens = Number(row.cached_input_tokens || 0);
+                    const outputTokens = Number(row.output_tokens || 0);
+                    const reasoningTokens = Number(row.reasoning_tokens || 0);
+                    const totalTokens = Number(row.total_tokens || 0);
+                    const costAmount = String(row.cost_amount || '0');
+                    const currency = String(row.currency || 'USD');
 
                     return `
                         <tr>
@@ -340,30 +330,56 @@
             `;
         }
 
+        function createDialogItem(dialog) {
+            const article = document.createElement('article');
+            article.className = 'usage-dialog-item';
+            article.dataset.dialogItem = '';
+            article.innerHTML = `
+                <button
+                    type="button"
+                    class="usage-dialog-toggle"
+                    data-dialog-toggle
+                    data-dialog-id="${escapeHtml(String(dialog.dialog_id || ''))}"
+                    aria-expanded="false"
+                >
+                    <span class="usage-dialog-info">
+                        <span class="usage-dialog-title">${escapeHtml(String(dialog.title || 'Untitled dialog'))}</span>
+                        <span class="usage-dialog-time">Last used ${escapeHtml(String(dialog.last_created || ''))}</span>
+                        <span class="usage-dialog-summary">
+                            <span>${escapeHtml(String(dialog.cost_amount || '0'))} ${escapeHtml(String(dialog.currency || 'USD'))}</span>
+                            <span>${Number(dialog.request_count || 0)} requests</span>
+                            <span>${Number(dialog.total_tokens || 0)} tokens</span>
+                        </span>
+                        <span class="usage-dialog-action">Show details</span>
+                    </span>
+                </button>
+                <div class="usage-dialog-details" data-dialog-details hidden>
+                    <div class="usage-dialog-error" data-dialog-error hidden></div>
+                    <div class="usage-dialog-details-content" data-dialog-content hidden></div>
+                </div>
+            `;
+            bindDialogItem(article);
+            return article;
+        }
+
         async function loadDialogDetails(toggle, detailsElement) {
             if (detailsElement.dataset.loaded === 'true') {
                 return;
             }
 
             const dialogId = toggle.dataset.dialogId;
-            const loadingElement = detailsElement.querySelector('[data-dialog-loading]');
             const errorElement = detailsElement.querySelector('[data-dialog-error]');
             const contentElement = detailsElement.querySelector('[data-dialog-content]');
+            const spinnerElement = document.querySelector('.loading-spinner');
 
-            loadingElement.hidden = false;
             errorElement.hidden = true;
             contentElement.hidden = true;
+            if (spinnerElement instanceof HTMLElement) {
+                spinnerElement.classList.remove('hidden');
+            }
 
             try {
-                const response = await fetch(`/api/chat/dialogs/${encodeURIComponent(dialogId)}/usage`, {
-                    headers: { Accept: 'application/json' },
-                    credentials: 'same-origin',
-                });
-                const payload = await response.json();
-                if (!response.ok || payload.error) {
-                    throw new Error(payload.message || 'Unable to load usage details for this dialog.');
-                }
-
+                const payload = await Requests.asyncGetJson(`/api/chat/dialogs/${encodeURIComponent(dialogId)}/usage`);
                 contentElement.innerHTML = formatTurnRows(payload.turns);
                 contentElement.hidden = false;
                 detailsElement.dataset.loaded = 'true';
@@ -371,11 +387,13 @@
                 errorElement.textContent = error instanceof Error ? error.message : 'Unable to load usage details for this dialog.';
                 errorElement.hidden = false;
             } finally {
-                loadingElement.hidden = true;
+                if (spinnerElement instanceof HTMLElement) {
+                    spinnerElement.classList.add('hidden');
+                }
             }
         }
 
-        dialogItems.forEach((item) => {
+        function bindDialogItem(item) {
             const toggle = item.querySelector('[data-dialog-toggle]');
             const detailsElement = item.querySelector('[data-dialog-details]');
             const actionElement = item.querySelector('.usage-dialog-action');
@@ -398,7 +416,54 @@
                 detailsElement.hidden = false;
                 await loadDialogDetails(toggle, detailsElement);
             });
+        }
+
+        function renderDialogs(dialogs) {
+            for (const dialog of dialogs) {
+                container.appendChild(createDialogItem(dialog));
+            }
+        }
+
+        async function loadDialogs(page) {
+            if (isLoadingDialogs || !hasMoreDialogs) {
+                return;
+            }
+
+            isLoadingDialogs = true;
+            loading.classList.remove('hidden');
+            loadMoreButton.disabled = true;
+
+            try {
+                const payload = await Requests.asyncGetJson(`/api/user/usage?page=${page}`);
+                const dialogsInfo = payload.dialogs_info || {};
+                const dialogs = Array.isArray(dialogsInfo.dialogs) ? dialogsInfo.dialogs : [];
+                if (dialogs.length === 0 && currentPage === 1) {
+                    noUsageDialogs.classList.remove('hidden');
+                    hasMoreDialogs = false;
+                    loadMoreButton.classList.add('hidden');
+                    return;
+                }
+
+                noUsageDialogs.classList.add('hidden');
+                renderDialogs(dialogs);
+                hasMoreDialogs = Boolean(dialogsInfo.has_next);
+                currentPage += 1;
+                loadMoreButton.classList.toggle('hidden', !hasMoreDialogs);
+            } catch (error) {
+                console.error(error);
+                Flash.setMessageFromError(error, 'An error occurred while loading usage dialogs.');
+            } finally {
+                isLoadingDialogs = false;
+                loadMoreButton.disabled = false;
+                loading.classList.add('hidden');
+            }
+        }
+
+        loadMoreButton.addEventListener('click', () => {
+            loadDialogs(currentPage);
         });
+
+        loadDialogs(currentPage);
     })();
 </script>
 

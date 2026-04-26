@@ -674,6 +674,16 @@ async def list_user_usage_by_dialog(user_id: int) -> list[dict[str, str | int]]:
     return ordered_dialogs
 
 
+async def get_user_usage_by_dialog_info(user_id: int, current_page: int = 1) -> dict[str, list[dict[str, str | int]] | bool]:
+    dialogs = await list_user_usage_by_dialog(user_id)
+    start_index = max(current_page - 1, 0) * DIALOGS_PER_PAGE
+    end_index = start_index + DIALOGS_PER_PAGE
+    return {
+        "dialogs": dialogs[start_index:end_index],
+        "has_next": end_index < len(dialogs),
+    }
+
+
 async def delete_dialog(user_id: int, dialog_id: str):
 
     async with async_session() as session:

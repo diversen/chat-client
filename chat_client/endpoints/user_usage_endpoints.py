@@ -19,7 +19,6 @@ async def usage_page(request: Request):
     user_id = user_id_or_response
 
     totals = await chat_repository.get_user_usage_totals(user_id)
-    dialogs = await chat_repository.list_user_usage_by_dialog(user_id)
     return await render_template(
         templates,
         request,
@@ -27,7 +26,6 @@ async def usage_page(request: Request):
         {
             "title": "Usage",
             "usage_totals": totals,
-            "usage_dialogs": dialogs,
         },
     )
 
@@ -39,8 +37,15 @@ async def get_usage(request: Request):
             message="It seems you have been logged out. Log in again",
             status_code=401,
         )
+        page_raw = str(request.query_params.get("page", "1")).strip()
+        try:
+            current_page = int(page_raw)
+        except ValueError:
+            raise exceptions_validation.JSONError("Invalid page parameter", status_code=400)
+        if current_page < 1:
+            raise exceptions_validation.JSONError("Invalid page parameter", status_code=400)
         totals = await chat_repository.get_user_usage_totals(user_id)
-        dialogs = await chat_repository.list_user_usage_by_dialog(user_id)
-        return json_success(totals=totals, dialogs=dialogs)
+        dialogs_info = await chat_repository.get_user_usage_by_dialog_info(user_id, current_page=current_page)
+        return json_success(totals=totals, dialogs_info=dialogs_info, dialogs=dialogs_info["dialogs"])
     except exceptions_validation.JSONError as error:
         return json_error_from_exception(error)

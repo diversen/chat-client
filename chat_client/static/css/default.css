@@ -993,7 +993,7 @@ table {
 }
 
 a.delete svg {
-    fill: var(--flash-error-color);
+    fill: var(--flash-notice-color);
     height: 24px;
     width: 24px;
 }

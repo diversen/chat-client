@@ -307,10 +307,11 @@ async def get_dialog_usage(
         dialog_id = str(request.path_params.get("dialog_id", "")).strip()
         if not dialog_id:
             raise exceptions_validation.UserValidate("Dialog id is required")
-        await chat_repository.get_dialog(user_id, dialog_id)
+        events = await chat_repository.list_dialog_usage_events(user_id, dialog_id)
+        if not events:
+            raise exceptions_validation.UserValidate("Dialog usage not found or not owned by user")
         totals = await chat_repository.get_dialog_usage_totals(user_id, dialog_id)
         turns = await chat_repository.get_dialog_usage_by_turn(user_id, dialog_id)
-        events = await chat_repository.list_dialog_usage_events(user_id, dialog_id)
         return json_success(dialog_id=dialog_id, totals=totals, turns=turns, events=events)
     except exceptions_validation.JSONError:
         raise
