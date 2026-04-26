@@ -42,6 +42,7 @@ def test_basic_routes():
         assert "default_model" in data
         assert "vision_models" in data
         assert "model_capabilities" in data
+        assert "model_providers" in data
         print("✓ Config endpoint works")
 
         # Test models list endpoint

@@ -139,6 +139,13 @@ def _resolve_provider_name(model: str) -> str:
     return ""
 
 
+def _build_model_providers() -> dict[str, str]:
+    return {
+        str(model_name): _resolve_provider_name(str(model_name))
+        for model_name in MODELS.keys()
+    }
+
+
 def _provider_supports_stream_usage(provider_name: str, provider_info: dict[str, Any]) -> bool:
     normalized_provider_name = str(provider_name or "").strip().lower()
     if normalized_provider_name == "openai":
@@ -258,6 +265,11 @@ def _supports_model_attachments(model_name: str) -> bool:
         provider_info_resolver=_resolve_provider_info,
         cache_token=_model_capabilities_cache_token(),
     )
+
+
+def _supports_model_reasoning(model_name: str) -> bool:
+    capabilities = _build_model_capabilities()
+    return bool(capabilities.get(model_name, {}).get("supports_reasoning"))
 
 
 def log_model_capabilities_summary(logger_: logging.Logger | None = None) -> dict[str, dict[str, bool]]:
@@ -524,6 +536,7 @@ async def _chat_response_stream(
     request: Request,
     messages,
     model,
+    reasoning_effort,
     logged_in,
     dialog_id: str,
     trace_id: str,
@@ -533,6 +546,7 @@ async def _chat_response_stream(
     tool_attachments = list(available_attachments or [])
     provider_name = _resolve_provider_name(model)
     provider_info = _resolve_provider_info(model)
+    effective_reasoning_effort = reasoning_effort if _supports_model_reasoning(model) else ""
     usage_turn_id = str(uuid.uuid4())
 
     async def _tool_executor_with_persist(tool_call):
@@ -618,6 +632,7 @@ async def _chat_response_stream(
         request,
         messages,
         model,
+        reasoning_effort=effective_reasoning_effort,
         openai_client_cls=OpenAI,
         provider_info_resolver=_resolve_provider_info,
         tool_models=_resolve_tool_models(),
@@ -712,6 +727,7 @@ async def get_chat_config(request: Request):
         system_message_denylist=SYSTEM_MESSAGE_DENYLIST,
         vision_models=VISION_MODELS,
         build_model_capabilities=_build_model_capabilities,
+        build_model_providers=_build_model_providers,
         json_success=json_success,
     )
 

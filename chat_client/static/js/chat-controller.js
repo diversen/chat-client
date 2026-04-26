@@ -7,13 +7,14 @@ const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024;
 const MAX_CONVERSATION_UPLOADS = 10;
 
 class ConversationController {
-    constructor({ view, storage, chat, config, elements, modelSelection }) {
+    constructor({ view, storage, chat, config, elements, modelSelection, reasoningSelection }) {
         this.view = view;
         this.storage = storage;
         this.chat = chat;
         this.config = config;
         this.elements = elements;
         this.modelSelection = modelSelection;
+        this.reasoningSelection = reasoningSelection;
         this.isInitializing = true;
         this.isSubmitting = false;
         this.isStreaming = false;
@@ -53,6 +54,7 @@ class ConversationController {
             supports_images: visionModels.includes(selectedModel),
             supports_attachments: true,
             supports_tools: false,
+            supports_reasoning: false,
         };
     }
 
@@ -64,21 +66,42 @@ class ConversationController {
         return Boolean(this.getSelectedModelCapabilities()?.supports_attachments);
     }
 
+    selectedModelSupportsReasoningEffort() {
+        return Boolean(this.getSelectedModelCapabilities()?.supports_reasoning);
+    }
+
+    getSelectedReasoningEffort() {
+        if (!this.selectedModelSupportsReasoningEffort()) {
+            return '';
+        }
+        const selectedValue = String(this.reasoningSelection.getSelectedValue() || '').trim().toLowerCase();
+        if (selectedValue === 'none') {
+            return '';
+        }
+        if (['low', 'medium', 'high'].includes(selectedValue)) {
+            return selectedValue;
+        }
+        return '';
+    }
+
     updateAttachmentUI() {
         const {
             attachImageButtonElem,
             imageInputElem,
             attachFileButtonElem,
             attachmentInputElem,
+            reasoningPickerElem,
         } = this.elements;
         const supportsImages = this.selectedModelSupportsImages();
         const supportsAttachments = this.selectedModelSupportsAttachments();
+        const supportsReasoningEffort = this.selectedModelSupportsReasoningEffort();
         attachImageButtonElem.classList.toggle('hidden', !supportsImages);
         attachImageButtonElem.disabled = !supportsImages;
         imageInputElem.disabled = !supportsImages;
         attachFileButtonElem.classList.toggle('hidden', !supportsAttachments);
         attachFileButtonElem.disabled = !supportsAttachments;
         attachmentInputElem.disabled = !supportsAttachments;
+        reasoningPickerElem.classList.toggle('hidden', !supportsReasoningEffort);
 
         if (!supportsImages && this.pendingImages.length > 0) {
             this.clearPendingImages();
@@ -445,6 +468,9 @@ class ConversationController {
             this.updateAttachmentUI();
             this.updateSendButtonState();
         });
+        this.reasoningSelection.subscribe(() => {
+            this.updateSendButtonState();
+        });
         this.bindFormEvents();
         this.bindMessageEvents();
         this.bindAttachmentEvents();
@@ -595,6 +621,7 @@ class ConversationController {
             await this.renderAssistantMessage({
                 shouldGenerateTitle: createdNewDialog && Boolean(userMessage),
                 model: this.modelSelection.getSelectedModel(),
+                reasoningEffort: this.getSelectedReasoningEffort(),
             });
         } catch (error) {
             await logError(error, 'Error in sendUserMessage');
@@ -656,6 +683,7 @@ class ConversationController {
     async renderAssistantMessage(options = {}) {
         const shouldGenerateTitle = Boolean(options?.shouldGenerateTitle);
         const modelName = String(options?.model || this.modelSelection.getSelectedModel() || '');
+        const reasoningEffort = String(options?.reasoningEffort || this.getSelectedReasoningEffort() || '');
         this.view.disableNew();
         this.view.enableAbort();
         this.isStreaming = true;
@@ -796,6 +824,7 @@ class ConversationController {
             await ensureLoadingAnswerContainer();
             for await (const chunk of this.chat.stream({
                 model: modelName,
+                reasoning_effort: reasoningEffort,
                 dialog_id: this.dialogId || '',
                 messages: this.messages,
             }, this.abortController.signal)) {

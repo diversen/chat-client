@@ -151,6 +151,7 @@ async def chat_response_stream(
                 request,
                 messages,
                 payload.model,
+                payload.reasoning_effort,
                 logged_in,
                 dialog_id,
                 trace_id,

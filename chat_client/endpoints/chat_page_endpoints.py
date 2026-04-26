@@ -49,6 +49,7 @@ async def get_chat_config(
     system_message_denylist: list[str],
     vision_models: list[str],
     build_model_capabilities,
+    build_model_providers,
     json_success,
 ):
     return await frontend_config_impl(
@@ -57,6 +58,7 @@ async def get_chat_config(
         system_message_denylist=system_message_denylist,
         vision_models=vision_models,
         build_model_capabilities=build_model_capabilities,
+        build_model_providers=build_model_providers,
         json_success=json_success,
     )
 

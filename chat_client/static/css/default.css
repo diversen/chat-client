@@ -195,6 +195,9 @@ nav svg {
     align-items: center;
     min-width: 0;
     flex: 0 0 auto;
+    width: 40px;
+    height: 40px;
+    overflow: hidden;
 }
 
 .model-picker-display {
@@ -212,9 +215,15 @@ nav svg {
     position: absolute;
     inset: 0;
     width: 100%;
+    height: 100%;
     max-width: none;
     opacity: 0;
     cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    border: 0;
+    margin: 0;
+    padding: 0;
 }
 
 .model-picker:focus-within .model-picker-display {
@@ -223,6 +232,52 @@ nav svg {
 }
 
 #select-model::-webkit-scrollbar {
+    display: none;
+}
+
+.reasoning-picker {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+    flex: 0 0 auto;
+    width: 40px;
+    height: 40px;
+    overflow: hidden;
+}
+
+.reasoning-picker-display {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
+    padding: 0;
+    width: 40px;
+    height: 40px;
+}
+
+#select-reasoning-effort {
+    min-width: 0;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    max-width: none;
+    opacity: 0;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    border: 0;
+    margin: 0;
+    padding: 0;
+}
+
+.reasoning-picker:focus-within .reasoning-picker-display {
+    outline: 2px solid var(--nav-background);
+    outline-offset: 2px;
+}
+
+#select-reasoning-effort::-webkit-scrollbar {
     display: none;
 }
 

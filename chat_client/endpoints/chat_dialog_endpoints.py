@@ -7,13 +7,23 @@ from starlette.responses import JSONResponse
 MAX_DIALOG_ATTACHMENTS = 10
 
 
-async def get_chat_config(request: Request, *, config, system_message_denylist, vision_models, build_model_capabilities, json_success):
+async def get_chat_config(
+    request: Request,
+    *,
+    config,
+    system_message_denylist,
+    vision_models,
+    build_model_capabilities,
+    build_model_providers,
+    json_success,
+):
     config_values = {
         "default_model": getattr(config, "DEFAULT_MODEL", ""),
         "use_katex": getattr(config, "USE_KATEX", False),
         "system_message_denylist": system_message_denylist,
         "vision_models": vision_models,
         "model_capabilities": build_model_capabilities(),
+        "model_providers": build_model_providers(),
     }
     return json_success(**config_values)
 

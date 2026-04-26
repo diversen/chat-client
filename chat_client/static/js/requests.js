@@ -98,11 +98,13 @@ class Requests {
     /**
      * Get JSON async.
      */
-    static async asyncGetJson(url, method = 'GET') {
+    static async asyncGetJson(url, method = 'GET', options = {}) {
         return Requests._fetchWithTimeout(url, {
+            ...options,
             method,
             headers: {
                 'Accept': 'application/json',
+                ...(options.headers || {}),
             },
         });
     }

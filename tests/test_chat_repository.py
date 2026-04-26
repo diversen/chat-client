@@ -693,6 +693,196 @@ def test_create_llm_usage_event_and_get_dialog_usage_totals():
     asyncio.run(_run())
 
 
+def test_usage_aggregation_recovers_cost_and_models_from_events():
+    async def _run():
+        temp_dir = tempfile.mkdtemp()
+        db_path = Path(temp_dir) / "test_chat_repository_usage_recovery.db"
+        engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}", echo=False)
+        session_factory = async_sessionmaker(engine, expire_on_commit=False)
+
+        data_module = ModuleType("data")
+        config_module = ModuleType("data.config")
+        config_module.DATABASE = db_path
+        data_module.config = config_module
+        sys.modules["data"] = data_module
+        sys.modules["data.config"] = config_module
+
+        from chat_client.repositories import chat_repository
+
+        original_session_factory = chat_repository.async_session
+        chat_repository.async_session = session_factory
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+
+            async with session_factory() as session:
+                user = User(
+                    email="repo-test-usage-recovery@example.com",
+                    password_hash="x",
+                    random="y",
+                )
+                session.add(user)
+                await session.commit()
+                await session.refresh(user)
+                user_id = int(user.user_id)
+
+            dialog_id = await chat_repository.create_dialog(user_id, "Usage recovery")
+            await chat_repository.create_llm_usage_event(
+                user_id=user_id,
+                dialog_id=dialog_id,
+                turn_id="turn-1",
+                round_index=1,
+                provider="openai",
+                model="gpt-5",
+                input_tokens=1200,
+                cached_input_tokens=1000,
+                output_tokens=45,
+                total_tokens=1245,
+                reasoning_tokens=7,
+                input_price_per_million="1.25",
+                cached_input_price_per_million="0.125",
+                output_price_per_million="10.00",
+                currency="USD",
+                cost_amount="0",
+                usage_source="provider",
+            )
+            await chat_repository.create_llm_usage_event(
+                user_id=user_id,
+                dialog_id=dialog_id,
+                turn_id="turn-1",
+                round_index=2,
+                provider="openai",
+                model="gpt-5-mini",
+                input_tokens=500,
+                cached_input_tokens=0,
+                output_tokens=20,
+                total_tokens=520,
+                reasoning_tokens=0,
+                input_price_per_million="1.25",
+                cached_input_price_per_million="0.125",
+                output_price_per_million="10.00",
+                currency="USD",
+                cost_amount="0",
+                usage_source="provider",
+            )
+
+            totals = await chat_repository.get_dialog_usage_totals(user_id, dialog_id)
+            turns = await chat_repository.get_dialog_usage_by_turn(user_id, dialog_id)
+            events = await chat_repository.list_dialog_usage_events(user_id, dialog_id)
+
+            assert totals["cost_amount"] == "0.00151250"
+            assert turns == [
+                {
+                    "turn_id": "turn-1",
+                    "models": ["gpt-5", "gpt-5-mini"],
+                    "request_count": 2,
+                    "input_tokens": 1700,
+                    "cached_input_tokens": 1000,
+                    "output_tokens": 65,
+                    "total_tokens": 1765,
+                    "reasoning_tokens": 7,
+                    "currency": "USD",
+                    "cost_amount": "0.00151250",
+                    "first_created": turns[0]["first_created"],
+                }
+            ]
+            assert events[0]["cost_amount"] == "0.00068750"
+            assert events[1]["cost_amount"] == "0.00082500"
+        finally:
+            chat_repository.async_session = original_session_factory
+            sys.modules.pop("data.config", None)
+            sys.modules.pop("data", None)
+            await engine.dispose()
+            if db_path.exists():
+                db_path.unlink()
+
+    asyncio.run(_run())
+
+
+def test_usage_aggregation_recovers_cost_from_configured_pricing_when_row_rates_are_zero():
+    async def _run():
+        temp_dir = tempfile.mkdtemp()
+        db_path = Path(temp_dir) / "test_chat_repository_usage_pricing_fallback.db"
+        engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}", echo=False)
+        session_factory = async_sessionmaker(engine, expire_on_commit=False)
+
+        data_module = ModuleType("data")
+        config_module = ModuleType("data.config")
+        config_module.DATABASE = db_path
+        data_module.config = config_module
+        sys.modules["data"] = data_module
+        sys.modules["data.config"] = config_module
+
+        from chat_client.repositories import chat_repository
+
+        original_session_factory = chat_repository.async_session
+        original_model_pricing = getattr(chat_repository.config, "MODEL_PRICING", {})
+        chat_repository.async_session = session_factory
+        chat_repository.config.MODEL_PRICING = {
+            "openai": {
+                "gpt-5": {
+                    "input_per_million": "1.25",
+                    "cached_input_per_million": "0.125",
+                    "output_per_million": "10.00",
+                    "currency": "USD",
+                }
+            }
+        }
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+
+            async with session_factory() as session:
+                user = User(
+                    email="repo-test-usage-pricing-fallback@example.com",
+                    password_hash="x",
+                    random="y",
+                )
+                session.add(user)
+                await session.commit()
+                await session.refresh(user)
+                user_id = int(user.user_id)
+
+            dialog_id = await chat_repository.create_dialog(user_id, "Usage pricing fallback")
+            await chat_repository.create_llm_usage_event(
+                user_id=user_id,
+                dialog_id=dialog_id,
+                turn_id="turn-1",
+                round_index=1,
+                provider="openai",
+                model="gpt-5",
+                input_tokens=1200,
+                cached_input_tokens=1000,
+                output_tokens=45,
+                total_tokens=1245,
+                reasoning_tokens=7,
+                input_price_per_million="0",
+                cached_input_price_per_million="0",
+                output_price_per_million="0",
+                currency="USD",
+                cost_amount="0",
+                usage_source="provider",
+            )
+
+            totals = await chat_repository.get_dialog_usage_totals(user_id, dialog_id)
+            turns = await chat_repository.get_dialog_usage_by_turn(user_id, dialog_id)
+            events = await chat_repository.list_dialog_usage_events(user_id, dialog_id)
+
+            assert totals["cost_amount"] == "0.00068750"
+            assert turns[0]["cost_amount"] == "0.00068750"
+            assert events[0]["cost_amount"] == "0.00068750"
+        finally:
+            chat_repository.async_session = original_session_factory
+            chat_repository.config.MODEL_PRICING = original_model_pricing
+            sys.modules.pop("data.config", None)
+            sys.modules.pop("data", None)
+            await engine.dispose()
+            if db_path.exists():
+                db_path.unlink()
+
+    asyncio.run(_run())
+
+
 def test_delete_dialog_preserves_llm_usage_events():
     async def _run():
         temp_dir = tempfile.mkdtemp()

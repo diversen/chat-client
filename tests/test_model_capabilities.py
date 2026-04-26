@@ -28,6 +28,7 @@ def test_build_model_capabilities_merges_ollama_detection():
         "supports_images": True,
         "supports_tools": True,
         "supports_attachments": True,
+        "supports_reasoning": False,
         "supports_thinking": True,
         "supports_system_messages": True,
         "context_length": 32768,
@@ -36,6 +37,7 @@ def test_build_model_capabilities_merges_ollama_detection():
         "supports_images": False,
         "supports_tools": False,
         "supports_attachments": False,
+        "supports_reasoning": False,
         "supports_thinking": False,
         "supports_system_messages": True,
         "context_length": None,
@@ -100,6 +102,7 @@ def test_warm_and_log_model_capabilities_logs_pretty_json():
         "supports_images": False,
         "supports_tools": True,
         "supports_attachments": True,
+        "supports_reasoning": False,
         "supports_thinking": True,
         "supports_system_messages": True,
         "context_length": 32768,
@@ -107,7 +110,7 @@ def test_warm_and_log_model_capabilities_logs_pretty_json():
     assert len(dummy_logger.messages) == 1
     assert (
         dummy_logger.messages[0]
-        == 'Model capabilities detected at startup:\n{\n  "qwen3:latest": {\n    "context_length": 32768,\n    "provider": "ollama",\n    "supports_attachments": true,\n    "supports_images": false,\n    "supports_system_messages": true,\n    "supports_thinking": true,\n    "supports_tools": true\n  }\n}'
+        == 'Model capabilities detected at startup:\n{\n  "qwen3:latest": {\n    "context_length": 32768,\n    "provider": "ollama",\n    "supports_attachments": true,\n    "supports_images": false,\n    "supports_reasoning": false,\n    "supports_system_messages": true,\n    "supports_thinking": true,\n    "supports_tools": true\n  }\n}'
     )
 
 
@@ -170,3 +173,46 @@ def test_build_model_capabilities_denies_system_messages_for_denylist():
 
     assert capabilities["blocked-model"]["supports_system_messages"] is False
     assert capabilities["blocked-model"]["context_length"] == 4096
+
+
+def test_build_model_capabilities_merges_openai_reasoning_detection():
+    with patch(
+        "chat_client.core.model_capabilities.get_openai_model_metadata",
+        return_value={
+            "supports_reasoning": True,
+            "supports_thinking": True,
+            "context_length": None,
+        },
+    ):
+        capabilities = model_capabilities.build_model_capabilities(
+            models={"gpt-5.1": "openai", "gpt-5.4-nano": "openai"},
+            vision_models=[],
+            tool_models=[],
+            system_message_denylist=[],
+            provider_info_resolver=lambda _model_name: {"api_key": "key", "base_url": "https://api.openai.com/v1"},
+            cache_token={"models": {"gpt-5.1": "openai", "gpt-5.4-nano": "openai"}},
+        )
+
+    assert capabilities["gpt-5.1"]["supports_reasoning"] is True
+    assert capabilities["gpt-5.1"]["supports_thinking"] is True
+
+
+def test_build_model_capabilities_probes_openai_reasoning_with_tools_for_tool_models():
+    with patch(
+        "chat_client.core.model_capabilities.get_openai_model_metadata",
+        return_value={
+            "supports_reasoning": False,
+            "supports_thinking": False,
+            "context_length": None,
+        },
+    ) as mock_get_openai_model_metadata:
+        model_capabilities.build_model_capabilities(
+            models={"gpt-5.4-nano": "openai"},
+            vision_models=[],
+            tool_models=["gpt-5.4-nano"],
+            system_message_denylist=[],
+            provider_info_resolver=lambda _model_name: {"api_key": "key", "base_url": "https://api.openai.com/v1"},
+            cache_token={"models": {"gpt-5.4-nano": "openai"}, "tool_models": ["gpt-5.4-nano"]},
+        )
+
+    assert mock_get_openai_model_metadata.call_args.kwargs["probe_tools"] is True

@@ -24,18 +24,23 @@ function shouldFocusMessageInput() {
     return window.location.pathname === '/' || !isLikelyPhoneDevice();
 }
 
-function initializeChatUI({ messageElem, modelSelection }) {
+function initializeChatUI({ messageElem, modelSelection, reasoningSelection }) {
     modelSelection.restoreStoredModel();
+    reasoningSelection.restoreStoredValue();
     modelSelection.render();
     modelSelection.bind();
+    reasoningSelection.bind();
     messageElem.style.display = 'unset';
     if (shouldFocusMessageInput()) {
         messageElem.focus();
     }
 }
 
-function bindPromptFocusBehavior({ messageElem, modelSelection }) {
+function bindPromptFocusBehavior({ messageElem, modelSelection, reasoningSelection }) {
     modelSelection.subscribe(() => {
+        messageElem.focus();
+    });
+    reasoningSelection.subscribe(() => {
         messageElem.focus();
     });
 }
@@ -52,11 +57,11 @@ function bindScrollToBottomLayout({ scrollToBottom, promptElem }) {
     return updateScrollButtonLayout;
 }
 
-function initAppEvents({ messageElem, scrollToBottom, promptElem, modelSelection }) {
-    bindPromptFocusBehavior({ messageElem, modelSelection });
+function initAppEvents({ messageElem, scrollToBottom, promptElem, modelSelection, reasoningSelection }) {
+    bindPromptFocusBehavior({ messageElem, modelSelection, reasoningSelection });
     const updateScrollButtonLayout = bindScrollToBottomLayout({ scrollToBottom, promptElem });
     const initializeUI = () => {
-        initializeChatUI({ messageElem, modelSelection });
+        initializeChatUI({ messageElem, modelSelection, reasoningSelection });
         updateScrollButtonLayout();
     };
 

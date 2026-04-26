@@ -561,6 +561,13 @@ def _resolve_empty_answer_retry_count(value: Any) -> int:
     return max(resolved, 0)
 
 
+def normalize_reasoning_effort(value: Any) -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized in {"low", "medium", "high"}:
+        return normalized
+    return ""
+
+
 def _normalize_tool_calls(raw_tool_calls: Any) -> list[dict[str, Any]]:
     normalized: list[dict[str, Any]] = []
     if not isinstance(raw_tool_calls, list):
@@ -714,6 +721,7 @@ async def chat_response_stream(
     request: Request,
     messages: list[dict[str, Any]],
     model: str,
+    reasoning_effort: str = "",
     *,
     openai_client_cls: Callable[..., Any],
     provider_info_resolver: Callable[[str], dict[str, Any]],
@@ -740,6 +748,7 @@ async def chat_response_stream(
     }
     try:
         provider_info = provider_info_resolver(model)
+        normalized_reasoning_effort = normalize_reasoning_effort(reasoning_effort)
         max_rounds = _resolve_max_chat_loop_rounds(max_chat_loop_rounds)
         max_empty_answer_retries = _resolve_empty_answer_retry_count(empty_answer_retry_count)
 
@@ -784,6 +793,8 @@ async def chat_response_stream(
                 "messages": messages,
                 "stream": True,
             }
+            if normalized_reasoning_effort and str(provider_name or "").strip().lower() == "openai":
+                create_kwargs["reasoning_effort"] = normalized_reasoning_effort
             if include_usage_in_stream:
                 create_kwargs["stream_options"] = {"include_usage": True}
             if tools_enabled:

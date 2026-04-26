@@ -7,6 +7,7 @@ from openai import OpenAI
 OLLAMA_CAPABILITY_TIMEOUT_SECONDS = 5.0
 
 _OLLAMA_MODEL_METADATA_CACHE: dict[tuple[str, str], dict[str, Any]] = {}
+_OPENAI_MODEL_METADATA_CACHE: dict[tuple[str, str, bool], dict[str, Any]] = {}
 
 
 def get_provider_models(provider: dict):
@@ -208,3 +209,69 @@ def get_ollama_model_capabilities(provider: dict[str, Any], model_name: str) -> 
         "supports_tools": bool(metadata.get("supports_tools")),
         "supports_thinking": bool(metadata.get("supports_thinking")),
     }
+
+
+def get_openai_model_metadata(provider: dict[str, Any], model_name: str, *, probe_tools: bool = False) -> dict[str, Any]:
+    """
+    Best-effort OpenAI metadata detection.
+
+    `supports_reasoning` and `supports_thinking` are inferred by probing a small
+    Chat Completions API call with reasoning enabled. Failure is treated as unsupported.
+    """
+    if not isinstance(provider, dict):
+        return {}
+
+    normalized_model_name = str(model_name or "").strip()
+    base_url = str(provider.get("base_url", "") or "").strip()
+    if not normalized_model_name:
+        return {}
+
+    cache_key = (base_url, normalized_model_name, bool(probe_tools))
+    cached = _OPENAI_MODEL_METADATA_CACHE.get(cache_key)
+    if cached is not None:
+        return dict(cached)
+
+    metadata: dict[str, Any] = {
+        "supports_reasoning": False,
+        "supports_thinking": False,
+        "context_length": None,
+    }
+
+    try:
+        timeout_seconds = float(provider.get("timeout_seconds", OLLAMA_CAPABILITY_TIMEOUT_SECONDS) or OLLAMA_CAPABILITY_TIMEOUT_SECONDS)
+        client = OpenAI(
+            api_key=provider.get("api_key"),
+            base_url=base_url or None,
+            timeout=timeout_seconds,
+        )
+        create_kwargs: dict[str, Any] = {
+            "model": normalized_model_name,
+            "messages": [{"role": "user", "content": "Say OK."}],
+            "reasoning_effort": "low",
+            "stream": False,
+            "max_completion_tokens": 10,
+        }
+        if probe_tools:
+            create_kwargs["tools"] = [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "noop",
+                        "description": "Do nothing.",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {},
+                            "additionalProperties": False,
+                        },
+                    },
+                }
+            ]
+        client.chat.completions.create(**create_kwargs)
+        metadata["supports_reasoning"] = True
+        metadata["supports_thinking"] = True
+    except Exception:
+        _OPENAI_MODEL_METADATA_CACHE[cache_key] = dict(metadata)
+        return dict(metadata)
+
+    _OPENAI_MODEL_METADATA_CACHE[cache_key] = dict(metadata)
+    return dict(metadata)

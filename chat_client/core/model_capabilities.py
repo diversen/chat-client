@@ -2,7 +2,7 @@ import json
 import logging
 from typing import Any, Callable
 
-from chat_client.core.api_utils import get_ollama_model_metadata
+from chat_client.core.api_utils import get_ollama_model_metadata, get_openai_model_metadata
 
 _MODEL_CAPABILITIES_CACHE: dict[str, dict[str, dict[str, Any]]] = {}
 
@@ -86,8 +86,15 @@ def build_model_capabilities(
     capabilities: dict[str, dict[str, Any]] = {}
     for model_name in models.keys():
         detected_capabilities: dict[str, Any] = {}
-        if resolve_model_provider_name(models, model_name) == "ollama":
+        provider_name = resolve_model_provider_name(models, model_name)
+        if provider_name == "ollama":
             detected_capabilities = get_ollama_model_metadata(provider_info_resolver(model_name), model_name)
+        elif provider_name == "openai":
+            detected_capabilities = get_openai_model_metadata(
+                provider_info_resolver(model_name),
+                model_name,
+                probe_tools=model_name in configured_tool_models,
+            )
 
         supports_images = model_name in configured_vision_models or bool(detected_capabilities.get("supports_images"))
         supports_tools = model_name in configured_tool_models or bool(detected_capabilities.get("supports_tools"))
@@ -96,6 +103,7 @@ def build_model_capabilities(
             "supports_images": supports_images,
             "supports_tools": supports_tools,
             "supports_attachments": supports_tools,
+            "supports_reasoning": bool(detected_capabilities.get("supports_reasoning")),
             "supports_thinking": bool(detected_capabilities.get("supports_thinking")),
             "supports_system_messages": supports_system_messages,
             "context_length": detected_capabilities.get("context_length"),

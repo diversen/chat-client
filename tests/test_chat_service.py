@@ -47,6 +47,14 @@ def test_map_openai_error_message_for_image_modality_in_response_json():
     assert chat_service.map_openai_error_message(error) == chat_service.IMAGE_MODALITY_ERROR_MESSAGE
 
 
+def test_normalize_reasoning_effort_accepts_supported_values():
+    assert chat_service.normalize_reasoning_effort("LOW") == "low"
+    assert chat_service.normalize_reasoning_effort("medium") == "medium"
+    assert chat_service.normalize_reasoning_effort("high") == "high"
+    assert chat_service.normalize_reasoning_effort("none") == ""
+    assert chat_service.normalize_reasoning_effort("") == ""
+
+
 def test_summarize_messages_for_log_includes_attachment_paths():
     summary = chat_service.summarize_messages_for_log(
         [
@@ -477,6 +485,80 @@ def test_chat_response_stream_tools_model_without_tool_calls_streams_on_first_ca
     assert create_calls[0]["stream"] is True
     assert "tools" in create_calls[0]
     assert len(chunks) == 1
+    assert "streamed final" in chunks[0]
+    assert final_stream.closed is True
+
+
+def test_chat_response_stream_passes_reasoning_effort_for_openai_provider():
+    final_stream = DummyStream([_chunk("streamed final", finish_reason="stop")])
+    create_calls = []
+
+    def _create(**kwargs):
+        create_calls.append(kwargs)
+        return final_stream
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=_create)))
+    request = DummyRequest(disconnected_after_calls=999)
+
+    async def _run():
+        chunks = []
+        async for chunk in chat_service.chat_response_stream(
+            request,
+            messages=[{"role": "user", "content": "hello"}],
+            model="test-model",
+            reasoning_effort="high",
+            openai_client_cls=lambda **_: client,
+            provider_info_resolver=lambda _model: {},
+            tool_models=[],
+            tools_loader=lambda: [],
+            tool_executor=lambda _tool_call: "",
+            provider_name="openai",
+            logger=logging.getLogger("test"),
+        ):
+            chunks.append(chunk)
+        return chunks
+
+    chunks = asyncio.run(_run())
+
+    assert len(create_calls) == 1
+    assert create_calls[0]["reasoning_effort"] == "high"
+    assert "streamed final" in chunks[0]
+    assert final_stream.closed is True
+
+
+def test_chat_response_stream_ignores_reasoning_effort_for_non_openai_provider():
+    final_stream = DummyStream([_chunk("streamed final", finish_reason="stop")])
+    create_calls = []
+
+    def _create(**kwargs):
+        create_calls.append(kwargs)
+        return final_stream
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=_create)))
+    request = DummyRequest(disconnected_after_calls=999)
+
+    async def _run():
+        chunks = []
+        async for chunk in chat_service.chat_response_stream(
+            request,
+            messages=[{"role": "user", "content": "hello"}],
+            model="test-model",
+            reasoning_effort="high",
+            openai_client_cls=lambda **_: client,
+            provider_info_resolver=lambda _model: {},
+            tool_models=[],
+            tools_loader=lambda: [],
+            tool_executor=lambda _tool_call: "",
+            provider_name="ollama",
+            logger=logging.getLogger("test"),
+        ):
+            chunks.append(chunk)
+        return chunks
+
+    chunks = asyncio.run(_run())
+
+    assert len(create_calls) == 1
+    assert "reasoning_effort" not in create_calls[0]
     assert "streamed final" in chunks[0]
     assert final_stream.closed is True
 

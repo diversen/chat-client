@@ -4,7 +4,7 @@ import { initAppEvents } from '/static/js/app-events.js';
 import { mountStaticIcons } from '/static/js/app-icon-mount.js';
 import { dd } from '/static/js/diff-dom.js';
 import { renderKatex, renderMarkdownWithKatex } from '/static/js/katex-render.js';
-import { initModelPicker } from '/static/js/model-picker.js';
+import { initModelPicker, initReasoningSelection } from '/static/js/model-picker.js';
 import { storageService, chatService } from '/static/js/chat-services.js';
 import { ConversationController } from '/static/js/chat-controller.js';
 import { createChatView } from '/static/js/chat-view.js';
@@ -12,7 +12,8 @@ import { createChatView } from '/static/js/chat-view.js';
 const elements = getChatElements();
 mountStaticIcons(elements);
 const modelSelection = initModelPicker(elements);
-initAppEvents({ ...elements, modelSelection });
+const reasoningSelection = initReasoningSelection(elements);
+initAppEvents({ ...elements, modelSelection, reasoningSelection });
 const config = await getConfig();
 
 // Math rendering
@@ -143,6 +144,7 @@ const view = createChatView({
     config,
     elements,
     modelSelection,
+    reasoningSelection,
     renderStreamedResponseText,
     updateContentDiff,
 });
@@ -157,6 +159,7 @@ const controller = new ConversationController({
     config,
     elements,
     modelSelection,
+    reasoningSelection,
 });
 
 /**

@@ -607,6 +607,7 @@ class TestChatEndpoints(BaseTestCase):
         assert "system_message_denylist" in data
         assert "vision_models" in data
         assert "model_capabilities" in data
+        assert "model_providers" in data
         assert isinstance(data["model_capabilities"], dict)
 
     @patch("chat_client.endpoints.chat_endpoints.TOOL_MODELS", ["tool-model"])
@@ -625,6 +626,7 @@ class TestChatEndpoints(BaseTestCase):
                 "supports_images": True,
                 "supports_tools": False,
                 "supports_attachments": False,
+                "supports_reasoning": False,
                 "supports_thinking": False,
                 "supports_system_messages": True,
                 "context_length": None,
@@ -633,6 +635,7 @@ class TestChatEndpoints(BaseTestCase):
                 "supports_images": False,
                 "supports_tools": True,
                 "supports_attachments": True,
+                "supports_reasoning": False,
                 "supports_thinking": False,
                 "supports_system_messages": True,
                 "context_length": None,
@@ -641,10 +644,28 @@ class TestChatEndpoints(BaseTestCase):
                 "supports_images": False,
                 "supports_tools": False,
                 "supports_attachments": False,
+                "supports_reasoning": False,
                 "supports_thinking": False,
                 "supports_system_messages": True,
                 "context_length": None,
             },
+        }
+        assert data["model_providers"] == {
+            "vision-model": "x",
+            "tool-model": "x",
+            "combo-model": "x",
+        }
+
+    @patch(
+        "chat_client.endpoints.chat_endpoints.MODELS",
+        {"gpt-5": "openai", "qwen3:latest": "ollama"},
+    )
+    def test_build_model_providers(self):
+        from chat_client.endpoints.chat_endpoints import _build_model_providers
+
+        assert _build_model_providers() == {
+            "gpt-5": "openai",
+            "qwen3:latest": "ollama",
         }
 
     def test_list_models(self):
@@ -704,6 +725,7 @@ class TestChatEndpoints(BaseTestCase):
         assert data["error"] is True
 
     @patch("chat_client.endpoints.chat_endpoints.OpenAI")
+    @patch("chat_client.endpoints.chat_endpoints.MODELS", {"test-model": "openai"})
     @patch("chat_client.core.user_session.is_logged_in")
     def test_chat_response_stream_authenticated(self, mock_logged_in, mock_openai_class):
         """Test POST /chat when authenticated"""
@@ -717,6 +739,50 @@ class TestChatEndpoints(BaseTestCase):
 
         assert response.status_code == 200
         assert response.headers["content-type"] == "text/event-stream; charset=utf-8"
+
+    @patch("chat_client.endpoints.chat_endpoints.OpenAI")
+    @patch("chat_client.endpoints.chat_endpoints.MODELS", {"test-model": "openai"})
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_chat_response_stream_passes_reasoning_effort_for_openai(self, mock_logged_in, mock_openai_class):
+        mock_logged_in.return_value = 1
+
+        mock_client = mock_openai_client()
+        mock_openai_class.return_value = mock_client
+
+        response = self.client.post(
+            "/chat",
+            json={
+                "messages": [{"role": "user", "content": "Hello"}],
+                "model": "test-model",
+                "reasoning_effort": "medium",
+            },
+        )
+
+        assert response.status_code == 200
+        _ = response.content
+        assert mock_client.chat.completions.create.call_args.kwargs["reasoning_effort"] == "medium"
+
+    @patch("chat_client.endpoints.chat_endpoints.OpenAI")
+    @patch("chat_client.endpoints.chat_endpoints.MODELS", {"test-model": "ollama"})
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_chat_response_stream_ignores_reasoning_effort_for_non_openai(self, mock_logged_in, mock_openai_class):
+        mock_logged_in.return_value = 1
+
+        mock_client = mock_openai_client()
+        mock_openai_class.return_value = mock_client
+
+        response = self.client.post(
+            "/chat",
+            json={
+                "messages": [{"role": "user", "content": "Hello"}],
+                "model": "test-model",
+                "reasoning_effort": "high",
+            },
+        )
+
+        assert response.status_code == 200
+        _ = response.content
+        assert "reasoning_effort" not in mock_client.chat.completions.create.call_args.kwargs
 
     @patch("chat_client.endpoints.chat_endpoints.VISION_MODELS", ["test-model"])
     @patch("chat_client.endpoints.chat_endpoints.OpenAI")
@@ -1466,6 +1532,7 @@ class TestChatEndpoints(BaseTestCase):
         mock_get_turns.return_value = [
             {
                 "turn_id": "turn-server-1",
+                "models": ["gpt-5"],
                 "request_count": 2,
                 "input_tokens": 1700,
                 "cached_input_tokens": 1000,
@@ -1532,6 +1599,7 @@ class TestChatEndpoints(BaseTestCase):
         mock_get_turns.return_value = [
             {
                 "turn_id": "turn-server-1",
+                "models": ["gpt-5"],
                 "request_count": 1,
                 "input_tokens": 1200,
                 "cached_input_tokens": 800,

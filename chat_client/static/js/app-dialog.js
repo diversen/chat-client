@@ -1,7 +1,9 @@
 import { Requests } from '/static/js/requests.js';
 
 async function getConfig() {
-    return Requests.asyncGetJson('/api/chat/config');
+    return Requests.asyncGetJson('/api/chat/config', 'GET', {
+        cache: 'no-store',
+    });
 }
 
 /**

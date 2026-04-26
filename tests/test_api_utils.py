@@ -112,3 +112,98 @@ def test_get_ollama_model_metadata_includes_context_length():
         "supports_thinking": False,
         "context_length": 32768,
     }
+
+
+def test_get_openai_model_metadata_marks_reasoning_models_supported():
+    api_utils._OPENAI_MODEL_METADATA_CACHE.clear()
+
+    class DummyChatCompletions:
+        def __init__(self):
+            self.calls = []
+
+        def create(self, **kwargs):
+            self.calls.append(kwargs)
+            return {"id": "resp_123"}
+
+    completions = DummyChatCompletions()
+
+    class DummyOpenAIClient:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+            self.chat = type("DummyChat", (), {"completions": completions})()
+
+    with patch("chat_client.core.api_utils.OpenAI", DummyOpenAIClient):
+        metadata = api_utils.get_openai_model_metadata(
+            {"api_key": "key", "base_url": "https://api.openai.com/v1"},
+            "gpt-5.1",
+        )
+
+    assert metadata == {
+        "supports_reasoning": True,
+        "supports_thinking": True,
+        "context_length": None,
+    }
+    assert completions.calls == [
+        {
+            "model": "gpt-5.1",
+            "messages": [{"role": "user", "content": "Say OK."}],
+            "reasoning_effort": "low",
+            "stream": False,
+            "max_completion_tokens": 10,
+        }
+    ]
+
+
+def test_get_openai_model_metadata_returns_false_when_reasoning_probe_fails():
+    api_utils._OPENAI_MODEL_METADATA_CACHE.clear()
+
+    class DummyChatCompletions:
+        def create(self, **kwargs):
+            raise RuntimeError("unsupported parameter")
+
+    class DummyOpenAIClient:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+            self.chat = type("DummyChat", (), {"completions": DummyChatCompletions()})()
+
+    with patch("chat_client.core.api_utils.OpenAI", DummyOpenAIClient):
+        metadata = api_utils.get_openai_model_metadata(
+            {"api_key": "key", "base_url": "https://api.openai.com/v1"},
+            "gpt-5.4-nano",
+        )
+
+    assert metadata == {
+        "supports_reasoning": False,
+        "supports_thinking": False,
+        "context_length": None,
+    }
+
+
+def test_get_openai_model_metadata_includes_noop_tool_when_probe_tools_enabled():
+    api_utils._OPENAI_MODEL_METADATA_CACHE.clear()
+
+    class DummyChatCompletions:
+        def __init__(self):
+            self.calls = []
+
+        def create(self, **kwargs):
+            self.calls.append(kwargs)
+            return {"id": "chatcmpl_123"}
+
+    completions = DummyChatCompletions()
+
+    class DummyOpenAIClient:
+        def __init__(self, **kwargs):
+            self.kwargs = kwargs
+            self.chat = type("DummyChat", (), {"completions": completions})()
+
+    with patch("chat_client.core.api_utils.OpenAI", DummyOpenAIClient):
+        metadata = api_utils.get_openai_model_metadata(
+            {"api_key": "key", "base_url": "https://api.openai.com/v1"},
+            "gpt-5.4-nano",
+            probe_tools=True,
+        )
+
+    assert metadata["supports_reasoning"] is True
+    assert completions.calls[0]["reasoning_effort"] == "low"
+    assert completions.calls[0]["tools"][0]["function"]["name"] == "noop"

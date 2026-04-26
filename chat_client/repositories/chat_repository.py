@@ -1,5 +1,6 @@
 from chat_client.core import exceptions_validation
 from chat_client.core.attachments import make_image_attachment_ref
+from chat_client.core.usage_pricing import compute_usage_cost, resolve_model_pricing
 from chat_client.repositories import attachment_repository
 from chat_client.repositories import image_repository
 
@@ -31,6 +32,45 @@ def _dialogs_per_page() -> int:
         return max(int(value), 1)
     except (TypeError, ValueError):
         return 20
+
+
+def _normalize_cost_amount(
+    *,
+    cost_amount: str | int | float | Decimal | None,
+    provider: str,
+    model: str,
+    input_tokens: int,
+    cached_input_tokens: int,
+    output_tokens: int,
+    input_price_per_million: str | int | float | Decimal | None,
+    cached_input_price_per_million: str | int | float | Decimal | None,
+    output_price_per_million: str | int | float | Decimal | None,
+) -> str:
+    try:
+        normalized = Decimal(str(cost_amount or "0"))
+        if normalized > 0:
+            return format(normalized, "f")
+    except Exception:
+        pass
+
+    input_rate = str(input_price_per_million or "0")
+    cached_input_rate = str(cached_input_price_per_million or "0")
+    output_rate = str(output_price_per_million or "0")
+
+    if input_rate == "0" and cached_input_rate == "0" and output_rate == "0":
+        pricing = resolve_model_pricing(getattr(config, "MODEL_PRICING", {}), provider, model)
+        input_rate = pricing["input_per_million"]
+        cached_input_rate = pricing["cached_input_per_million"]
+        output_rate = pricing["output_per_million"]
+
+    return compute_usage_cost(
+        input_tokens=input_tokens,
+        cached_input_tokens=cached_input_tokens,
+        output_tokens=output_tokens,
+        input_per_million=input_rate,
+        cached_input_per_million=cached_input_rate,
+        output_per_million=output_rate,
+    )
 
 
 async def _touch_dialog_in_session(session, user_id: int, dialog_id: str) -> None:
@@ -477,7 +517,19 @@ async def get_dialog_usage_totals(user_id: int, dialog_id: str) -> dict[str, str
         reasoning_tokens += int(row.reasoning_tokens or 0)
         currency = str(row.currency or currency)
         try:
-            total_cost += Decimal(str(row.cost_amount or "0"))
+            total_cost += Decimal(
+                _normalize_cost_amount(
+                    cost_amount=row.cost_amount,
+                    provider=str(row.provider or ""),
+                    model=str(row.model or ""),
+                    input_tokens=int(row.input_tokens or 0),
+                    cached_input_tokens=int(row.cached_input_tokens or 0),
+                    output_tokens=int(row.output_tokens or 0),
+                    input_price_per_million=row.input_price_per_million,
+                    cached_input_price_per_million=row.cached_input_price_per_million,
+                    output_price_per_million=row.output_price_per_million,
+                )
+            )
         except Exception:
             pass
 
@@ -510,6 +562,20 @@ async def list_dialog_usage_events(user_id: int, dialog_id: str) -> list[dict[st
     events: list[dict[str, str | int]] = []
     for row in rows:
         created = row.created.isoformat() if row.created is not None else ""
+        input_tokens = int(row.input_tokens or 0)
+        cached_input_tokens = int(row.cached_input_tokens or 0)
+        output_tokens = int(row.output_tokens or 0)
+        normalized_cost = _normalize_cost_amount(
+            cost_amount=row.cost_amount,
+            provider=str(row.provider or ""),
+            model=str(row.model or ""),
+            input_tokens=input_tokens,
+            cached_input_tokens=cached_input_tokens,
+            output_tokens=output_tokens,
+            input_price_per_million=row.input_price_per_million,
+            cached_input_price_per_million=row.cached_input_price_per_million,
+            output_price_per_million=row.output_price_per_million,
+        )
         events.append(
             {
                 "turn_id": str(row.turn_id or ""),
@@ -519,16 +585,16 @@ async def list_dialog_usage_events(user_id: int, dialog_id: str) -> list[dict[st
                 "model": str(row.model or ""),
                 "call_type": str(row.call_type or ""),
                 "request_id": str(row.request_id or ""),
-                "input_tokens": int(row.input_tokens or 0),
-                "cached_input_tokens": int(row.cached_input_tokens or 0),
-                "output_tokens": int(row.output_tokens or 0),
+                "input_tokens": input_tokens,
+                "cached_input_tokens": cached_input_tokens,
+                "output_tokens": output_tokens,
                 "total_tokens": int(row.total_tokens or 0),
                 "reasoning_tokens": int(row.reasoning_tokens or 0),
                 "input_price_per_million": str(row.input_price_per_million or "0"),
                 "cached_input_price_per_million": str(row.cached_input_price_per_million or "0"),
                 "output_price_per_million": str(row.output_price_per_million or "0"),
                 "currency": str(row.currency or "USD"),
-                "cost_amount": str(row.cost_amount or "0"),
+                "cost_amount": normalized_cost,
                 "usage_source": str(row.usage_source or "missing"),
                 "created": created,
             }
@@ -548,6 +614,7 @@ async def get_dialog_usage_by_turn(user_id: int, dialog_id: str) -> list[dict[st
         if turn_id not in turns_by_id:
             turns_by_id[turn_id] = {
                 "turn_id": turn_id,
+                "models": [],
                 "request_count": 0,
                 "input_tokens": 0,
                 "cached_input_tokens": 0,
@@ -561,6 +628,11 @@ async def get_dialog_usage_by_turn(user_id: int, dialog_id: str) -> list[dict[st
             turn_order.append(turn_id)
 
         turn = turns_by_id[turn_id]
+        model_name = str(event.get("model", "") or "").strip()
+        if model_name:
+            existing_models = [str(model) for model in turn.get("models", []) if str(model).strip()]
+            if model_name not in existing_models:
+                turn["models"] = existing_models + [model_name]
         turn["request_count"] = int(turn["request_count"]) + 1
         turn["input_tokens"] = int(turn["input_tokens"]) + int(event.get("input_tokens", 0))
         turn["cached_input_tokens"] = int(turn["cached_input_tokens"]) + int(event.get("cached_input_tokens", 0))
@@ -607,7 +679,19 @@ async def get_user_usage_totals(user_id: int) -> dict[str, str | int]:
         reasoning_tokens += int(row.reasoning_tokens or 0)
         currency = str(row.currency or currency)
         try:
-            total_cost += Decimal(str(row.cost_amount or "0"))
+            total_cost += Decimal(
+                _normalize_cost_amount(
+                    cost_amount=row.cost_amount,
+                    provider=str(row.provider or ""),
+                    model=str(row.model or ""),
+                    input_tokens=int(row.input_tokens or 0),
+                    cached_input_tokens=int(row.cached_input_tokens or 0),
+                    output_tokens=int(row.output_tokens or 0),
+                    input_price_per_million=row.input_price_per_million,
+                    cached_input_price_per_million=row.cached_input_price_per_million,
+                    output_price_per_million=row.output_price_per_million,
+                )
+            )
         except Exception:
             pass
 
@@ -671,7 +755,19 @@ async def list_user_usage_by_dialog(user_id: int) -> list[dict[str, str | int]]:
         if row.created is not None:
             dialog["last_created"] = row.created.isoformat()
         try:
-            total_cost = Decimal(str(dialog.get("cost_amount", "0"))) + Decimal(str(row.cost_amount or "0"))
+            total_cost = Decimal(str(dialog.get("cost_amount", "0"))) + Decimal(
+                _normalize_cost_amount(
+                    cost_amount=row.cost_amount,
+                    provider=str(row.provider or ""),
+                    model=str(row.model or ""),
+                    input_tokens=int(row.input_tokens or 0),
+                    cached_input_tokens=int(row.cached_input_tokens or 0),
+                    output_tokens=int(row.output_tokens or 0),
+                    input_price_per_million=row.input_price_per_million,
+                    cached_input_price_per_million=row.cached_input_price_per_million,
+                    output_price_per_million=row.output_price_per_million,
+                )
+            )
             dialog["cost_amount"] = format(total_cost, "f")
         except Exception:
             pass

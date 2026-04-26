@@ -283,6 +283,7 @@
                 .map((row) => {
                     const turnId = String(row.turn_id || '');
                     const created = String(row.first_created || '');
+                    const models = Array.isArray(row.models) ? row.models.filter((model) => String(model || '').trim()) : [];
                     const requestCount = Number(row.request_count || 0);
                     const inputTokens = Number(row.input_tokens || 0);
                     const cachedInputTokens = Number(row.cached_input_tokens || 0);
@@ -296,6 +297,7 @@
                         <tr>
                             <td>${escapeHtml(turnId)}</td>
                             <td>${escapeHtml(created)}</td>
+                            <td>${escapeHtml(models.join(', ') || '-')}</td>
                             <td>${requestCount}</td>
                             <td>${inputTokens}</td>
                             <td>${cachedInputTokens}</td>
@@ -315,6 +317,7 @@
                             <tr>
                                 <th>Turn</th>
                                 <th>First used</th>
+                                <th>Model</th>
                                 <th>Requests</th>
                                 <th>Input</th>
                                 <th>Cached</th>
