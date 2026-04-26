@@ -30,6 +30,9 @@ RELOAD = True
 DATA_DIR = "data"
 DATABASE = Path(DATA_DIR) / "database.db"
 
+# Number of dialogs shown per page in dialogs and usage listings.
+DIALOGS_PER_PAGE = 20
+
 # Used when sending emails
 HOSTNAME_WITH_SCHEME = "https://home.10kilobyte.com"
 SITE_NAME = "home.10kilobyte.com"

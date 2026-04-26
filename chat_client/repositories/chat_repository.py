@@ -15,6 +15,7 @@ from chat_client.models import (
     LlmUsageEvent,
 )
 from chat_client.database.db_session import async_session
+import data.config as config
 import uuid
 import logging
 import json
@@ -23,7 +24,13 @@ from sqlalchemy import select, func, update, delete, exists, or_
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-DIALOGS_PER_PAGE = 20
+
+def _dialogs_per_page() -> int:
+    value = getattr(config, "DIALOGS_PER_PAGE", 20)
+    try:
+        return max(int(value), 1)
+    except (TypeError, ValueError):
+        return 20
 
 
 async def _touch_dialog_in_session(session, user_id: int, dialog_id: str) -> None:
@@ -676,8 +683,9 @@ async def list_user_usage_by_dialog(user_id: int) -> list[dict[str, str | int]]:
 
 async def get_user_usage_by_dialog_info(user_id: int, current_page: int = 1) -> dict[str, list[dict[str, str | int]] | bool]:
     dialogs = await list_user_usage_by_dialog(user_id)
-    start_index = max(current_page - 1, 0) * DIALOGS_PER_PAGE
-    end_index = start_index + DIALOGS_PER_PAGE
+    dialogs_per_page = _dialogs_per_page()
+    start_index = max(current_page - 1, 0) * dialogs_per_page
+    end_index = start_index + dialogs_per_page
     return {
         "dialogs": dialogs[start_index:end_index],
         "has_next": end_index < len(dialogs),
@@ -702,6 +710,7 @@ async def get_dialogs_info(user_id: int, current_page: int = 1, query: str = "")
 
     async with async_session() as session:
         query = str(query).strip()
+        dialogs_per_page = _dialogs_per_page()
 
         filters = [Dialog.user_id == user_id]
         if query:
@@ -726,8 +735,8 @@ async def get_dialogs_info(user_id: int, current_page: int = 1, query: str = "")
             select(Dialog)
             .where(*filters)
             .order_by(Dialog.updated.desc(), Dialog.dialog_id.desc())
-            .limit(DIALOGS_PER_PAGE)
-            .offset((current_page - 1) * DIALOGS_PER_PAGE)
+            .limit(dialogs_per_page)
+            .offset((current_page - 1) * dialogs_per_page)
         )
         result = await session.execute(stmt)
         dialogs = result.scalars().all()
@@ -738,7 +747,7 @@ async def get_dialogs_info(user_id: int, current_page: int = 1, query: str = "")
         num_dialogs = count_result.scalar_one()
 
         has_prev = current_page > 1
-        has_next = num_dialogs > current_page * DIALOGS_PER_PAGE
+        has_next = num_dialogs > current_page * dialogs_per_page
         prev_page = current_page - 1 if has_prev else 0
         next_page = current_page + 1 if has_next else 0
 
@@ -759,7 +768,7 @@ async def get_dialogs_info(user_id: int, current_page: int = 1, query: str = "")
 
         return {
             "current_page": current_page,
-            "per_page": DIALOGS_PER_PAGE,
+            "per_page": dialogs_per_page,
             "has_prev": has_prev,
             "has_next": has_next,
             "prev_page": prev_page,

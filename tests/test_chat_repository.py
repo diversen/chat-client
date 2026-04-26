@@ -438,6 +438,63 @@ def test_get_dialogs_info_orders_by_updated():
     asyncio.run(_run())
 
 
+def test_get_dialogs_info_uses_configured_dialogs_per_page():
+    async def _run():
+        temp_dir = tempfile.mkdtemp()
+        db_path = Path(temp_dir) / "test_chat_repository_dialogs_per_page.db"
+        engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}", echo=False)
+        session_factory = async_sessionmaker(engine, expire_on_commit=False)
+
+        data_module = ModuleType("data")
+        config_module = ModuleType("data.config")
+        config_module.DATABASE = db_path
+        config_module.DIALOGS_PER_PAGE = 2
+        data_module.config = config_module
+        sys.modules["data"] = data_module
+        sys.modules["data.config"] = config_module
+
+        from chat_client.repositories import chat_repository
+
+        original_session_factory = chat_repository.async_session
+        original_config = chat_repository.config
+        chat_repository.async_session = session_factory
+        chat_repository.config = config_module
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+
+            async with session_factory() as session:
+                user = User(
+                    email="repo-test-dialogs-per-page@example.com",
+                    password_hash="x",
+                    random="y",
+                )
+                session.add(user)
+                await session.commit()
+                await session.refresh(user)
+                user_id = int(user.user_id)
+
+            for index in range(3):
+                await chat_repository.create_dialog(user_id, f"Dialog {index}")
+
+            dialogs_info = await chat_repository.get_dialogs_info(user_id)
+
+            assert dialogs_info["per_page"] == 2
+            assert len(dialogs_info["dialogs"]) == 2
+            assert dialogs_info["has_next"] is True
+        finally:
+            chat_repository.async_session = original_session_factory
+            chat_repository.config = original_config
+            sys.modules.pop("data.config", None)
+            sys.modules.pop("data", None)
+            await engine.dispose()
+            if db_path.exists():
+                db_path.unlink()
+            Path(temp_dir).rmdir()
+
+    asyncio.run(_run())
+
+
 def test_get_messages_orders_by_sequence_index():
     async def _run():
         temp_dir = tempfile.mkdtemp()
