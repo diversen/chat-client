@@ -113,6 +113,22 @@ def test_summarize_last_user_message_for_log_includes_attached_file_path_note():
     assert "/mnt/data/0059_cipher.txt" in summary["last_user_message_full"]
 
 
+def test_summarize_last_user_message_for_log_truncates_long_text():
+    summary = chat_service.summarize_last_user_message_for_log(
+        [
+            {
+                "role": "user",
+                "content": "x" * (chat_service.GENERIC_LOG_TEXT_PREVIEW_LIMIT + 10),
+            }
+        ]
+    )
+
+    assert summary["last_user_message_full"].endswith("...[truncated]")
+    assert len(summary["last_user_message_full"]) == (
+        chat_service.GENERIC_LOG_TEXT_PREVIEW_LIMIT + len("...[truncated]")
+    )
+
+
 class DummyRequest:
     def __init__(self, disconnected_after_calls: int = 999):
         self.calls = 0

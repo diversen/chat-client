@@ -147,7 +147,7 @@ def summarize_last_user_message_for_log(messages: list[dict[str, Any]]) -> dict[
         content = message.get("content", "")
         if isinstance(content, str):
             return {
-                "last_user_message_full": content,
+                "last_user_message_full": _truncate_for_log(content),
             }
 
         if isinstance(content, list):
@@ -160,7 +160,7 @@ def summarize_last_user_message_for_log(messages: list[dict[str, Any]]) -> dict[
                 elif item.get("type") == "image_url":
                     text_parts.append("[image]")
             return {
-                "last_user_message_full": "\n".join(part for part in text_parts if part),
+                "last_user_message_full": _truncate_for_log("\n".join(part for part in text_parts if part)),
             }
 
     return {}
