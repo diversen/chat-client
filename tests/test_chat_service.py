@@ -101,7 +101,7 @@ class DummyStream:
         self.closed = True
 
 
-def _chunk(content: str | None = "", finish_reason=None, tool_calls=None, reasoning: str | None = None):
+def _chunk(content: str | None = "", finish_reason=None, tool_calls=None, reasoning: str | None = None, usage=None, chunk_id="chunk-id"):
     delta_payload = {}
     if content is not None:
         delta_payload["content"] = content
@@ -123,14 +123,22 @@ def _chunk(content: str | None = "", finish_reason=None, tool_calls=None, reason
                 }
             )
         delta_payload["tool_calls"] = serialized_tool_calls
-    return SimpleNamespace(
-        choices=[
+    choices = []
+    if content is not None or tool_calls is not None or reasoning is not None or finish_reason is not None:
+        choices.append(
             SimpleNamespace(
                 delta=SimpleNamespace(content=content, tool_calls=tool_calls, reasoning=reasoning),
                 finish_reason=finish_reason,
             )
-        ],
-        model_dump=lambda: {"choices": [{"delta": delta_payload}]},
+        )
+    payload = {"id": chunk_id, "choices": [{"delta": delta_payload}] if choices else []}
+    if usage is not None:
+        payload["usage"] = usage
+    return SimpleNamespace(
+        id=chunk_id,
+        choices=choices,
+        usage=usage,
+        model_dump=lambda: payload,
     )
 
 
@@ -264,6 +272,70 @@ def test_chat_response_stream_uses_streaming_tool_loop():
     assert any("comparison" in chunk for chunk in chunks)
     assert first_stream.closed is True
     assert final_stream.closed is True
+
+
+def test_chat_response_stream_persists_provider_usage_per_round():
+    stream = DummyStream(
+        [
+            _chunk("hello", finish_reason="stop", chunk_id="cmpl-1"),
+            _chunk(
+                None,
+                usage={
+                    "prompt_tokens": 1200,
+                    "completion_tokens": 45,
+                    "total_tokens": 1245,
+                    "prompt_tokens_details": {"cached_tokens": 1000},
+                    "completion_tokens_details": {"reasoning_tokens": 7},
+                },
+                chunk_id="cmpl-1",
+            ),
+        ]
+    )
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=lambda **_: stream)))
+    request = DummyRequest(disconnected_after_calls=999)
+    persisted_usage = []
+
+    async def _persist_usage_event(**usage_data):
+        persisted_usage.append(usage_data)
+
+    async def _run():
+        chunks = []
+        async for chunk in chat_service.chat_response_stream(
+            request,
+            messages=[{"role": "user", "content": "hi"}],
+            model="test-model",
+            openai_client_cls=lambda **_: client,
+            provider_info_resolver=lambda _model: {},
+            tool_models=[],
+            tools_loader=lambda: [],
+            tool_executor=lambda _tool_call: "",
+            logger=logging.getLogger("test"),
+            turn_id="turn-usage",
+            provider_name="openai",
+            include_usage_in_stream=True,
+            persist_usage_event=_persist_usage_event,
+        ):
+            chunks.append(chunk)
+        return chunks
+
+    chunks = asyncio.run(_run())
+    assert len(chunks) == 2
+    assert persisted_usage == [
+        {
+            "turn_id": "turn-usage",
+            "round_index": 1,
+            "provider": "openai",
+            "model": "test-model",
+            "call_type": "chat",
+            "request_id": "cmpl-1",
+            "input_tokens": 1200,
+            "cached_input_tokens": 1000,
+            "output_tokens": 45,
+            "total_tokens": 1245,
+            "reasoning_tokens": 7,
+            "usage_source": "provider",
+        }
+    ]
 
 
 def test_chat_response_stream_ignores_tool_calls_for_non_tool_models():

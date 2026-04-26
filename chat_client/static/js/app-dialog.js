@@ -28,6 +28,10 @@ async function getMessages(dialogID) {
     return Requests.asyncGetJson(`/api/chat/dialogs/${dialogID}/messages`);
 }
 
+async function getDialogUsage(dialogID) {
+    return Requests.asyncGetJson(`/api/chat/dialogs/${dialogID}/usage`);
+}
+
 /**
  * POST message object ({ role: role, message: message } ) to /api/chat/dialogs/{dialog_id}/messages
  * Returns the message_id of the created message
@@ -63,4 +67,4 @@ async function updateMessage(messageId, content) {
     return Requests.asyncPostJson(`/api/chat/messages/${messageId}`, { content });
 }
 
-export { createDialog, generateDialogTitle, getMessages, createMessage, createAssistantTurnEvents, getConfig, updateMessage, uploadAttachment };
+export { createDialog, generateDialogTitle, getMessages, getDialogUsage, createMessage, createAssistantTurnEvents, getConfig, updateMessage, uploadAttachment };

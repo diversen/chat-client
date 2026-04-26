@@ -1,4 +1,4 @@
-import { createDialog, generateDialogTitle, getMessages, createMessage, createAssistantTurnEvents, updateMessage, uploadAttachment } from '/static/js/app-dialog.js';
+import { createDialog, generateDialogTitle, getMessages, getDialogUsage, createMessage, createAssistantTurnEvents, updateMessage, uploadAttachment } from '/static/js/app-dialog.js';
 
 const storageService = {
     createDialog,
@@ -7,6 +7,7 @@ const storageService = {
     createAssistantTurnEvents,
     updateMessage,
     getMessages,
+    getDialogUsage,
     uploadAttachment,
 };
 
@@ -70,6 +71,13 @@ function normalizeStreamEvents(data, reasoningOpen) {
     if (data?.tool_call) {
         return {
             events: [{ toolCall: data.tool_call }],
+            reasoningOpen,
+        };
+    }
+
+    if (typeof data?.turn_id === 'string' && data.turn_id.trim()) {
+        return {
+            events: [{ turnId: data.turn_id.trim() }],
             reasoningOpen,
         };
     }

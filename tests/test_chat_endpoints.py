@@ -1172,6 +1172,8 @@ class TestChatEndpoints(BaseTestCase):
         mock_generate_dialog_title.assert_called_once_with(
             "How do I mount a network drive on Linux?",
             "title-model",
+            1,
+            "test-dialog",
         )
         mock_update_dialog_title.assert_called_once_with(1, "test-dialog", "Mounted network drive")
 
@@ -1427,6 +1429,177 @@ class TestChatEndpoints(BaseTestCase):
         data = response.json()
         assert len(data) == 1
         assert data[0]["content"] == "Hello"
+
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_get_dialog_usage_not_authenticated(self, mock_logged_in):
+        mock_logged_in.return_value = False
+
+        response = self.client.get("/api/chat/dialogs/test-dialog/usage")
+
+        assert response.status_code == 401
+        data = response.json()
+        assert data["error"] is True
+        assert data["redirect"] == "/user/login?next=/chat/test-dialog&reason=auth_required"
+
+    @patch("chat_client.repositories.chat_repository.list_dialog_usage_events")
+    @patch("chat_client.repositories.chat_repository.get_dialog_usage_by_turn")
+    @patch("chat_client.repositories.chat_repository.get_dialog_usage_totals")
+    @patch("chat_client.repositories.chat_repository.get_dialog")
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_get_dialog_usage_authenticated(
+        self,
+        mock_logged_in,
+        mock_get_dialog,
+        mock_get_totals,
+        mock_get_turns,
+        mock_list_events,
+    ):
+        mock_logged_in.return_value = 1
+        mock_get_dialog.return_value = {"dialog_id": "test-dialog", "title": "Test Dialog", "created": "2026-01-01T00:00:00"}
+        mock_get_totals.return_value = {
+            "request_count": 2,
+            "input_tokens": 1700,
+            "cached_input_tokens": 1000,
+            "output_tokens": 65,
+            "total_tokens": 1765,
+            "reasoning_tokens": 7,
+            "currency": "USD",
+            "cost_amount": "0.00151250",
+        }
+        mock_get_turns.return_value = [
+            {
+                "turn_id": "turn-server-1",
+                "request_count": 2,
+                "input_tokens": 1700,
+                "cached_input_tokens": 1000,
+                "output_tokens": 65,
+                "total_tokens": 1765,
+                "reasoning_tokens": 7,
+                "currency": "USD",
+                "cost_amount": "0.00151250",
+                "first_created": "2026-01-01T00:00:01",
+            }
+        ]
+        mock_list_events.return_value = [
+            {
+                "turn_id": "turn-server-1",
+                "round_index": 1,
+                "provider": "openai",
+                "model": "gpt-5",
+                "call_type": "chat",
+                "request_id": "cmpl-1",
+                "input_tokens": 1200,
+                "cached_input_tokens": 1000,
+                "output_tokens": 45,
+                "total_tokens": 1245,
+                "reasoning_tokens": 7,
+                "currency": "USD",
+                "cost_amount": "0.00068750",
+                "usage_source": "provider",
+                "created": "2026-01-01T00:00:01",
+            }
+        ]
+
+        response = self.client.get("/api/chat/dialogs/test-dialog/usage")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["error"] is False
+        assert data["dialog_id"] == "test-dialog"
+        assert data["totals"]["cached_input_tokens"] == 1000
+        assert data["turns"][0]["turn_id"] == "turn-server-1"
+        assert data["events"][0]["request_id"] == "cmpl-1"
+
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_get_user_usage_not_authenticated(self, mock_logged_in):
+        mock_logged_in.return_value = False
+
+        response = self.client.get("/api/user/usage")
+
+        assert response.status_code == 401
+        data = response.json()
+        assert data["error"] is True
+
+    @patch("chat_client.repositories.chat_repository.list_user_usage_by_dialog")
+    @patch("chat_client.repositories.chat_repository.get_user_usage_totals")
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_get_user_usage_authenticated(self, mock_logged_in, mock_get_totals, mock_list_dialogs):
+        mock_logged_in.return_value = 1
+        mock_get_totals.return_value = {
+            "request_count": 2,
+            "input_tokens": 1700,
+            "cached_input_tokens": 1000,
+            "output_tokens": 65,
+            "total_tokens": 1765,
+            "reasoning_tokens": 7,
+            "currency": "USD",
+            "cost_amount": "0.00151250",
+        }
+        mock_list_dialogs.return_value = [
+            {
+                "dialog_id": "dialog-1",
+                "title": "Recent dialog",
+                "request_count": 2,
+                "input_tokens": 1700,
+                "cached_input_tokens": 1000,
+                "output_tokens": 65,
+                "total_tokens": 1765,
+                "reasoning_tokens": 7,
+                "currency": "USD",
+                "cost_amount": "0.00151250",
+                "first_created": "2026-01-01T00:00:01",
+                "last_created": "2026-01-01T00:00:02",
+            }
+        ]
+
+        response = self.client.get("/api/user/usage")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["error"] is False
+        assert data["totals"]["cost_amount"] == "0.00151250"
+        assert data["dialogs"][0]["dialog_id"] == "dialog-1"
+
+    @patch("chat_client.repositories.chat_repository.list_user_usage_by_dialog")
+    @patch("chat_client.repositories.chat_repository.get_user_usage_totals")
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_usage_page_authenticated(self, mock_logged_in, mock_get_totals, mock_list_dialogs):
+        mock_logged_in.return_value = 1
+        mock_get_totals.return_value = {
+            "request_count": 2,
+            "input_tokens": 1700,
+            "cached_input_tokens": 1000,
+            "output_tokens": 65,
+            "total_tokens": 1765,
+            "reasoning_tokens": 7,
+            "currency": "USD",
+            "cost_amount": "0.00151250",
+        }
+        mock_list_dialogs.return_value = [
+            {
+                "dialog_id": "dialog-1",
+                "title": "Recent dialog",
+                "request_count": 2,
+                "input_tokens": 1700,
+                "cached_input_tokens": 1000,
+                "output_tokens": 65,
+                "total_tokens": 1765,
+                "reasoning_tokens": 7,
+                "currency": "USD",
+                "cost_amount": "0.00151250",
+                "first_created": "2026-01-01T00:00:01",
+                "last_created": "2026-01-01T00:00:02",
+            }
+        ]
+
+        response = self.client.get("/user/usage")
+
+        assert response.status_code == 200
+        assert "Usage" in response.text
+        assert "0.00151250 USD" in response.text
+        assert "Usage by dialog" in response.text
+        assert "Recent dialog" in response.text
+        assert "Show details" in response.text
 
     @patch("chat_client.core.user_session.is_logged_in")
     def test_update_message_not_authenticated(self, mock_logged_in):

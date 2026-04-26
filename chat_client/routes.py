@@ -3,7 +3,7 @@ from starlette.routing import BaseRoute, Mount, Route
 from chat_client.endpoints import chat_endpoints
 from chat_client.endpoints import error_endpoints
 from chat_client.endpoints import prompt_endpoints
-from chat_client.endpoints import user_auth_endpoints, user_dialog_endpoints, user_profile_endpoints
+from chat_client.endpoints import user_auth_endpoints, user_dialog_endpoints, user_profile_endpoints, user_usage_endpoints
 
 user_routes: list[Route] = [
     Route("/user/captcha", user_auth_endpoints.get_captcha, methods=["GET"]),
@@ -22,6 +22,8 @@ user_routes: list[Route] = [
     Route("/api/user/dialogs", user_dialog_endpoints.list_dialogs, methods=["GET"]),
     Route("/user/profile", user_profile_endpoints.profile_page, methods=["GET"]),
     Route("/api/user/profile", user_profile_endpoints.update_profile, methods=["POST"]),
+    Route("/user/usage", user_usage_endpoints.usage_page, methods=["GET"]),
+    Route("/api/user/usage", user_usage_endpoints.get_usage, methods=["GET"]),
 ]
 
 chat_routes: list[Route] = [
@@ -35,6 +37,7 @@ chat_routes: list[Route] = [
     Route("/api/chat/dialogs", chat_endpoints.create_dialog, methods=["POST"]),
     Route("/api/chat/dialogs/{dialog_id:str}", chat_endpoints.get_dialog, methods=["GET"]),
     Route("/api/chat/dialogs/{dialog_id:str}/messages", chat_endpoints.list_messages, methods=["GET"]),
+    Route("/api/chat/dialogs/{dialog_id:str}/usage", chat_endpoints.get_dialog_usage, methods=["GET"]),
     Route("/api/chat/dialogs/{dialog_id:str}/messages", chat_endpoints.create_message, methods=["POST"]),
     Route("/api/chat/dialogs/{dialog_id:str}/title", chat_endpoints.create_dialog_title, methods=["POST"]),
     Route("/api/chat/dialogs/{dialog_id:str}/assistant-turn-events", chat_endpoints.create_assistant_turn_events, methods=["POST"]),

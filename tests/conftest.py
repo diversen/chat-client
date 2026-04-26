@@ -29,6 +29,7 @@ def _install_test_config() -> None:
     config_module.DIALOG_TITLE_MODEL = ""
     config_module.PROVIDERS = {"test-provider": {"base_url": "http://test", "api_key": "test"}}
     config_module.MODELS = {"test-model": "test-provider"}
+    config_module.MODEL_PRICING = {}
     config_module.VISION_MODELS = []
     config_module.SYSTEM_MESSAGE_DENYLIST = []
     config_module.TOOL_REGISTRY = {}

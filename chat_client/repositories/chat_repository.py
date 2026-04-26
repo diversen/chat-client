@@ -3,11 +3,22 @@ from chat_client.core.attachments import make_image_attachment_ref
 from chat_client.repositories import attachment_repository
 from chat_client.repositories import image_repository
 
-from chat_client.models import Dialog, Message, Image, MessageImage, Attachment, MessageAttachment, ToolCallEvent, AssistantTurnEvent
+from chat_client.models import (
+    Dialog,
+    Message,
+    Image,
+    MessageImage,
+    Attachment,
+    MessageAttachment,
+    ToolCallEvent,
+    AssistantTurnEvent,
+    LlmUsageEvent,
+)
 from chat_client.database.db_session import async_session
 import uuid
 import logging
 import json
+from decimal import Decimal
 from sqlalchemy import select, func, update, delete, exists, or_
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -370,6 +381,297 @@ async def create_tool_call_event(
         session.add(event)
         await _touch_dialog_in_session(session, user_id, dialog_id)
         await session.commit()
+
+
+async def create_llm_usage_event(
+    user_id: int,
+    dialog_id: str,
+    *,
+    turn_id: str = "",
+    round_index: int = 0,
+    provider: str = "",
+    model: str = "",
+    call_type: str = "chat",
+    request_id: str = "",
+    input_tokens: int = 0,
+    cached_input_tokens: int = 0,
+    output_tokens: int = 0,
+    total_tokens: int = 0,
+    reasoning_tokens: int = 0,
+    input_price_per_million: str = "0",
+    cached_input_price_per_million: str = "0",
+    output_price_per_million: str = "0",
+    currency: str = "USD",
+    cost_amount: str = "0",
+    usage_source: str = "missing",
+):
+    async with async_session() as session:
+        dialog_title = ""
+        if dialog_id:
+            dialog_result = await session.execute(
+                select(Dialog.title).where(Dialog.dialog_id == dialog_id, Dialog.user_id == user_id)
+            )
+            dialog_title = str(dialog_result.scalar_one_or_none() or "")
+
+        event = LlmUsageEvent(
+            user_id=user_id,
+            dialog_id=dialog_id,
+            dialog_title=dialog_title,
+            turn_id=str(turn_id or ""),
+            round_index=max(int(round_index or 0), 0),
+            provider=str(provider or ""),
+            model=str(model or ""),
+            call_type=str(call_type or "chat"),
+            request_id=str(request_id or ""),
+            input_tokens=max(int(input_tokens or 0), 0),
+            cached_input_tokens=max(int(cached_input_tokens or 0), 0),
+            output_tokens=max(int(output_tokens or 0), 0),
+            total_tokens=max(int(total_tokens or 0), 0),
+            reasoning_tokens=max(int(reasoning_tokens or 0), 0),
+            input_price_per_million=str(input_price_per_million or "0"),
+            cached_input_price_per_million=str(cached_input_price_per_million or "0"),
+            output_price_per_million=str(output_price_per_million or "0"),
+            currency=str(currency or "USD"),
+            cost_amount=str(cost_amount or "0"),
+            usage_source=str(usage_source or "missing"),
+        )
+        session.add(event)
+        await _touch_dialog_in_session(session, user_id, dialog_id)
+        await session.commit()
+
+
+async def get_dialog_usage_totals(user_id: int, dialog_id: str) -> dict[str, str | int]:
+    async with async_session() as session:
+        rows = (
+            (
+                await session.execute(
+                    select(LlmUsageEvent).where(LlmUsageEvent.user_id == user_id, LlmUsageEvent.dialog_id == dialog_id)
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+    total_cost = Decimal("0")
+    currency = "USD"
+    input_tokens = 0
+    cached_input_tokens = 0
+    output_tokens = 0
+    total_tokens = 0
+    reasoning_tokens = 0
+    request_count = 0
+
+    for row in rows:
+        request_count += 1
+        input_tokens += int(row.input_tokens or 0)
+        cached_input_tokens += int(row.cached_input_tokens or 0)
+        output_tokens += int(row.output_tokens or 0)
+        total_tokens += int(row.total_tokens or 0)
+        reasoning_tokens += int(row.reasoning_tokens or 0)
+        currency = str(row.currency or currency)
+        try:
+            total_cost += Decimal(str(row.cost_amount or "0"))
+        except Exception:
+            pass
+
+    return {
+        "request_count": request_count,
+        "input_tokens": input_tokens,
+        "cached_input_tokens": cached_input_tokens,
+        "output_tokens": output_tokens,
+        "total_tokens": total_tokens,
+        "reasoning_tokens": reasoning_tokens,
+        "currency": currency,
+        "cost_amount": format(total_cost, "f"),
+    }
+
+
+async def list_dialog_usage_events(user_id: int, dialog_id: str) -> list[dict[str, str | int]]:
+    async with async_session() as session:
+        rows = (
+            (
+                await session.execute(
+                    select(LlmUsageEvent)
+                    .where(LlmUsageEvent.user_id == user_id, LlmUsageEvent.dialog_id == dialog_id)
+                    .order_by(LlmUsageEvent.created.asc(), LlmUsageEvent.llm_usage_event_id.asc())
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+    events: list[dict[str, str | int]] = []
+    for row in rows:
+        created = row.created.isoformat() if row.created is not None else ""
+        events.append(
+            {
+                "turn_id": str(row.turn_id or ""),
+                "dialog_title": str(row.dialog_title or ""),
+                "round_index": int(row.round_index or 0),
+                "provider": str(row.provider or ""),
+                "model": str(row.model or ""),
+                "call_type": str(row.call_type or ""),
+                "request_id": str(row.request_id or ""),
+                "input_tokens": int(row.input_tokens or 0),
+                "cached_input_tokens": int(row.cached_input_tokens or 0),
+                "output_tokens": int(row.output_tokens or 0),
+                "total_tokens": int(row.total_tokens or 0),
+                "reasoning_tokens": int(row.reasoning_tokens or 0),
+                "input_price_per_million": str(row.input_price_per_million or "0"),
+                "cached_input_price_per_million": str(row.cached_input_price_per_million or "0"),
+                "output_price_per_million": str(row.output_price_per_million or "0"),
+                "currency": str(row.currency or "USD"),
+                "cost_amount": str(row.cost_amount or "0"),
+                "usage_source": str(row.usage_source or "missing"),
+                "created": created,
+            }
+        )
+    return events
+
+
+async def get_dialog_usage_by_turn(user_id: int, dialog_id: str) -> list[dict[str, str | int]]:
+    events = await list_dialog_usage_events(user_id, dialog_id)
+    turns_by_id: dict[str, dict[str, str | int]] = {}
+    turn_order: list[str] = []
+
+    for event in events:
+        turn_id = str(event.get("turn_id", "") or "")
+        if not turn_id:
+            continue
+        if turn_id not in turns_by_id:
+            turns_by_id[turn_id] = {
+                "turn_id": turn_id,
+                "request_count": 0,
+                "input_tokens": 0,
+                "cached_input_tokens": 0,
+                "output_tokens": 0,
+                "total_tokens": 0,
+                "reasoning_tokens": 0,
+                "currency": str(event.get("currency", "USD") or "USD"),
+                "cost_amount": "0",
+                "first_created": str(event.get("created", "") or ""),
+            }
+            turn_order.append(turn_id)
+
+        turn = turns_by_id[turn_id]
+        turn["request_count"] = int(turn["request_count"]) + 1
+        turn["input_tokens"] = int(turn["input_tokens"]) + int(event.get("input_tokens", 0))
+        turn["cached_input_tokens"] = int(turn["cached_input_tokens"]) + int(event.get("cached_input_tokens", 0))
+        turn["output_tokens"] = int(turn["output_tokens"]) + int(event.get("output_tokens", 0))
+        turn["total_tokens"] = int(turn["total_tokens"]) + int(event.get("total_tokens", 0))
+        turn["reasoning_tokens"] = int(turn["reasoning_tokens"]) + int(event.get("reasoning_tokens", 0))
+        turn["currency"] = str(event.get("currency", "USD") or "USD")
+        try:
+            total_cost = Decimal(str(turn.get("cost_amount", "0"))) + Decimal(str(event.get("cost_amount", "0")))
+            turn["cost_amount"] = format(total_cost, "f")
+        except Exception:
+            pass
+
+    return [turns_by_id[turn_id] for turn_id in turn_order]
+
+
+async def get_user_usage_totals(user_id: int) -> dict[str, str | int]:
+    async with async_session() as session:
+        rows = (
+            (
+                await session.execute(
+                    select(LlmUsageEvent).where(LlmUsageEvent.user_id == user_id).order_by(LlmUsageEvent.created.asc())
+                )
+            )
+            .scalars()
+            .all()
+        )
+
+    total_cost = Decimal("0")
+    currency = "USD"
+    input_tokens = 0
+    cached_input_tokens = 0
+    output_tokens = 0
+    total_tokens = 0
+    reasoning_tokens = 0
+    request_count = 0
+
+    for row in rows:
+        request_count += 1
+        input_tokens += int(row.input_tokens or 0)
+        cached_input_tokens += int(row.cached_input_tokens or 0)
+        output_tokens += int(row.output_tokens or 0)
+        total_tokens += int(row.total_tokens or 0)
+        reasoning_tokens += int(row.reasoning_tokens or 0)
+        currency = str(row.currency or currency)
+        try:
+            total_cost += Decimal(str(row.cost_amount or "0"))
+        except Exception:
+            pass
+
+    return {
+        "request_count": request_count,
+        "input_tokens": input_tokens,
+        "cached_input_tokens": cached_input_tokens,
+        "output_tokens": output_tokens,
+        "total_tokens": total_tokens,
+        "reasoning_tokens": reasoning_tokens,
+        "currency": currency,
+        "cost_amount": format(total_cost, "f"),
+    }
+
+
+async def list_user_usage_by_dialog(user_id: int) -> list[dict[str, str | int]]:
+    async with async_session() as session:
+        usage_rows = (
+            (
+                await session.execute(
+                    select(LlmUsageEvent)
+                    .where(LlmUsageEvent.user_id == user_id)
+                    .order_by(LlmUsageEvent.created.asc(), LlmUsageEvent.llm_usage_event_id.asc())
+                )
+            )
+            .scalars()
+            .all()
+        )
+    dialogs_by_id: dict[str, dict[str, str | int]] = {}
+    dialog_order: list[str] = []
+
+    for row in usage_rows:
+        dialog_id = str(row.dialog_id or "")
+        if not dialog_id:
+            continue
+        if dialog_id not in dialogs_by_id:
+            dialogs_by_id[dialog_id] = {
+                "dialog_id": dialog_id,
+                "title": str(row.dialog_title or ""),
+                "request_count": 0,
+                "input_tokens": 0,
+                "cached_input_tokens": 0,
+                "output_tokens": 0,
+                "total_tokens": 0,
+                "reasoning_tokens": 0,
+                "currency": str(row.currency or "USD"),
+                "cost_amount": "0",
+                "first_created": row.created.isoformat() if row.created is not None else "",
+                "last_created": row.created.isoformat() if row.created is not None else "",
+            }
+            dialog_order.append(dialog_id)
+
+        dialog = dialogs_by_id[dialog_id]
+        dialog["request_count"] = int(dialog["request_count"]) + 1
+        dialog["input_tokens"] = int(dialog["input_tokens"]) + int(row.input_tokens or 0)
+        dialog["cached_input_tokens"] = int(dialog["cached_input_tokens"]) + int(row.cached_input_tokens or 0)
+        dialog["output_tokens"] = int(dialog["output_tokens"]) + int(row.output_tokens or 0)
+        dialog["total_tokens"] = int(dialog["total_tokens"]) + int(row.total_tokens or 0)
+        dialog["reasoning_tokens"] = int(dialog["reasoning_tokens"]) + int(row.reasoning_tokens or 0)
+        dialog["currency"] = str(row.currency or "USD")
+        if row.created is not None:
+            dialog["last_created"] = row.created.isoformat()
+        try:
+            total_cost = Decimal(str(dialog.get("cost_amount", "0"))) + Decimal(str(row.cost_amount or "0"))
+            dialog["cost_amount"] = format(total_cost, "f")
+        except Exception:
+            pass
+
+    ordered_dialogs = [dialogs_by_id[dialog_id] for dialog_id in dialog_order]
+    ordered_dialogs.sort(key=lambda item: (str(item.get("last_created", "")), str(item.get("dialog_id", ""))), reverse=True)
+    return ordered_dialogs
 
 
 async def delete_dialog(user_id: int, dialog_id: str):

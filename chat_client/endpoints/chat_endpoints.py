@@ -27,6 +27,7 @@ from chat_client.core import config_utils
 from chat_client.core import mcp_client
 from chat_client.core import model_capabilities
 from chat_client.core import tool_executor
+from chat_client.core.usage_pricing import compute_usage_cost, normalize_chat_usage, resolve_model_pricing
 from chat_client.endpoints import chat_attachment_endpoints, chat_dialog_endpoints, chat_page_endpoints, chat_stream_endpoints
 from chat_client.repositories import attachment_repository, chat_repository, prompt_repository
 from chat_client.core import exceptions_validation
@@ -63,6 +64,7 @@ CONFIGURED_TOOL_REGISTRY = getattr(config, "TOOL_REGISTRY", {})
 CONFIGURED_LOCAL_TOOL_DEFINITIONS = getattr(config, "LOCAL_TOOL_DEFINITIONS", [])
 CONFIGURED_TOOL_MODELS = getattr(config, "TOOL_MODELS", [])
 CONFIGURED_DIALOG_TITLE_MODEL = getattr(config, "DIALOG_TITLE_MODEL", "")
+CONFIGURED_MODEL_PRICING = getattr(config, "MODEL_PRICING", {})
 RESOLVED_CHAT_MAX_LOOP_ROUNDS = getattr(config, "CHAT_MAX_LOOP_ROUNDS", chat_service.DEFAULT_CHAT_MAX_LOOP_ROUNDS)
 RESOLVED_CHAT_EMPTY_ANSWER_RETRY_COUNT = getattr(config, "CHAT_EMPTY_ANSWER_RETRY_COUNT", 1)
 RESOLVED_CHAT_RETRY_ON_EMPTY_ANSWER_STOP = bool(getattr(config, "CHAT_RETRY_ON_EMPTY_ANSWER_STOP", False))
@@ -81,6 +83,7 @@ LOCAL_TOOL_DEFINITIONS = CONFIGURED_LOCAL_TOOL_DEFINITIONS
 TOOL_MODELS = CONFIGURED_TOOL_MODELS
 DIALOG_TITLE_MODEL = str(CONFIGURED_DIALOG_TITLE_MODEL or "").strip()
 CHAT_MAX_LOOP_ROUNDS = RESOLVED_CHAT_MAX_LOOP_ROUNDS
+MODEL_PRICING = CONFIGURED_MODEL_PRICING
 
 _mcp_tools_cache: list[dict] = []
 _mcp_tools_cache_at: float = 0.0
@@ -125,6 +128,53 @@ def _with_auth_redirect_on_json_error(*, fallback: str = "/"):
 
 def _resolve_provider_info(model: str) -> dict:
     return chat_service.resolve_provider_info(model, MODELS, PROVIDERS)
+
+
+def _resolve_provider_name(model: str) -> str:
+    model_config = MODELS.get(model, "")
+    if isinstance(model_config, str):
+        return model_config
+    if isinstance(model_config, dict):
+        return str(model_config.get("provider", "") or "").strip()
+    return ""
+
+
+def _provider_supports_stream_usage(provider_name: str, provider_info: dict[str, Any]) -> bool:
+    normalized_provider_name = str(provider_name or "").strip().lower()
+    if normalized_provider_name == "openai":
+        return True
+    base_url = str(provider_info.get("base_url", "") or "").strip().lower()
+    return base_url.startswith("https://api.openai.com/")
+
+
+def _build_usage_cost_record(provider_name: str, model_name: str, usage_data: dict[str, Any]) -> dict[str, Any]:
+    pricing = resolve_model_pricing(MODEL_PRICING, provider_name, model_name)
+    input_tokens = int(usage_data.get("input_tokens", 0) or 0)
+    cached_input_tokens = min(int(usage_data.get("cached_input_tokens", 0) or 0), input_tokens)
+    output_tokens = int(usage_data.get("output_tokens", 0) or 0)
+    total_tokens = int(usage_data.get("total_tokens", 0) or 0)
+    reasoning_tokens = int(usage_data.get("reasoning_tokens", 0) or 0)
+    return {
+        "provider": provider_name,
+        "model": model_name,
+        "input_tokens": input_tokens,
+        "cached_input_tokens": cached_input_tokens,
+        "output_tokens": output_tokens,
+        "total_tokens": total_tokens,
+        "reasoning_tokens": reasoning_tokens,
+        "input_price_per_million": pricing["input_per_million"],
+        "cached_input_price_per_million": pricing["cached_input_per_million"],
+        "output_price_per_million": pricing["output_per_million"],
+        "currency": pricing["currency"],
+        "cost_amount": compute_usage_cost(
+            input_tokens=input_tokens,
+            cached_input_tokens=cached_input_tokens,
+            output_tokens=output_tokens,
+            input_per_million=pricing["input_per_million"],
+            cached_input_per_million=pricing["cached_input_per_million"],
+            output_per_million=pricing["output_per_million"],
+        ),
+    }
 
 
 def _model_capabilities_cache_token() -> dict[str, Any]:
@@ -387,7 +437,7 @@ def _serialize_tool_content(result) -> str:
 TITLE_GENERATION_MAX_TOKENS = 24
 
 
-def _generate_dialog_title(user_content: str, model: str) -> str:
+def _generate_dialog_title(user_content: str, model: str, user_id: int | None = None, dialog_id: str = "") -> str:
     normalized_user_content = str(user_content or "").strip()
     selected_model = str(model or "").strip()
     if not normalized_user_content:
@@ -396,6 +446,7 @@ def _generate_dialog_title(user_content: str, model: str) -> str:
         raise exceptions_validation.UserValidate("Model is required to generate a dialog title")
 
     provider_info = _resolve_provider_info(selected_model)
+    provider_name = _resolve_provider_name(selected_model)
     client = OpenAI(
         api_key=provider_info.get("api_key"),
         base_url=provider_info.get("base_url"),
@@ -405,6 +456,45 @@ def _generate_dialog_title(user_content: str, model: str) -> str:
         messages=cast(Any, _build_dialog_title_prompt(normalized_user_content)),
         stream=False,
         max_tokens=TITLE_GENERATION_MAX_TOKENS,
+    )
+    usage_data = normalize_chat_usage(response)
+    usage_cost_record = _build_usage_cost_record(provider_name, selected_model, usage_data)
+    if user_id is not None and dialog_id:
+        asyncio.run(
+            chat_repository.create_llm_usage_event(
+                user_id=user_id,
+                dialog_id=dialog_id,
+                turn_id="",
+                round_index=1,
+                provider=usage_cost_record["provider"],
+                model=usage_cost_record["model"],
+                call_type="title_generation",
+                request_id=usage_data["request_id"],
+                input_tokens=usage_cost_record["input_tokens"],
+                cached_input_tokens=usage_cost_record["cached_input_tokens"],
+                output_tokens=usage_cost_record["output_tokens"],
+                total_tokens=usage_cost_record["total_tokens"],
+                reasoning_tokens=usage_cost_record["reasoning_tokens"],
+                input_price_per_million=usage_cost_record["input_price_per_million"],
+                cached_input_price_per_million=usage_cost_record["cached_input_price_per_million"],
+                output_price_per_million=usage_cost_record["output_price_per_million"],
+                currency=usage_cost_record["currency"],
+                cost_amount=usage_cost_record["cost_amount"],
+                usage_source=usage_data["usage_source"],
+            )
+        )
+    _log_chat_event(
+        logging.INFO,
+        "chat.dialog_title.usage",
+        model=selected_model,
+        provider=provider_name,
+        input_tokens=usage_data["input_tokens"],
+        cached_input_tokens=usage_data["cached_input_tokens"],
+        output_tokens=usage_data["output_tokens"],
+        total_tokens=usage_data["total_tokens"],
+        cost_amount=usage_cost_record["cost_amount"],
+        currency=usage_cost_record["currency"],
+        usage_source=usage_data["usage_source"],
     )
     choices = getattr(response, "choices", None)
     if not isinstance(choices, list) or not choices:
@@ -441,6 +531,9 @@ async def _chat_response_stream(
 ):
     log_context = _build_chat_log_context(trace_id=trace_id, user_id=logged_in, dialog_id=dialog_id, model=model)
     tool_attachments = list(available_attachments or [])
+    provider_name = _resolve_provider_name(model)
+    provider_info = _resolve_provider_info(model)
+    usage_turn_id = str(uuid.uuid4())
 
     async def _tool_executor_with_persist(tool_call):
         result_text = ""
@@ -478,6 +571,49 @@ async def _chat_response_stream(
                     **log_context,
                 )
 
+    async def _persist_usage_event(**usage_data: Any) -> None:
+        if not dialog_id:
+            return
+        usage_cost_record = _build_usage_cost_record(provider_name, model, usage_data)
+        await chat_repository.create_llm_usage_event(
+            user_id=logged_in,
+            dialog_id=dialog_id,
+            turn_id=str(usage_data.get("turn_id", "") or usage_turn_id),
+            round_index=int(usage_data.get("round_index", 0) or 0),
+            provider=usage_cost_record["provider"],
+            model=usage_cost_record["model"],
+            call_type=str(usage_data.get("call_type", "chat") or "chat"),
+            request_id=str(usage_data.get("request_id", "") or ""),
+            input_tokens=usage_cost_record["input_tokens"],
+            cached_input_tokens=usage_cost_record["cached_input_tokens"],
+            output_tokens=usage_cost_record["output_tokens"],
+            total_tokens=usage_cost_record["total_tokens"],
+            reasoning_tokens=usage_cost_record["reasoning_tokens"],
+            input_price_per_million=usage_cost_record["input_price_per_million"],
+            cached_input_price_per_million=usage_cost_record["cached_input_price_per_million"],
+            output_price_per_million=usage_cost_record["output_price_per_million"],
+            currency=usage_cost_record["currency"],
+            cost_amount=usage_cost_record["cost_amount"],
+            usage_source=str(usage_data.get("usage_source", "missing") or "missing"),
+        )
+        _log_chat_event(
+            logging.INFO,
+            "chat.usage.persisted",
+            turn_id=str(usage_data.get("turn_id", "") or usage_turn_id),
+            round_index=int(usage_data.get("round_index", 0) or 0),
+            provider=provider_name,
+            input_tokens=usage_cost_record["input_tokens"],
+            cached_input_tokens=usage_cost_record["cached_input_tokens"],
+            output_tokens=usage_cost_record["output_tokens"],
+            total_tokens=usage_cost_record["total_tokens"],
+            cost_amount=usage_cost_record["cost_amount"],
+            currency=usage_cost_record["currency"],
+            usage_source=str(usage_data.get("usage_source", "missing") or "missing"),
+            **log_context,
+        )
+
+    yield f"data: {json.dumps({'turn_id': usage_turn_id})}\n\n"
+
     async for chunk in chat_service.chat_response_stream(
         request,
         messages,
@@ -494,6 +630,10 @@ async def _chat_response_stream(
         trace_id=trace_id,
         user_id=logged_in,
         dialog_id=dialog_id,
+        turn_id=usage_turn_id,
+        provider_name=provider_name,
+        include_usage_in_stream=_provider_supports_stream_usage(provider_name, provider_info),
+        persist_usage_event=_persist_usage_event,
     ):
         yield chunk
 
@@ -519,6 +659,19 @@ async def stream_chat(request: Request):
         stream_response_fn=_chat_response_stream,
         json_error_from_exception=json_error_from_exception,
         chat_login_redirect_path=_chat_login_redirect_path,
+    )
+
+
+@_with_auth_redirect_on_json_error()
+async def get_dialog_usage(request: Request):
+    return await chat_dialog_endpoints.get_dialog_usage(
+        request,
+        require_user_id_json=require_user_id_json,
+        chat_repository=chat_repository,
+        exceptions_validation=exceptions_validation,
+        json_success=json_success,
+        json_error=json_error,
+        logger=logger,
     )
 
 

@@ -176,6 +176,8 @@ async def create_dialog_title(
                 create_dialog_title_fn,
                 first_user_message,
                 dialog_title_model,
+                user_id,
+                dialog_id,
             )
         else:
             generated_title = derive_dialog_title_from_user_message(first_user_message)
@@ -288,6 +290,35 @@ async def list_messages(
     except Exception:
         logger.exception("Error getting messages")
         return json_error("Error getting messages", status_code=500)
+
+
+async def get_dialog_usage(
+    request: Request,
+    *,
+    require_user_id_json,
+    chat_repository,
+    exceptions_validation,
+    json_success,
+    json_error,
+    logger: logging.Logger,
+):
+    try:
+        user_id = await require_user_id_json(request, message="You must be logged in to get dialog usage")
+        dialog_id = str(request.path_params.get("dialog_id", "")).strip()
+        if not dialog_id:
+            raise exceptions_validation.UserValidate("Dialog id is required")
+        await chat_repository.get_dialog(user_id, dialog_id)
+        totals = await chat_repository.get_dialog_usage_totals(user_id, dialog_id)
+        turns = await chat_repository.get_dialog_usage_by_turn(user_id, dialog_id)
+        events = await chat_repository.list_dialog_usage_events(user_id, dialog_id)
+        return json_success(dialog_id=dialog_id, totals=totals, turns=turns, events=events)
+    except exceptions_validation.JSONError:
+        raise
+    except exceptions_validation.UserValidate as e:
+        return json_error(str(e), status_code=400)
+    except Exception:
+        logger.exception("Error getting dialog usage")
+        return json_error("Error getting dialog usage", status_code=500)
 
 
 async def delete_dialog(

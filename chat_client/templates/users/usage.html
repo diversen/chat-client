@@ -1,0 +1,405 @@
+{% extends "base.html" %} {% set body_class = 'page-usage' %} {% block content %}
+
+<main class="default-container usage-page">
+    <div class="dialogs-toolbar">
+        <h3>Usage</h3>
+    </div>
+
+    <section class="usage-summary-grid">
+        <article class="usage-card">
+            <div class="usage-card-label">Total cost</div>
+            <div class="usage-card-value">{{ usage_totals.cost_amount }} {{ usage_totals.currency }}</div>
+        </article>
+        <article class="usage-card">
+            <div class="usage-card-label">Requests</div>
+            <div class="usage-card-value">{{ usage_totals.request_count }}</div>
+        </article>
+        <article class="usage-card">
+            <div class="usage-card-label">Input tokens</div>
+            <div class="usage-card-value">{{ usage_totals.input_tokens }}</div>
+        </article>
+        <article class="usage-card">
+            <div class="usage-card-label">Cached input</div>
+            <div class="usage-card-value">{{ usage_totals.cached_input_tokens }}</div>
+        </article>
+        <article class="usage-card">
+            <div class="usage-card-label">Output tokens</div>
+            <div class="usage-card-value">{{ usage_totals.output_tokens }}</div>
+        </article>
+        <article class="usage-card">
+            <div class="usage-card-label">Reasoning tokens</div>
+            <div class="usage-card-value">{{ usage_totals.reasoning_tokens }}</div>
+        </article>
+    </section>
+
+    <section class="usage-dialogs-card">
+        <div class="usage-section-header">
+            <h4>Usage by dialog</h4>
+            <div class="usage-section-meta">Listed by most recent usage</div>
+        </div>
+
+        {% if usage_dialogs %}
+        <div class="usage-dialog-list">
+            {% for dialog in usage_dialogs %}
+            <article class="usage-dialog-item" data-dialog-item>
+                <button
+                    type="button"
+                    class="usage-dialog-toggle"
+                    data-dialog-toggle
+                    data-dialog-id="{{ dialog.dialog_id }}"
+                    aria-expanded="false"
+                >
+                    <span class="usage-dialog-main">
+                        <span class="usage-dialog-title">{{ dialog.title or 'Untitled dialog' }}</span>
+                        <span class="usage-dialog-time">Last used {{ dialog.last_created }}</span>
+                    </span>
+                    <span class="usage-dialog-summary">
+                        <span>{{ dialog.cost_amount }} {{ dialog.currency }}</span>
+                        <span>{{ dialog.request_count }} requests</span>
+                        <span>{{ dialog.total_tokens }} tokens</span>
+                    </span>
+                    <span class="usage-dialog-action">Show details</span>
+                </button>
+                <div class="usage-dialog-details" data-dialog-details hidden>
+                    <div class="usage-dialog-loading" data-dialog-loading hidden>Loading usage details…</div>
+                    <div class="usage-dialog-error" data-dialog-error hidden></div>
+                    <div class="usage-dialog-details-content" data-dialog-content hidden></div>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="usage-empty-state">No usage has been recorded yet.</div>
+        {% endif %}
+    </section>
+</main>
+
+<style>
+    .page-usage .default-container {
+        height: auto;
+        min-height: calc(100svh - var(--main-menu-top));
+        padding-bottom: 24px;
+    }
+
+    .usage-page {
+        padding-bottom: 0;
+    }
+
+    .usage-summary-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 12px;
+        margin-bottom: 24px;
+    }
+
+    .usage-card,
+    .usage-dialogs-card {
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: linear-gradient(180deg, var(--background-alt) 0%, var(--background) 100%);
+        color: var(--text-main);
+        box-shadow: 0 1px 2px rgba(var(--nav-background-rgb), 0.08);
+    }
+
+    .usage-card {
+        padding: 14px 16px;
+    }
+
+    .usage-card-label {
+        font-size: 0.9rem;
+        color: var(--text-muted);
+        margin-bottom: 6px;
+    }
+
+    .usage-card-value {
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: var(--text-bright);
+    }
+
+    .usage-section-header {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 16px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .usage-section-header h4 {
+        margin: 0;
+    }
+
+    .usage-section-meta {
+        font-size: 0.9rem;
+        color: var(--text-muted);
+    }
+
+    .usage-dialog-list {
+        display: flex;
+        flex-direction: column;
+        overflow: visible;
+    }
+
+    .usage-dialog-item + .usage-dialog-item {
+        border-top: 1px solid var(--border);
+    }
+
+    .usage-dialog-item {
+        overflow: visible;
+    }
+
+    .usage-dialog-toggle {
+        width: 100%;
+        border: 0;
+        background: transparent;
+        color: inherit;
+        text-align: left;
+        padding: 16px;
+        display: grid;
+        grid-template-columns: minmax(0, 2fr) minmax(0, 1.3fr) auto;
+        gap: 12px;
+        align-items: center;
+        cursor: pointer;
+    }
+
+    .usage-dialog-toggle:hover,
+    .usage-dialog-toggle:focus-visible {
+        background: rgba(var(--nav-background-rgb), 0.04);
+    }
+
+    .usage-dialog-main,
+    .usage-dialog-summary {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 0;
+    }
+
+    .usage-dialog-title {
+        font-weight: 600;
+        color: var(--text-bright);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .usage-dialog-time,
+    .usage-dialog-summary {
+        font-size: 0.92rem;
+        color: var(--text-muted);
+    }
+
+    .usage-dialog-action {
+        font-size: 0.92rem;
+        font-weight: 600;
+        color: var(--link);
+        white-space: nowrap;
+    }
+
+    .usage-dialog-details {
+        padding: 0 16px 16px;
+        overflow: visible;
+    }
+
+    .usage-dialog-loading,
+    .usage-dialog-error {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: rgba(var(--nav-background-rgb), 0.03);
+    }
+
+    .usage-dialog-loading,
+    .usage-dialog-error {
+        padding: 12px;
+        font-size: 0.95rem;
+    }
+
+    .usage-dialog-error {
+        color: #a94442;
+    }
+
+    .usage-turn-table-wrap {
+        width: 100%;
+        overflow-x: auto;
+        overflow-y: visible;
+        -webkit-overflow-scrolling: touch;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: rgba(var(--nav-background-rgb), 0.03);
+    }
+
+    .usage-turn-table {
+        width: 100%;
+        border-collapse: collapse;
+        min-width: 980px;
+        margin-bottom: 0;
+    }
+
+    .usage-turn-table th,
+    .usage-turn-table td {
+        padding: 10px 12px;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+        font-size: 0.94rem;
+    }
+
+    .usage-turn-table th {
+        font-size: 0.82rem;
+        letter-spacing: 0.03em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+    }
+
+    .usage-turn-table tbody tr:last-child td {
+        border-bottom: 0;
+    }
+
+    .usage-empty-state {
+        padding: 18px 16px;
+        color: var(--text-muted);
+    }
+
+    @media (max-width: 800px) {
+        .usage-dialog-toggle {
+            grid-template-columns: 1fr;
+        }
+
+        .usage-dialog-action {
+            justify-self: start;
+        }
+    }
+</style>
+
+<script>
+    (() => {
+        const dialogItems = document.querySelectorAll('[data-dialog-item]');
+
+        function escapeHtml(value) {
+            return String(value)
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#39;');
+        }
+
+        function formatTurnRows(turns) {
+            if (!Array.isArray(turns) || turns.length === 0) {
+                return '<div class="usage-empty-state">No usage details found for this dialog.</div>';
+            }
+
+            const rows = turns
+                .map((turn) => {
+                    const turnId = String(turn.turn_id || '');
+                    const created = String(turn.first_created || '');
+                    const requestCount = Number(turn.request_count || 0);
+                    const inputTokens = Number(turn.input_tokens || 0);
+                    const cachedInputTokens = Number(turn.cached_input_tokens || 0);
+                    const outputTokens = Number(turn.output_tokens || 0);
+                    const reasoningTokens = Number(turn.reasoning_tokens || 0);
+                    const totalTokens = Number(turn.total_tokens || 0);
+                    const costAmount = String(turn.cost_amount || '0');
+                    const currency = String(turn.currency || 'USD');
+
+                    return `
+                        <tr>
+                            <td>${escapeHtml(turnId)}</td>
+                            <td>${escapeHtml(created)}</td>
+                            <td>${requestCount}</td>
+                            <td>${inputTokens}</td>
+                            <td>${cachedInputTokens}</td>
+                            <td>${outputTokens}</td>
+                            <td>${reasoningTokens}</td>
+                            <td>${totalTokens}</td>
+                            <td>${escapeHtml(costAmount)} ${escapeHtml(currency)}</td>
+                        </tr>
+                    `;
+                })
+                .join('');
+
+            return `
+                <div class="usage-turn-table-wrap">
+                    <table class="usage-turn-table">
+                        <thead>
+                            <tr>
+                                <th>Turn</th>
+                                <th>First used</th>
+                                <th>Requests</th>
+                                <th>Input</th>
+                                <th>Cached</th>
+                                <th>Output</th>
+                                <th>Reasoning</th>
+                                <th>Total</th>
+                                <th>Cost</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        async function loadDialogDetails(toggle, detailsElement) {
+            if (detailsElement.dataset.loaded === 'true') {
+                return;
+            }
+
+            const dialogId = toggle.dataset.dialogId;
+            const loadingElement = detailsElement.querySelector('[data-dialog-loading]');
+            const errorElement = detailsElement.querySelector('[data-dialog-error]');
+            const contentElement = detailsElement.querySelector('[data-dialog-content]');
+
+            loadingElement.hidden = false;
+            errorElement.hidden = true;
+            contentElement.hidden = true;
+
+            try {
+                const response = await fetch(`/api/chat/dialogs/${encodeURIComponent(dialogId)}/usage`, {
+                    headers: { Accept: 'application/json' },
+                    credentials: 'same-origin',
+                });
+                const payload = await response.json();
+                if (!response.ok || payload.error) {
+                    throw new Error(payload.message || 'Unable to load usage details for this dialog.');
+                }
+
+                contentElement.innerHTML = formatTurnRows(payload.turns);
+                contentElement.hidden = false;
+                detailsElement.dataset.loaded = 'true';
+            } catch (error) {
+                errorElement.textContent = error instanceof Error ? error.message : 'Unable to load usage details for this dialog.';
+                errorElement.hidden = false;
+            } finally {
+                loadingElement.hidden = true;
+            }
+        }
+
+        dialogItems.forEach((item) => {
+            const toggle = item.querySelector('[data-dialog-toggle]');
+            const detailsElement = item.querySelector('[data-dialog-details]');
+            const actionElement = item.querySelector('.usage-dialog-action');
+
+            if (!(toggle instanceof HTMLButtonElement) || !(detailsElement instanceof HTMLElement) || !actionElement) {
+                return;
+            }
+
+            toggle.addEventListener('click', async () => {
+                const expanded = toggle.getAttribute('aria-expanded') === 'true';
+                if (expanded) {
+                    toggle.setAttribute('aria-expanded', 'false');
+                    actionElement.textContent = 'Show details';
+                    detailsElement.hidden = true;
+                    return;
+                }
+
+                toggle.setAttribute('aria-expanded', 'true');
+                actionElement.textContent = 'Hide details';
+                detailsElement.hidden = false;
+                await loadDialogDetails(toggle, detailsElement);
+            });
+        });
+    })();
+</script>
+
+{% endblock content %}

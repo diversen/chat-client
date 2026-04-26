@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from chat_client.models import Base, Dialog, ToolCallEvent, User
+from chat_client.models import Base, Dialog, LlmUsageEvent, ToolCallEvent, User
 
 
 def _aiosqlite_available() -> bool:
@@ -512,6 +512,204 @@ def test_get_messages_orders_by_sequence_index():
             messages = await chat_repository.get_messages(user_id, dialog_id)
             roles = [msg["role"] for msg in messages]
             assert roles == ["assistant_turn", "user"]
+        finally:
+            chat_repository.async_session = original_session_factory
+            sys.modules.pop("data.config", None)
+            sys.modules.pop("data", None)
+            await engine.dispose()
+            if db_path.exists():
+                db_path.unlink()
+            Path(temp_dir).rmdir()
+
+    asyncio.run(_run())
+
+
+def test_create_llm_usage_event_and_get_dialog_usage_totals():
+    async def _run():
+        temp_dir = tempfile.mkdtemp()
+        db_path = Path(temp_dir) / "test_chat_repository_usage_totals.db"
+        engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}", echo=False)
+        session_factory = async_sessionmaker(engine, expire_on_commit=False)
+
+        data_module = ModuleType("data")
+        config_module = ModuleType("data.config")
+        config_module.DATABASE = db_path
+        data_module.config = config_module
+        sys.modules["data"] = data_module
+        sys.modules["data.config"] = config_module
+
+        from chat_client.repositories import chat_repository
+
+        original_session_factory = chat_repository.async_session
+        chat_repository.async_session = session_factory
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+
+            async with session_factory() as session:
+                user = User(
+                    email="repo-test-usage@example.com",
+                    password_hash="x",
+                    random="y",
+                )
+                session.add(user)
+                await session.commit()
+                await session.refresh(user)
+                user_id = int(user.user_id)
+
+            dialog_id = await chat_repository.create_dialog(user_id, "Usage totals")
+            await chat_repository.create_llm_usage_event(
+                user_id=user_id,
+                dialog_id=dialog_id,
+                turn_id="turn-1",
+                round_index=1,
+                provider="openai",
+                model="gpt-5",
+                input_tokens=1200,
+                cached_input_tokens=1000,
+                output_tokens=45,
+                total_tokens=1245,
+                reasoning_tokens=7,
+                input_price_per_million="1.25",
+                cached_input_price_per_million="0.125",
+                output_price_per_million="10.00",
+                currency="USD",
+                cost_amount="0.00068750",
+                usage_source="provider",
+            )
+            await chat_repository.create_llm_usage_event(
+                user_id=user_id,
+                dialog_id=dialog_id,
+                turn_id="turn-1",
+                round_index=2,
+                provider="openai",
+                model="gpt-5",
+                input_tokens=500,
+                cached_input_tokens=0,
+                output_tokens=20,
+                total_tokens=520,
+                reasoning_tokens=0,
+                input_price_per_million="1.25",
+                cached_input_price_per_million="0.125",
+                output_price_per_million="10.00",
+                currency="USD",
+                cost_amount="0.00082500",
+                usage_source="provider",
+            )
+
+            totals = await chat_repository.get_dialog_usage_totals(user_id, dialog_id)
+
+            assert totals == {
+                "request_count": 2,
+                "input_tokens": 1700,
+                "cached_input_tokens": 1000,
+                "output_tokens": 65,
+                "total_tokens": 1765,
+                "reasoning_tokens": 7,
+                "currency": "USD",
+                "cost_amount": "0.00151250",
+            }
+
+            async with session_factory() as session:
+                rows = (
+                    (
+                        await session.execute(
+                            select(LlmUsageEvent).where(LlmUsageEvent.dialog_id == dialog_id).order_by(LlmUsageEvent.round_index.asc())
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+
+            assert len(rows) == 2
+            assert rows[0].cached_input_tokens == 1000
+            assert rows[1].round_index == 2
+        finally:
+            chat_repository.async_session = original_session_factory
+            sys.modules.pop("data.config", None)
+            sys.modules.pop("data", None)
+            await engine.dispose()
+            if db_path.exists():
+                db_path.unlink()
+            Path(temp_dir).rmdir()
+
+    asyncio.run(_run())
+
+
+def test_delete_dialog_preserves_llm_usage_events():
+    async def _run():
+        temp_dir = tempfile.mkdtemp()
+        db_path = Path(temp_dir) / "test_chat_repository_delete_dialog_usage.db"
+        engine = create_async_engine(f"sqlite+aiosqlite:///{db_path}", echo=False)
+        session_factory = async_sessionmaker(engine, expire_on_commit=False)
+
+        data_module = ModuleType("data")
+        config_module = ModuleType("data.config")
+        config_module.DATABASE = db_path
+        data_module.config = config_module
+        sys.modules["data"] = data_module
+        sys.modules["data.config"] = config_module
+
+        from chat_client.repositories import chat_repository
+
+        original_session_factory = chat_repository.async_session
+        chat_repository.async_session = session_factory
+        try:
+            async with engine.begin() as conn:
+                await conn.run_sync(Base.metadata.create_all)
+
+            async with session_factory() as session:
+                user = User(
+                    email="repo-test-delete-usage@example.com",
+                    password_hash="x",
+                    random="y",
+                )
+                session.add(user)
+                await session.commit()
+                await session.refresh(user)
+                user_id = int(user.user_id)
+
+            dialog_id = await chat_repository.create_dialog(user_id, "Delete me")
+            await chat_repository.create_llm_usage_event(
+                user_id=user_id,
+                dialog_id=dialog_id,
+                turn_id="turn-1",
+                round_index=1,
+                provider="openai",
+                model="gpt-5",
+                input_tokens=10,
+                output_tokens=5,
+                total_tokens=15,
+                currency="USD",
+                cost_amount="0.0001",
+                usage_source="provider",
+            )
+
+            await chat_repository.delete_dialog(user_id, dialog_id)
+
+            async with session_factory() as session:
+                usage_rows = (
+                    (
+                        await session.execute(
+                            select(LlmUsageEvent).where(LlmUsageEvent.dialog_id == dialog_id)
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+                dialog_rows = (
+                    (
+                        await session.execute(
+                            select(Dialog).where(Dialog.dialog_id == dialog_id)
+                        )
+                    )
+                    .scalars()
+                    .all()
+                )
+
+            assert dialog_rows == []
+            assert len(usage_rows) == 1
+            assert usage_rows[0].dialog_title == "Delete me"
         finally:
             chat_repository.async_session = original_session_factory
             sys.modules.pop("data.config", None)

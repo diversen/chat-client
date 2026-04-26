@@ -16,6 +16,7 @@ from chat_client.core.attachments import (
     list_attachment_paths,
     parse_image_attachment_ref,
 )
+from chat_client.core.usage_pricing import normalize_usage_payload
 
 GENERIC_OPENAI_ERROR_MESSAGE = "An error occurred. Please try again later."
 IMAGE_MODALITY_ERROR_MESSAGE = "The selected model does not support image inputs. Remove attached images or choose a vision model."
@@ -726,6 +727,10 @@ async def chat_response_stream(
     trace_id: str = "",
     user_id: Any = None,
     dialog_id: str = "",
+    turn_id: str = "",
+    provider_name: str = "",
+    include_usage_in_stream: bool = False,
+    persist_usage_event: Callable[..., Any] | None = None,
 ) -> AsyncIterator[str]:
     base_log_context = {
         "trace_id": trace_id,
@@ -779,6 +784,8 @@ async def chat_response_stream(
                 "messages": messages,
                 "stream": True,
             }
+            if include_usage_in_stream:
+                create_kwargs["stream_options"] = {"include_usage": True}
             if tools_enabled:
                 create_kwargs["tools"] = tool_definitions
 
@@ -808,6 +815,15 @@ async def chat_response_stream(
             last_chunk_summary: dict[str, Any] | None = None
             first_chunk_preview = ""
             last_chunk_preview = ""
+            usage_summary = {
+                "request_id": "",
+                "input_tokens": 0,
+                "cached_input_tokens": 0,
+                "output_tokens": 0,
+                "total_tokens": 0,
+                "reasoning_tokens": 0,
+                "usage_source": "missing",
+            }
             tool_call_state: dict[str, Any] = {
                 "tool_calls_by_key": {},
                 "tool_call_order": [],
@@ -836,6 +852,8 @@ async def chat_response_stream(
                     last_chunk_preview = chunk_preview
                     json_chunk = json.dumps(model_dict)
                     yield f"data: {json_chunk}\n\n"
+                    if isinstance(model_dict.get("usage"), dict):
+                        usage_summary = normalize_usage_payload(model_dict)
 
                     choices = getattr(chunk, "choices", None)
                     if not isinstance(choices, list) or not choices:
@@ -895,8 +913,30 @@ async def chat_response_stream(
                 tool_call_count=len(tool_calls),
                 content_chars=assistant_summary["content_chars"],
                 chunk_count=chunk_count,
+                usage_source=usage_summary["usage_source"],
+                input_tokens=usage_summary["input_tokens"],
+                cached_input_tokens=usage_summary["cached_input_tokens"],
+                output_tokens=usage_summary["output_tokens"],
+                total_tokens=usage_summary["total_tokens"],
                 **base_log_context,
             )
+            if persist_usage_event is not None:
+                persist_result = persist_usage_event(
+                    turn_id=turn_id,
+                    round_index=rounds,
+                    provider=provider_name,
+                    model=model,
+                    call_type="chat",
+                    request_id=usage_summary["request_id"],
+                    input_tokens=usage_summary["input_tokens"],
+                    cached_input_tokens=usage_summary["cached_input_tokens"],
+                    output_tokens=usage_summary["output_tokens"],
+                    total_tokens=usage_summary["total_tokens"],
+                    reasoning_tokens=usage_summary["reasoning_tokens"],
+                    usage_source=usage_summary["usage_source"],
+                )
+                if isawaitable(persist_result):
+                    await persist_result
             _log_event(
                 logger,
                 logging.DEBUG,

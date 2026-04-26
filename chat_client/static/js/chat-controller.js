@@ -663,7 +663,8 @@ class ConversationController {
         this.updateSendButtonState();
 
         const streamedTurnEvents = [];
-        const turnId = this.createTurnId();
+        const fallbackTurnId = this.createTurnId();
+        let turnId = '';
         let turnUi = null;
         const hasVisibleText = (rawText) => String(rawText || '').trim().length > 0;
         const discardFinalizedSegment = (finalized) => {
@@ -798,6 +799,10 @@ class ConversationController {
                 dialog_id: this.dialogId || '',
                 messages: this.messages,
             }, this.abortController.signal)) {
+                if (chunk.turnId) {
+                    turnId = String(chunk.turnId || '').trim();
+                    continue;
+                }
                 if (chunk.toolStatus) {
                     const currentSegment = turnUi?.getActiveAssistantSegment?.();
                     if (currentSegment && currentSegment.segmentKind !== 'tool') {
@@ -857,7 +862,7 @@ class ConversationController {
 
             if (this.dialogId && streamedTurnEvents.length > 0) {
                 await this.storage.createAssistantTurnEvents(this.dialogId, {
-                    turn_id: turnId,
+                    turn_id: turnId || fallbackTurnId,
                     events: streamedTurnEvents,
                 });
             }

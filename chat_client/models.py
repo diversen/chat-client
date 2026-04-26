@@ -244,6 +244,41 @@ class AssistantTurnEvent(Base):
     )
 
 
+class LlmUsageEvent(Base):
+    __tablename__ = "llm_usage_event"
+    __table_args__ = (
+        Index("llm_usage_event_dialog_id", "dialog_id"),
+        Index("llm_usage_event_user_id", "user_id"),
+        Index("llm_usage_event_dialog_turn_id", "dialog_id", "turn_id"),
+        {"sqlite_autoincrement": True},
+    )
+
+    llm_usage_event_id: Mapped[int | None] = mapped_column(primary_key=True, autoincrement=True, nullable=False, init=False)
+    dialog_id: Mapped[str] = mapped_column(String, nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False)
+    dialog_title: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    turn_id: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    round_index: Mapped[int] = mapped_column(nullable=False, default=0)
+    provider: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    model: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    call_type: Mapped[str] = mapped_column(Text, nullable=False, default="chat")
+    request_id: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    input_tokens: Mapped[int] = mapped_column(nullable=False, default=0)
+    cached_input_tokens: Mapped[int] = mapped_column(nullable=False, default=0)
+    output_tokens: Mapped[int] = mapped_column(nullable=False, default=0)
+    total_tokens: Mapped[int] = mapped_column(nullable=False, default=0)
+    reasoning_tokens: Mapped[int] = mapped_column(nullable=False, default=0)
+    input_price_per_million: Mapped[str] = mapped_column(Text, nullable=False, default="0")
+    cached_input_price_per_million: Mapped[str] = mapped_column(Text, nullable=False, default="0")
+    output_price_per_million: Mapped[str] = mapped_column(Text, nullable=False, default="0")
+    currency: Mapped[str] = mapped_column(Text, nullable=False, default="USD")
+    cost_amount: Mapped[str] = mapped_column(Text, nullable=False, default="0")
+    usage_source: Mapped[str] = mapped_column(Text, nullable=False, default="missing")
+    created: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=func.current_timestamp(), nullable=False, init=False
+    )
+
+
 class Prompt(Base):
     __tablename__ = "prompt"
     __table_args__ = (

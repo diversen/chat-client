@@ -97,6 +97,19 @@ MODELS: dict[str, str] = {
     # "gemma-3-27b-it": "gemini",
 }
 
+# Optional pricing table used for exact cost calculations stored alongside usage events.
+# Rates are per 1M tokens and should match your provider's published pricing at the time of use.
+MODEL_PRICING: dict[str, dict[str, dict[str, str]]] = {
+    # "openai": {
+    #     "gpt-5": {
+    #         "input_per_million": "1.25",
+    #         "cached_input_per_million": "0.125",
+    #         "output_per_million": "10.00",
+    #         "currency": "USD",
+    #     },
+    # }
+}
+
 # Enable vision models (models that can process both text and images)
 # Ollama vision models are discovered automatically.
 VISION_MODELS: list[str] = []
