@@ -252,6 +252,13 @@ def _close_stream(stream: Any, logger: logging.Logger) -> None:
         logger.exception("Failed to close provider stream")
 
 
+async def _request_is_disconnected(request: Request, timeout_seconds: float = 0.01) -> bool:
+    try:
+        return await asyncio.wait_for(request.is_disconnected(), timeout=timeout_seconds)
+    except TimeoutError:
+        return False
+
+
 def _create_sync_stream(create_fn: Callable[..., Any], create_kwargs: dict[str, Any]) -> Any:
     """
     Run the provider stream creation in a worker thread so connection setup
@@ -561,11 +568,43 @@ def _resolve_empty_answer_retry_count(value: Any) -> int:
     return max(resolved, 0)
 
 
-def normalize_reasoning_effort(value: Any) -> str:
+def normalize_reasoning_effort(value: Any, *, allow_none: bool = False) -> str:
     normalized = str(value or "").strip().lower()
     if normalized in {"low", "medium", "high"}:
         return normalized
+    if allow_none and normalized == "none":
+        return "none"
     return ""
+
+
+def normalize_reasoning_effort_for_provider(value: Any, provider_name: str = "") -> str:
+    normalized_provider = str(provider_name or "").strip().lower()
+    return normalize_reasoning_effort(value, allow_none=normalized_provider == "ollama")
+
+
+def build_chat_completion_create_kwargs(
+    *,
+    model: str,
+    messages: list[dict[str, Any]],
+    provider_name: str = "",
+    reasoning_effort: Any = "",
+    include_usage_in_stream: bool = False,
+    tool_definitions: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    create_kwargs: dict[str, Any] = {
+        "model": model,
+        "messages": messages,
+        "stream": True,
+    }
+    normalized_provider = str(provider_name or "").strip().lower()
+    normalized_reasoning_effort = normalize_reasoning_effort_for_provider(reasoning_effort, normalized_provider)
+    if normalized_reasoning_effort and normalized_provider in {"openai", "ollama"}:
+        create_kwargs["reasoning_effort"] = normalized_reasoning_effort
+    if include_usage_in_stream:
+        create_kwargs["stream_options"] = {"include_usage": True}
+    if isinstance(tool_definitions, list) and tool_definitions:
+        create_kwargs["tools"] = tool_definitions
+    return create_kwargs
 
 
 def _normalize_tool_calls(raw_tool_calls: Any) -> list[dict[str, Any]]:
@@ -748,7 +787,6 @@ async def chat_response_stream(
     }
     try:
         provider_info = provider_info_resolver(model)
-        normalized_reasoning_effort = normalize_reasoning_effort(reasoning_effort)
         max_rounds = _resolve_max_chat_loop_rounds(max_chat_loop_rounds)
         max_empty_answer_retries = _resolve_empty_answer_retry_count(empty_answer_retry_count)
 
@@ -788,17 +826,14 @@ async def chat_response_stream(
                 yield f"data: {json.dumps({'error': 'Tool loop exceeded maximum rounds'})}\n\n"
                 return
 
-            create_kwargs: dict[str, Any] = {
-                "model": model,
-                "messages": messages,
-                "stream": True,
-            }
-            if normalized_reasoning_effort and str(provider_name or "").strip().lower() == "openai":
-                create_kwargs["reasoning_effort"] = normalized_reasoning_effort
-            if include_usage_in_stream:
-                create_kwargs["stream_options"] = {"include_usage": True}
-            if tools_enabled:
-                create_kwargs["tools"] = tool_definitions
+            create_kwargs = build_chat_completion_create_kwargs(
+                model=model,
+                messages=messages,
+                provider_name=provider_name,
+                reasoning_effort=reasoning_effort,
+                include_usage_in_stream=include_usage_in_stream,
+                tool_definitions=tool_definitions if tools_enabled else None,
+            )
 
             round_started_at = time.perf_counter()
             _log_event(
@@ -848,7 +883,7 @@ async def chat_response_stream(
                     finished, chunk = await asyncio.to_thread(_next_stream_chunk, stream_iterator)
                     if finished:
                         break
-                    if await request.is_disconnected():
+                    if await _request_is_disconnected(request):
                         disconnected = True
                         break
 

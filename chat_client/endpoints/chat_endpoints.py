@@ -267,9 +267,16 @@ def _supports_model_attachments(model_name: str) -> bool:
     )
 
 
-def _supports_model_reasoning(model_name: str) -> bool:
-    capabilities = _build_model_capabilities()
-    return bool(capabilities.get(model_name, {}).get("supports_reasoning"))
+def _supports_model_thinking_control(model_name: str) -> bool:
+    return model_capabilities.supports_model_thinking_control(
+        model_name=model_name,
+        models=MODELS,
+        vision_models=VISION_MODELS,
+        tool_models=TOOL_MODELS,
+        system_message_denylist=SYSTEM_MESSAGE_DENYLIST,
+        provider_info_resolver=_resolve_provider_info,
+        cache_token=_model_capabilities_cache_token(),
+    )
 
 
 def log_model_capabilities_summary(logger_: logging.Logger | None = None) -> dict[str, dict[str, bool]]:
@@ -546,7 +553,7 @@ async def _chat_response_stream(
     tool_attachments = list(available_attachments or [])
     provider_name = _resolve_provider_name(model)
     provider_info = _resolve_provider_info(model)
-    effective_reasoning_effort = reasoning_effort if _supports_model_reasoning(model) else ""
+    effective_reasoning_effort = reasoning_effort if _supports_model_thinking_control(model) else ""
     usage_turn_id = str(uuid.uuid4())
 
     async def _tool_executor_with_persist(tool_call):

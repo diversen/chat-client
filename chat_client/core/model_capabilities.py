@@ -54,6 +54,12 @@ def _supports_system_messages_for_model(model_name: str, system_message_denylist
     return model_name not in system_message_denylist
 
 
+def supports_thinking_control(details: dict[str, Any] | None) -> bool:
+    if not isinstance(details, dict):
+        return False
+    return bool(details.get("supports_reasoning") or details.get("supports_thinking"))
+
+
 def build_model_capabilities(
     *,
     models: dict[str, Any],
@@ -105,6 +111,7 @@ def build_model_capabilities(
             "supports_attachments": supports_tools,
             "supports_reasoning": bool(detected_capabilities.get("supports_reasoning")),
             "supports_thinking": bool(detected_capabilities.get("supports_thinking")),
+            "supports_thinking_control": supports_thinking_control(detected_capabilities),
             "supports_system_messages": supports_system_messages,
             "context_length": detected_capabilities.get("context_length"),
         }
@@ -172,6 +179,27 @@ def supports_model_attachments(
         cache_token=cache_token,
     )
     return bool(capabilities.get(model_name, {}).get("supports_attachments"))
+
+
+def supports_model_thinking_control(
+    *,
+    model_name: str,
+    models: dict[str, Any],
+    vision_models: list[str] | None,
+    tool_models: list[str] | None,
+    system_message_denylist: list[str] | None,
+    provider_info_resolver: Callable[[str], dict[str, Any]],
+    cache_token: Any = None,
+) -> bool:
+    capabilities = build_model_capabilities(
+        models=models,
+        vision_models=vision_models,
+        tool_models=tool_models,
+        system_message_denylist=system_message_denylist,
+        provider_info_resolver=provider_info_resolver,
+        cache_token=cache_token,
+    )
+    return bool(capabilities.get(model_name, {}).get("supports_thinking_control"))
 
 
 def warm_and_log_model_capabilities(

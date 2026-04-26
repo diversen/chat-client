@@ -19,7 +19,19 @@ NOISY_DEPENDENCY_LOGGERS = (
 )
 
 
+def _normalize_log_level(level: typing.Any) -> int:
+    if isinstance(level, str):
+        normalized = logging.getLevelName(level.upper())
+        if isinstance(normalized, int):
+            return normalized
+        return logging.INFO
+    if isinstance(level, int):
+        return level
+    return logging.INFO
+
+
 def get_rotating_file_handler(level: typing.Any, file_name):
+    level = _normalize_log_level(level)
     Path(file_name).parent.mkdir(parents=True, exist_ok=True)
     Path(file_name).touch()
     handler = ConcurrentRotatingFileHandler(file_name, maxBytes=MAX_LOG_SIZE, backupCount=BACKUP_COUNT)
@@ -32,6 +44,7 @@ def setup_logging(log_level: int = logging.INFO, data_dir: str | os.PathLike[str
     """
     Configures the logging setup with the specified log level.
     """
+    log_level = _normalize_log_level(log_level)
 
     logger = logging.getLogger()
     logger.setLevel(log_level)

@@ -52,7 +52,33 @@ def test_normalize_reasoning_effort_accepts_supported_values():
     assert chat_service.normalize_reasoning_effort("medium") == "medium"
     assert chat_service.normalize_reasoning_effort("high") == "high"
     assert chat_service.normalize_reasoning_effort("none") == ""
+    assert chat_service.normalize_reasoning_effort("none", allow_none=True) == "none"
     assert chat_service.normalize_reasoning_effort("") == ""
+
+
+def test_normalize_reasoning_effort_for_provider_allows_none_only_for_ollama():
+    assert chat_service.normalize_reasoning_effort_for_provider("none", "ollama") == "none"
+    assert chat_service.normalize_reasoning_effort_for_provider("none", "openai") == ""
+
+
+def test_build_chat_completion_create_kwargs_shapes_provider_options():
+    create_kwargs = chat_service.build_chat_completion_create_kwargs(
+        model="qwen3:latest",
+        messages=[{"role": "user", "content": "hello"}],
+        provider_name="ollama",
+        reasoning_effort="none",
+        include_usage_in_stream=True,
+        tool_definitions=[{"type": "function", "function": {"name": "noop"}}],
+    )
+
+    assert create_kwargs == {
+        "model": "qwen3:latest",
+        "messages": [{"role": "user", "content": "hello"}],
+        "stream": True,
+        "reasoning_effort": "none",
+        "stream_options": {"include_usage": True},
+        "tools": [{"type": "function", "function": {"name": "noop"}}],
+    }
 
 
 def test_summarize_messages_for_log_includes_attachment_paths():
@@ -526,7 +552,7 @@ def test_chat_response_stream_passes_reasoning_effort_for_openai_provider():
     assert final_stream.closed is True
 
 
-def test_chat_response_stream_ignores_reasoning_effort_for_non_openai_provider():
+def test_chat_response_stream_passes_reasoning_effort_for_ollama_provider():
     final_stream = DummyStream([_chunk("streamed final", finish_reason="stop")])
     create_calls = []
 
@@ -558,7 +584,44 @@ def test_chat_response_stream_ignores_reasoning_effort_for_non_openai_provider()
     chunks = asyncio.run(_run())
 
     assert len(create_calls) == 1
-    assert "reasoning_effort" not in create_calls[0]
+    assert create_calls[0]["reasoning_effort"] == "high"
+    assert "streamed final" in chunks[0]
+    assert final_stream.closed is True
+
+
+def test_chat_response_stream_passes_none_reasoning_effort_for_ollama_provider():
+    final_stream = DummyStream([_chunk("streamed final", finish_reason="stop")])
+    create_calls = []
+
+    def _create(**kwargs):
+        create_calls.append(kwargs)
+        return final_stream
+
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=_create)))
+    request = DummyRequest(disconnected_after_calls=999)
+
+    async def _run():
+        chunks = []
+        async for chunk in chat_service.chat_response_stream(
+            request,
+            messages=[{"role": "user", "content": "hello"}],
+            model="test-model",
+            reasoning_effort="none",
+            openai_client_cls=lambda **_: client,
+            provider_info_resolver=lambda _model: {},
+            tool_models=[],
+            tools_loader=lambda: [],
+            tool_executor=lambda _tool_call: "",
+            provider_name="ollama",
+            logger=logging.getLogger("test"),
+        ):
+            chunks.append(chunk)
+        return chunks
+
+    chunks = asyncio.run(_run())
+
+    assert len(create_calls) == 1
+    assert create_calls[0]["reasoning_effort"] == "none"
     assert "streamed final" in chunks[0]
     assert final_stream.closed is True
 

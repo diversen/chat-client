@@ -55,6 +55,7 @@ class ConversationController {
             supports_attachments: true,
             supports_tools: false,
             supports_reasoning: false,
+            supports_thinking: false,
         };
     }
 
@@ -67,7 +68,12 @@ class ConversationController {
     }
 
     selectedModelSupportsReasoningEffort() {
-        return Boolean(this.getSelectedModelCapabilities()?.supports_reasoning);
+        const capabilities = this.getSelectedModelCapabilities();
+        return Boolean(
+            capabilities?.supports_thinking_control
+            || capabilities?.supports_reasoning
+            || capabilities?.supports_thinking,
+        );
     }
 
     getSelectedReasoningEffort() {
@@ -75,10 +81,7 @@ class ConversationController {
             return '';
         }
         const selectedValue = String(this.reasoningSelection.getSelectedValue() || '').trim().toLowerCase();
-        if (selectedValue === 'none') {
-            return '';
-        }
-        if (['low', 'medium', 'high'].includes(selectedValue)) {
+        if (['none', 'low', 'medium', 'high'].includes(selectedValue)) {
             return selectedValue;
         }
         return '';

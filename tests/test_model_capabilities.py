@@ -30,6 +30,7 @@ def test_build_model_capabilities_merges_ollama_detection():
         "supports_attachments": True,
         "supports_reasoning": False,
         "supports_thinking": True,
+        "supports_thinking_control": True,
         "supports_system_messages": True,
         "context_length": 32768,
     }
@@ -39,6 +40,7 @@ def test_build_model_capabilities_merges_ollama_detection():
         "supports_attachments": False,
         "supports_reasoning": False,
         "supports_thinking": False,
+        "supports_thinking_control": False,
         "supports_system_messages": True,
         "context_length": None,
     }
@@ -104,13 +106,14 @@ def test_warm_and_log_model_capabilities_logs_pretty_json():
         "supports_attachments": True,
         "supports_reasoning": False,
         "supports_thinking": True,
+        "supports_thinking_control": True,
         "supports_system_messages": True,
         "context_length": 32768,
     }
     assert len(dummy_logger.messages) == 1
     assert (
         dummy_logger.messages[0]
-        == 'Model capabilities detected at startup:\n{\n  "qwen3:latest": {\n    "context_length": 32768,\n    "provider": "ollama",\n    "supports_attachments": true,\n    "supports_images": false,\n    "supports_reasoning": false,\n    "supports_system_messages": true,\n    "supports_thinking": true,\n    "supports_tools": true\n  }\n}'
+        == 'Model capabilities detected at startup:\n{\n  "qwen3:latest": {\n    "context_length": 32768,\n    "provider": "ollama",\n    "supports_attachments": true,\n    "supports_images": false,\n    "supports_reasoning": false,\n    "supports_system_messages": true,\n    "supports_thinking": true,\n    "supports_thinking_control": true,\n    "supports_tools": true\n  }\n}'
     )
 
 
@@ -195,6 +198,7 @@ def test_build_model_capabilities_merges_openai_reasoning_detection():
 
     assert capabilities["gpt-5.1"]["supports_reasoning"] is True
     assert capabilities["gpt-5.1"]["supports_thinking"] is True
+    assert capabilities["gpt-5.1"]["supports_thinking_control"] is True
 
 
 def test_build_model_capabilities_probes_openai_reasoning_with_tools_for_tool_models():
@@ -216,3 +220,23 @@ def test_build_model_capabilities_probes_openai_reasoning_with_tools_for_tool_mo
         )
 
     assert mock_get_openai_model_metadata.call_args.kwargs["probe_tools"] is True
+
+
+def test_supports_model_thinking_control_uses_built_capabilities():
+    with patch(
+        "chat_client.core.model_capabilities.get_ollama_model_metadata",
+        return_value={
+            "supports_images": False,
+            "supports_tools": False,
+            "supports_thinking": True,
+            "context_length": 8192,
+        },
+    ):
+        assert model_capabilities.supports_model_thinking_control(
+            model_name="qwen3:latest",
+            models={"qwen3:latest": "ollama"},
+            vision_models=[],
+            tool_models=[],
+            system_message_denylist=[],
+            provider_info_resolver=lambda _model_name: {"base_url": "http://localhost:11434/v1", "api_key": "ollama"},
+        ) is True

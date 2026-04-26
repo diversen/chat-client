@@ -628,6 +628,7 @@ class TestChatEndpoints(BaseTestCase):
                 "supports_attachments": False,
                 "supports_reasoning": False,
                 "supports_thinking": False,
+                "supports_thinking_control": False,
                 "supports_system_messages": True,
                 "context_length": None,
             },
@@ -637,6 +638,7 @@ class TestChatEndpoints(BaseTestCase):
                 "supports_attachments": True,
                 "supports_reasoning": False,
                 "supports_thinking": False,
+                "supports_thinking_control": False,
                 "supports_system_messages": True,
                 "context_length": None,
             },
@@ -646,6 +648,7 @@ class TestChatEndpoints(BaseTestCase):
                 "supports_attachments": False,
                 "supports_reasoning": False,
                 "supports_thinking": False,
+                "supports_thinking_control": False,
                 "supports_system_messages": True,
                 "context_length": None,
             },
@@ -742,8 +745,17 @@ class TestChatEndpoints(BaseTestCase):
 
     @patch("chat_client.endpoints.chat_endpoints.OpenAI")
     @patch("chat_client.endpoints.chat_endpoints.MODELS", {"test-model": "openai"})
+    @patch(
+        "chat_client.endpoints.chat_endpoints._supports_model_thinking_control",
+        return_value=True,
+    )
     @patch("chat_client.core.user_session.is_logged_in")
-    def test_chat_response_stream_passes_reasoning_effort_for_openai(self, mock_logged_in, mock_openai_class):
+    def test_chat_response_stream_passes_reasoning_effort_for_openai(
+        self,
+        mock_logged_in,
+        _mock_supports_model_thinking_control,
+        mock_openai_class,
+    ):
         mock_logged_in.return_value = 1
 
         mock_client = mock_openai_client()
@@ -764,8 +776,17 @@ class TestChatEndpoints(BaseTestCase):
 
     @patch("chat_client.endpoints.chat_endpoints.OpenAI")
     @patch("chat_client.endpoints.chat_endpoints.MODELS", {"test-model": "ollama"})
+    @patch(
+        "chat_client.endpoints.chat_endpoints._supports_model_thinking_control",
+        return_value=True,
+    )
     @patch("chat_client.core.user_session.is_logged_in")
-    def test_chat_response_stream_ignores_reasoning_effort_for_non_openai(self, mock_logged_in, mock_openai_class):
+    def test_chat_response_stream_passes_reasoning_effort_for_thinking_capable_ollama(
+        self,
+        mock_logged_in,
+        _mock_supports_model_thinking_control,
+        mock_openai_class,
+    ):
         mock_logged_in.return_value = 1
 
         mock_client = mock_openai_client()
@@ -782,7 +803,38 @@ class TestChatEndpoints(BaseTestCase):
 
         assert response.status_code == 200
         _ = response.content
-        assert "reasoning_effort" not in mock_client.chat.completions.create.call_args.kwargs
+        assert mock_client.chat.completions.create.call_args.kwargs["reasoning_effort"] == "high"
+
+    @patch("chat_client.endpoints.chat_endpoints.OpenAI")
+    @patch("chat_client.endpoints.chat_endpoints.MODELS", {"test-model": "ollama"})
+    @patch(
+        "chat_client.endpoints.chat_endpoints._supports_model_thinking_control",
+        return_value=True,
+    )
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_chat_response_stream_passes_none_reasoning_effort_for_ollama(
+        self,
+        mock_logged_in,
+        _mock_supports_model_thinking_control,
+        mock_openai_class,
+    ):
+        mock_logged_in.return_value = 1
+
+        mock_client = mock_openai_client()
+        mock_openai_class.return_value = mock_client
+
+        response = self.client.post(
+            "/chat",
+            json={
+                "messages": [{"role": "user", "content": "Hello"}],
+                "model": "test-model",
+                "reasoning_effort": "none",
+            },
+        )
+
+        assert response.status_code == 200
+        _ = response.content
+        assert mock_client.chat.completions.create.call_args.kwargs["reasoning_effort"] == "none"
 
     @patch("chat_client.endpoints.chat_endpoints.VISION_MODELS", ["test-model"])
     @patch("chat_client.endpoints.chat_endpoints.OpenAI")

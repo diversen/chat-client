@@ -6,6 +6,7 @@ Tests all major functionality with proper mocking.
 import os
 import sys
 from unittest.mock import patch, MagicMock
+from starlette.responses import Response
 
 # Add project root to path
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -36,20 +37,13 @@ class TestStarletteBackend:
 
             # Test chat streaming with authentication
             with patch("chat_client.core.user_session.is_logged_in", return_value=1):
-                with patch("chat_client.endpoints.chat_endpoints.OpenAI") as mock_openai:
-                    # Mock the streaming response
-                    mock_response = MagicMock()
-                    mock_response.choices = [MagicMock()]
-                    mock_response.choices[0].delta = MagicMock()
-                    mock_response.choices[0].delta.content = "Test response"
-                    mock_response.choices[0].delta.tool_calls = None
-                    mock_response.choices[0].finish_reason = "stop"
-                    mock_response.model_dump.return_value = {"choices": [{"delta": {"content": "Test"}}]}
+                async def _fake_chat_stream_response(*_args, **_kwargs):
+                    return Response("data: {}\n\n", media_type="text/event-stream")
 
-                    mock_client = MagicMock()
-                    mock_client.chat.completions.create.return_value = [mock_response]
-                    mock_openai.return_value = mock_client
-
+                with patch(
+                    "chat_client.endpoints.chat_endpoints.chat_stream_endpoints.chat_response_stream",
+                    side_effect=_fake_chat_stream_response,
+                ):
                     response = client.post("/chat", json={"messages": [{"role": "user", "content": "Hello"}], "model": "test-model"})
                     assert response.status_code == 200
                     assert "text/event-stream" in response.headers["content-type"]
