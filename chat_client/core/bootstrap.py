@@ -86,8 +86,8 @@ def run_migrations(config) -> Path:
     data_dir.mkdir(parents=True, exist_ok=True)
 
     database_path = Path(config.DATABASE)
-    logger.info("Data directory: %s", data_dir)
-    logger.info("Database path: %s", database_path)
+    logger.debug("Data directory: %s", data_dir)
+    logger.debug("Database path: %s", database_path)
 
     migrations_path = str(Path(__file__).resolve().parent.parent / "migrations")
     migration_manager = Migration(str(database_path), migrations_path)

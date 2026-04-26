@@ -5,7 +5,7 @@ import logging
 
 logger: logging.Logger = logging.getLogger(__name__)
 
-logger.info("Database path: %s", DATABASE)
+logger.debug("Database path: %s", DATABASE)
 
 engine = create_async_engine(
     f"sqlite+aiosqlite:///./{DATABASE}",

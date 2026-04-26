@@ -13,6 +13,11 @@ BACKUP_COUNT = 5
 
 formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
+NOISY_DEPENDENCY_LOGGERS = (
+    "alembic",
+    "sqlalchemy",
+)
+
 
 def get_rotating_file_handler(level: typing.Any, file_name):
     Path(file_name).parent.mkdir(parents=True, exist_ok=True)
@@ -47,5 +52,9 @@ def setup_logging(log_level: int = logging.INFO, data_dir: str | os.PathLike[str
     log_file = Path(data_dir) / "main.log"
     rotating_file_handler = get_rotating_file_handler(log_level, log_file)
     logger.addHandler(rotating_file_handler)
+
+    for logger_name in NOISY_DEPENDENCY_LOGGERS:
+        dependency_logger = logging.getLogger(logger_name)
+        dependency_logger.setLevel(max(log_level, logging.WARNING))
 
     logger.debug("Logging setup complete. Log level: %s", log_level)
