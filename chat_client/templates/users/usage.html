@@ -66,9 +66,6 @@
     .usage-dialogs-card {
         border: 1px solid var(--border);
         border-radius: 10px;
-        background: linear-gradient(180deg, var(--background-alt) 0%, var(--background) 100%);
-        color: var(--text-main);
-        box-shadow: 0 1px 2px rgba(var(--nav-background-rgb), 0.08);
     }
 
     .usage-card {
@@ -108,15 +105,6 @@
     .usage-dialog-list {
         display: flex;
         flex-direction: column;
-        overflow: visible;
-    }
-
-    .usage-dialog-item + .usage-dialog-item {
-        border-top: 1px solid var(--border);
-    }
-
-    .usage-dialog-item {
-        overflow: visible;
     }
 
     .usage-dialog-toggle {
@@ -127,11 +115,6 @@
         text-align: left;
         padding: 16px;
         cursor: pointer;
-    }
-
-    .usage-dialog-toggle:hover,
-    .usage-dialog-toggle:focus-visible {
-        background: rgba(var(--nav-background-rgb), 0.04);
     }
 
     .usage-dialog-info {
@@ -168,34 +151,19 @@
         margin-top: 2px;
     }
 
-    .usage-dialog-details {
-        padding: 0 16px 16px;
-        overflow: visible;
-    }
-
     .usage-dialog-error {
         border: 1px solid var(--border);
         border-radius: 8px;
-        background: rgba(var(--nav-background-rgb), 0.03);
-    }
-
-    .usage-dialog-error {
         padding: 12px;
         font-size: 0.95rem;
-    }
-
-    .usage-dialog-error {
-        color: #a94442;
+        color: var(--flash-error-color);
     }
 
     .usage-turn-table-wrap {
         width: 100%;
         overflow-x: auto;
         overflow-y: visible;
-        -webkit-overflow-scrolling: touch;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        background: rgba(var(--nav-background-rgb), 0.03);
+        padding: 10px;
     }
 
     .usage-turn-table {
@@ -209,7 +177,6 @@
     .usage-turn-table td {
         padding: 10px 12px;
         text-align: left;
-        border-bottom: 1px solid var(--border);
         font-size: 0.94rem;
         white-space: nowrap;
     }
@@ -226,10 +193,6 @@
         width: 1%;
     }
 
-    .usage-turn-table tbody tr:last-child td {
-        border-bottom: 0;
-    }
-
     .usage-empty-state {
         padding: 18px 16px;
         color: var(--text-muted);
@@ -241,9 +204,6 @@
 
     #load-more-usage-dialogs {
         margin: 0 16px 16px;
-    }
-
-    @media (max-width: 800px) {
     }
 </style>
 
@@ -295,16 +255,16 @@
 
                     return `
                         <tr>
-                            <td>${escapeHtml(turnId)}</td>
-                            <td>${escapeHtml(created)}</td>
-                            <td>${escapeHtml(models.join(', ') || '-')}</td>
+                            <td>${turnId}</td>
+                            <td>${created}</td>
+                            <td>${models.join(', ') || '-'}</td>
                             <td>${requestCount}</td>
                             <td>${inputTokens}</td>
                             <td>${cachedInputTokens}</td>
                             <td>${outputTokens}</td>
                             <td>${reasoningTokens}</td>
                             <td>${totalTokens}</td>
-                            <td>${escapeHtml(costAmount)} ${escapeHtml(currency)}</td>
+                            <td>${costAmount} ${currency}</td>
                         </tr>
                     `;
                 })
@@ -342,14 +302,14 @@
                     type="button"
                     class="usage-dialog-toggle"
                     data-dialog-toggle
-                    data-dialog-id="${escapeHtml(String(dialog.dialog_id || ''))}"
+                    data-dialog-id="${String(dialog.dialog_id || '')}"
                     aria-expanded="false"
                 >
                     <span class="usage-dialog-info">
                         <span class="usage-dialog-title">${escapeHtml(String(dialog.title || 'Untitled dialog'))}</span>
-                        <span class="usage-dialog-time">Last used ${escapeHtml(String(dialog.last_created || ''))}</span>
+                        <span class="usage-dialog-time">Last used ${String(dialog.last_created || '')}</span>
                         <span class="usage-dialog-summary">
-                            <span>${escapeHtml(String(dialog.cost_amount || '0'))} ${escapeHtml(String(dialog.currency || 'USD'))}</span>
+                            <span>${String(dialog.cost_amount || '0')} ${String(dialog.currency || 'USD')}</span>
                             <span>${Number(dialog.request_count || 0)} requests</span>
                             <span>${Number(dialog.total_tokens || 0)} tokens</span>
                         </span>

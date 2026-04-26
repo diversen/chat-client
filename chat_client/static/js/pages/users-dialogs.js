@@ -128,6 +128,10 @@ function initUsersDialogsPage() {
             return;
         }
 
+        if (!confirm('Are you sure you want to delete this dialog?')) {
+            return;
+        }
+
         loading.classList.remove('hidden');
 
         try {
