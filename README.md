@@ -13,7 +13,7 @@ Demo: <https://chat.10kilobyte.com> (`demo` / `demo`)
 - Prompt management
 - Image uploads for vision-capable models
 - Attachment uploading for tool usage
-- Tool calling through local tools or MCP
+- Tool calling through local tools
 - Vision, Thinking and tool usage. 
 
 See [docs/mcp.md](docs/mcp.md) for MCP notes.
