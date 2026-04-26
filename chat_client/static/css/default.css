@@ -501,6 +501,7 @@ nav svg {
 
 .markdown-table {
   overscroll-behavior-x: contain;
+  scrollbar-color: var(--border) transparent;
 }
 
 

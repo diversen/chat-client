@@ -164,6 +164,21 @@
         overflow-x: auto;
         overflow-y: visible;
         padding: 10px;
+        scrollbar-width: thin;
+        scrollbar-color: var(--border) transparent;
+    }
+
+    .usage-turn-table-wrap::-webkit-scrollbar {
+        height: 6px;
+    }
+
+    .usage-turn-table-wrap::-webkit-scrollbar-track {
+        background: transparent;
+    }
+
+    .usage-turn-table-wrap::-webkit-scrollbar-thumb {
+        background: var(--border);
+        border-radius: 999px;
     }
 
     .usage-turn-table {
