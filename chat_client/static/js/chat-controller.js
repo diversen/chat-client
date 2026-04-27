@@ -35,11 +35,6 @@ class ConversationController {
         this.abortController = new AbortController();
         this.pendingImages = [];
         this.pendingAttachments = [];
-        this.bottomSentinel = null;
-        this.bottomSentinelVisible = false;
-        this.bottomSentinelMeasured = false;
-        this.bottomSentinelObserverMargin = null;
-        this.bottomSentinelObserver = null;
         this.activeAssistantRenderPromise = Promise.resolve();
 
         this.wireUI();
@@ -171,54 +166,16 @@ class ConversationController {
         openImagePreviewModal(imagePreviewModalElem, imagePreviewModalImageElem, dataUrl, name);
     }
 
-    getBottomSentinel() {
+    getLastResponseElement() {
         const { responsesElem } = this.elements;
-        return responsesElem.querySelector('.responses-anchor-spacer');
-    }
-
-    ensureBottomSentinelObserver() {
-        const { scrollToBottom, promptElem } = this.elements;
-        if (!scrollToBottom || typeof IntersectionObserver === 'undefined') {
-            return;
-        }
-
-        const promptHeight = Math.ceil(promptElem?.getBoundingClientRect().height || 0);
-        const observerMargin = `0px 0px -${promptHeight}px 0px`;
-
-        if (this.bottomSentinelObserver && this.bottomSentinelObserverMargin !== observerMargin) {
-            if (this.bottomSentinel) {
-                this.bottomSentinelObserver.unobserve(this.bottomSentinel);
+        const children = Array.from(responsesElem.children);
+        for (let index = children.length - 1; index >= 0; index -= 1) {
+            const child = children[index];
+            if (!child.classList.contains('responses-anchor-spacer')) {
+                return child;
             }
-            this.bottomSentinelObserver.disconnect();
-            this.bottomSentinelObserver = null;
-            this.bottomSentinelMeasured = false;
         }
-
-        if (!this.bottomSentinelObserver) {
-            this.bottomSentinelObserver = new IntersectionObserver((entries) => {
-                const entry = entries[entries.length - 1];
-                if (!entry || entry.target !== this.bottomSentinel) return;
-                this.bottomSentinelMeasured = true;
-                this.bottomSentinelVisible = entry.isIntersecting;
-                this.checkScroll();
-            }, {
-                rootMargin: observerMargin,
-            });
-            this.bottomSentinelObserverMargin = observerMargin;
-        }
-
-        const sentinel = this.getBottomSentinel();
-        if (!sentinel || sentinel === this.bottomSentinel) {
-            return;
-        }
-
-        if (this.bottomSentinel) {
-            this.bottomSentinelObserver.unobserve(this.bottomSentinel);
-        }
-
-        this.bottomSentinel = sentinel;
-        this.bottomSentinelMeasured = false;
-        this.bottomSentinelObserver.observe(sentinel);
+        return null;
     }
 
     closeImagePreviewModal() {
@@ -471,15 +428,17 @@ class ConversationController {
             this.checkScroll();
         }, { passive: true });
 
+        window.addEventListener('resize', () => {
+            this.checkScroll();
+        });
+
         new MutationObserver(() => {
-            this.ensureBottomSentinelObserver();
             this.checkScroll();
             if (this.isStreaming) this.setEditFormSubmissionEnabled(false);
         }).observe(responsesElem, { childList: true, subtree: true });
     }
 
     wireUI() {
-        this.ensureBottomSentinelObserver();
         this.modelSelection.subscribe(() => {
             this.updateAttachmentUI();
             this.updateSendButtonState();
@@ -495,7 +454,7 @@ class ConversationController {
     }
 
     checkScroll() {
-        const { responsesElem } = this.elements;
+        const { responsesElem, promptElem } = this.elements;
         const isEditingMessage = Boolean(responsesElem.querySelector('.edit-form'));
 
         const doc = document.documentElement;
@@ -505,33 +464,17 @@ class ConversationController {
             return;
         }
 
-        const spacerHeight = this.bottomSentinel
-            ? Math.ceil(this.bottomSentinel.getBoundingClientRect().height || 0)
-            : 0;
-        const contentBottom = Math.max(0, doc.scrollHeight - spacerHeight);
-        const distanceFromContentBottom = Math.max(0, contentBottom - (window.innerHeight + window.scrollY));
+        const lastResponseElem = this.getLastResponseElement();
+        if (!lastResponseElem) {
+            this.setScrollToBottomVisible(false);
+            return;
+        }
+
+        const promptHeight = Math.ceil(promptElem?.getBoundingClientRect().height || 0);
+        const visibleBottom = window.innerHeight - promptHeight;
         const hideThreshold = 12;
-        if (distanceFromContentBottom <= hideThreshold) {
-            this.setScrollToBottomVisible(false);
-            return;
-        }
-
-        if (this.bottomSentinel && this.bottomSentinelObserver) {
-            if (!this.bottomSentinelMeasured) {
-                this.setScrollToBottomVisible(false);
-                return;
-            }
-            this.setScrollToBottomVisible(!this.bottomSentinelVisible);
-            return;
-        }
-
-        const distanceFromBottom = Math.max(0, doc.scrollHeight - (window.innerHeight + window.scrollY));
-        if (distanceFromBottom <= hideThreshold) {
-            this.setScrollToBottomVisible(false);
-            return;
-        }
-
-        this.setScrollToBottomVisible(true);
+        const lastResponseBottom = lastResponseElem.getBoundingClientRect().bottom;
+        this.setScrollToBottomVisible(lastResponseBottom > (visibleBottom + hideThreshold));
     }
 
     validateUserMessage(userMessage) {
