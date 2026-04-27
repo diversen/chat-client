@@ -44,3 +44,13 @@
     --main-menu-hover: #00000022;
     --main-menu-top: 61px;
 }
+
+input[type="date"] {
+    color-scheme: light;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    opacity: 1;
+    filter: contrast(1.1) brightness(0.35);
+}
