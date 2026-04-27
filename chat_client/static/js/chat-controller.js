@@ -216,6 +216,22 @@ class ConversationController {
         return persistedCount + this.pendingImages.length + this.pendingAttachments.length;
     }
 
+    getUploadContext() {
+        return {
+            dialogId: this.dialogId || '',
+            pendingAttachmentIds: this.pendingAttachments
+                .map((attachment) => attachment?.attachment_id)
+                .filter((attachmentId) => attachmentId !== null && attachmentId !== undefined),
+            pendingImageCount: this.pendingImages.length,
+        };
+    }
+
+    finishUploadSelection(inputElem) {
+        inputElem.value = '';
+        this.renderPendingUploads();
+        this.updateSendButtonState();
+    }
+
     async handleImageSelection(files) {
         const { imageInputElem } = this.elements;
         if (!this.selectedModelSupportsImages()) {
@@ -242,13 +258,7 @@ class ConversationController {
                 continue;
             }
             try {
-                const uploaded = await this.storage.uploadAttachment(file, {
-                    dialogId: this.dialogId || '',
-                    pendingAttachmentIds: this.pendingAttachments
-                        .map((attachment) => attachment?.attachment_id)
-                        .filter((attachmentId) => attachmentId !== null && attachmentId !== undefined),
-                    pendingImageCount: this.pendingImages.length,
-                });
+                const uploaded = await this.storage.uploadAttachment(file, this.getUploadContext());
                 this.pendingImages.push({
                     attachment_id: uploaded.attachment_id,
                     name: uploaded.name || file.name,
@@ -265,9 +275,7 @@ class ConversationController {
             }
         }
 
-        imageInputElem.value = '';
-        this.renderPendingUploads();
-        this.updateSendButtonState();
+        this.finishUploadSelection(imageInputElem);
     }
 
     async handleAttachmentSelection(files) {
@@ -284,13 +292,7 @@ class ConversationController {
 
         for (const file of selectedFiles) {
             try {
-                const uploaded = await this.storage.uploadAttachment(file, {
-                    dialogId: this.dialogId || '',
-                    pendingAttachmentIds: this.pendingAttachments
-                        .map((attachment) => attachment?.attachment_id)
-                        .filter((attachmentId) => attachmentId !== null && attachmentId !== undefined),
-                    pendingImageCount: this.pendingImages.length,
-                });
+                const uploaded = await this.storage.uploadAttachment(file, this.getUploadContext());
                 this.pendingAttachments.push(uploaded);
             } catch (error) {
                 console.error('Error uploading attachment:', error);
@@ -301,9 +303,7 @@ class ConversationController {
             }
         }
 
-        attachmentInputElem.value = '';
-        this.renderPendingUploads();
-        this.updateSendButtonState();
+        this.finishUploadSelection(attachmentInputElem);
     }
 
     bindFormEvents() {
