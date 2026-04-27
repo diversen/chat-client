@@ -42,6 +42,27 @@ def run_comprehensive_tests():
         return False
 
 
+def run_js_helper_tests():
+    """Run pure JavaScript helper tests"""
+    print("Running JavaScript Helper Tests...")
+    print("=" * 60)
+
+    try:
+        result = subprocess.run(
+            ["npm", "run", "test:js"],
+            cwd=project_root,
+            text=True,
+            timeout=120,
+        )
+        return result.returncode == 0
+    except FileNotFoundError:
+        print("Error running JavaScript helper tests: npm was not found")
+        return False
+    except Exception as e:
+        print(f"Error running JavaScript helper tests: {e}")
+        return False
+
+
 def main():
     """Main test runner"""
     print("Starlette Backend Test Suite")
@@ -88,6 +109,16 @@ def main():
         print(f"❌ Comprehensive tests failed: {e}")
         all_passed = False
 
+    # Run JS helper tests
+    try:
+        js_helper_success = run_js_helper_tests()
+        if not js_helper_success:
+            all_passed = False
+        print()
+    except Exception as e:
+        print(f"❌ JavaScript helper tests failed: {e}")
+        all_passed = False
+
     # Final results
     print("=" * 70)
     if all_passed:
@@ -99,6 +130,7 @@ def main():
         print("- ✅ Authentication and authorization")
         print("- ✅ User management (signup, login, profile)")
         print("- ✅ Chat functionality (streaming, dialogs, messages)")
+        print("- ✅ JavaScript helper logic")
         print("- ✅ Prompt management (CRUD operations)")
         print("- ✅ Error handling and logging")
         print("- ✅ Tool system")
