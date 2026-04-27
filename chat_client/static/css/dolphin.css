@@ -135,7 +135,7 @@ button,
 input[type="submit"],
 input[type="reset"],
 input[type="button"] {
-  background-color: var(--button-base);
+  background-color: var(--nav-background);
   padding-right: 30px;
   padding-left: 30px;
 }

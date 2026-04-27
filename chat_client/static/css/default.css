@@ -799,6 +799,10 @@ pre code {
     text-decoration: none;
 }
 
+.action-link:focus {
+    background-color: var(--focus);
+}
+
 .action-link[disabled]{
     background-color: var(--nav-background);
     color: var(--text-muted);
