@@ -11,6 +11,10 @@ const storageService = {
     uploadAttachment,
 };
 
+function asRecord(value) {
+    return value && typeof value === 'object' ? value : {};
+}
+
 async function getStreamingChatResponse(payload, signal) {
     const response = await fetch('/chat', {
         method: 'POST',
@@ -23,17 +27,17 @@ async function getStreamingChatResponse(payload, signal) {
         return response;
     }
 
-    let responseJson = null;
+    let responseJson = {};
     try {
-        responseJson = await response.json();
+        responseJson = asRecord(await response.json());
     } catch (_) {
-        responseJson = null;
+        responseJson = {};
     }
 
     const error = new Error(
-        responseJson?.message || `Server returned error: ${response.status} ${response.statusText}`,
+        responseJson.message || `Server returned error: ${response.status} ${response.statusText}`,
     );
-    if (responseJson?.redirect) {
+    if (responseJson.redirect) {
         error.redirect = responseJson.redirect;
     }
     error.status = response.status;
@@ -57,34 +61,38 @@ function parseStreamLine(rawLine) {
 }
 
 function normalizeStreamEvents(data, reasoningOpen) {
-    if (typeof data?.error === 'string' && data.error.trim()) {
-        throw new Error(data.error.trim());
+    const payload = asRecord(data);
+    if (typeof payload.error === 'string' && payload.error.trim()) {
+        throw new Error(payload.error.trim());
     }
 
-    if (data?.tool_status) {
+    if (payload.tool_status) {
         return {
-            events: [{ toolStatus: data.tool_status }],
+            events: [{ toolStatus: payload.tool_status }],
             reasoningOpen,
         };
     }
 
-    if (data?.tool_call) {
+    if (payload.tool_call) {
         return {
-            events: [{ toolCall: data.tool_call }],
+            events: [{ toolCall: payload.tool_call }],
             reasoningOpen,
         };
     }
 
-    if (typeof data?.turn_id === 'string' && data.turn_id.trim()) {
+    if (typeof payload.turn_id === 'string' && payload.turn_id.trim()) {
         return {
-            events: [{ turnId: data.turn_id.trim() }],
+            events: [{ turnId: payload.turn_id.trim() }],
             reasoningOpen,
         };
     }
 
     const events = [];
-    const delta = data?.choices?.[0]?.delta ?? {};
-    const finishReason = data?.choices?.[0]?.finish_reason;
+    const firstChoice = Array.isArray(payload.choices) && payload.choices[0] && typeof payload.choices[0] === 'object'
+        ? payload.choices[0]
+        : {};
+    const delta = asRecord(firstChoice.delta);
+    const finishReason = firstChoice.finish_reason;
 
     if (delta.reasoning) {
         if (!reasoningOpen) {

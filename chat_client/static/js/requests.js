@@ -12,6 +12,10 @@ class Requests {
         return fallbackMessage;
     }
 
+    static _asRecord(value) {
+        return value && typeof value === 'object' ? value : {};
+    }
+
     /**
      * Helper function to fetch with timeout
      */
@@ -27,22 +31,22 @@ class Requests {
             const response = await fetch(url, requestOptions);
             clearTimeout(timeoutId);
             const responseText = await response.text();
-            let responseJson = null;
+            let responseJson = {};
             if (responseText) {
                 try {
-                    responseJson = JSON.parse(responseText);
+                    responseJson = Requests._asRecord(JSON.parse(responseText));
                 } catch {
-                    responseJson = null;
+                    responseJson = {};
                 }
             }
 
             if (!response.ok) {
                 const message =
-                    responseJson?.message ||
+                    responseJson.message ||
                     `${requestOptions.method} request failed: ${response.status} ${response.statusText}`;
                 const error = new Error(message);
                 error.status = response.status;
-                if (responseJson?.redirect) {
+                if (responseJson.redirect) {
                     error.redirect = responseJson.redirect;
                     if (response.status === 401 && typeof window !== 'undefined') {
                         window.location.href = responseJson.redirect;
@@ -55,7 +59,7 @@ class Requests {
             if (!responseText) {
                 return {};
             }
-            if (responseJson !== null) {
+            if (Object.keys(responseJson).length > 0) {
                 return responseJson;
             }
 

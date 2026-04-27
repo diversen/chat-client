@@ -91,7 +91,7 @@ function initPromptFormPage({
     promptRecordId = null,
     getSubmitUrl,
     getSuccessRedirect = () => '/prompts',
-    getSuccessMessage = (response) => response?.message,
+    getSuccessMessage = (response) => response.message,
     onError,
     requests,
     flash,
@@ -130,7 +130,7 @@ function initPromptFormPage({
             const response = await requests.asyncPostJson(submitUrl, { title, prompt });
             const successMessage = typeof getSuccessMessage === 'function'
                 ? getSuccessMessage(response)
-                : response?.message;
+                : response.message;
             if (successMessage) {
                 flash.storeMessageForNextPage(successMessage, 'success');
             }

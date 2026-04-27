@@ -3,9 +3,10 @@ import { Requests } from '/static/js/requests.js';
 import { initPromptFormPage } from '/static/js/pages/page-utils.js';
 
 function initPromptsEditPage() {
+    const editForm = document.getElementById('edit-form');
     initPromptFormPage({
         buttonId: 'save-btn',
-        promptRecordId: document.getElementById('edit-form')?.getAttribute('data-prompt-id'),
+        promptRecordId: editForm.getAttribute('data-prompt-id'),
         getSubmitUrl: ({ promptRecordId }) => {
             if (!promptRecordId) {
                 Flash.setMessage('Prompt ID is missing.', 'error');
