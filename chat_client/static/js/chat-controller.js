@@ -658,6 +658,7 @@ class ConversationController {
         const contentElement = container.querySelector('.content');
         contentElement.style.whiteSpace = 'pre-wrap';
         contentElement.innerText = newContent;
+        this.view.updateCopyMessage(container, newContent);
 
         this.view.hideEditForm(container);
         this.removeMessagesAfter(container);

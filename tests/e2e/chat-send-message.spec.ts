@@ -44,6 +44,64 @@ test('send a message and render assistant response', async ({ page }) => {
   await expect(page.locator('.assistant-message .content').last()).toContainText('Playwright test response');
 });
 
+test('copy message uses edited user message content', async ({ page }) => {
+  ensureManagedTestUser();
+
+  await page.addInitScript(() => {
+    let copiedText = '';
+    Object.defineProperty(window, '__copiedText', {
+      get() {
+        return copiedText;
+      },
+      set(value) {
+        copiedText = String(value ?? '');
+      },
+      configurable: true,
+    });
+
+    Object.defineProperty(navigator, 'clipboard', {
+      value: {
+        writeText: async (text: string) => {
+          copiedText = String(text ?? '');
+        },
+      },
+      configurable: true,
+    });
+  });
+
+  await page.route('**/chat', async (route) => {
+    const sseBody = [
+      'data: {"choices":[{"delta":{"content":"Assistant reply"}}]}',
+      'data: [DONE]',
+      '',
+    ].join('\n');
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/event-stream',
+      body: sseBody,
+    });
+  });
+
+  await login(page);
+
+  await page.fill('#message', 'Original message');
+  await page.click('#send');
+  await expect(page.locator('.user-message .content').last()).toContainText('Original message');
+
+  const userMessage = page.locator('.user-message').last();
+  await userMessage.locator('.edit-message').click();
+  await userMessage.locator('.edit-textarea').fill('Updated message');
+  await userMessage.locator('.edit-send').click();
+
+  await expect(userMessage.locator('.content')).toContainText('Updated message');
+
+  await userMessage.locator('.copy-message').click();
+  await expect.poll(async () => {
+    return await page.evaluate(() => (window as Window & { __copiedText?: string }).__copiedText ?? '');
+  }).toBe('Updated message');
+});
+
 test('second user message aligns directly below top bar after short assistant reply', async ({ page }) => {
   ensureManagedTestUser();
 

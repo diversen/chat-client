@@ -122,13 +122,25 @@ function createMessageElement(role, messageId = null, containerRole = null) {
     return { container: messageContainer, contentElement: contentElement, loader: loaderSpan };
 }
 
+function setCopyMessageButtonText(container, message) {
+    const copyButton = container?.querySelector('.copy-message');
+    if (!copyButton) return;
+    copyButton.dataset.copyMessage = String(message || '');
+}
+
 function renderCopyMessageButton(container, message) {
     const messageActions = container.querySelector('.message-actions');
     messageActions.classList.remove('hidden');
-    messageActions.querySelector('.copy-message').addEventListener('click', (e) => {
+    const copyButton = messageActions.querySelector('.copy-message');
+    setCopyMessageButtonText(container, message);
+    if (copyButton.dataset.copyBound === 'true') {
+        return;
+    }
+    copyButton.dataset.copyBound = 'true';
+    copyButton.addEventListener('click', (e) => {
         e.preventDefault();
-        navigator.clipboard.writeText(message);
-        const copyButton = messageActions.querySelector('.copy-message');
+        const messageToCopy = copyButton.dataset.copyMessage || '';
+        navigator.clipboard.writeText(messageToCopy);
         copyButton.innerHTML = checkIcon;
         setTimeout(() => {
             copyButton.innerHTML = copyIcon;
@@ -942,6 +954,7 @@ function createChatView({ config, elements, modelSelection, renderStreamedRespon
         enableAbort() { abortButtonElem.removeAttribute('disabled'); },
         getSelectedModel() { return modelSelection.getSelectedModel(); },
         hideEditForm(container) { hideEditForm(container); },
+        updateCopyMessage(container, message) { setCopyMessageButtonText(container, message); },
         async scrollMessageToTop(container) {
             if (!container) return;
 
