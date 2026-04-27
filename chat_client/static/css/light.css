@@ -43,6 +43,7 @@
     --main-menu: black;
     --main-menu-hover: #00000022;
     --main-menu-top: 61px;
+    --date-picker-background: var(--form-background);
 }
 
 input[type="date"] {
