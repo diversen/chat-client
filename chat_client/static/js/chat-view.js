@@ -251,9 +251,7 @@ function tryParseJson(value) {
 }
 
 function appendLabeledPre(container, label, value, preClassName = '') {
-    const labelElement = document.createElement('p');
-    labelElement.innerHTML = `<strong>${label}:</strong>`;
-    container.appendChild(labelElement);
+    appendLabel(container, label);
 
     const pre = document.createElement('pre');
     if (preClassName) {
@@ -263,22 +261,10 @@ function appendLabeledPre(container, label, value, preClassName = '') {
     container.appendChild(pre);
 }
 
-function appendLabeledMarkdownCode(container, label, language, code) {
+function appendLabel(container, label) {
     const labelElement = document.createElement('p');
     labelElement.innerHTML = `<strong>${label}:</strong>`;
     container.appendChild(labelElement);
-
-    const block = document.createElement('div');
-    block.innerHTML = mdNoHTML.render(`\`\`\`${language}\n${code}\n\`\`\``);
-
-    if (typeof hljs !== 'undefined') {
-        const codeBlocks = block.querySelectorAll('pre code');
-        codeBlocks.forEach((element) => {
-            hljs.highlightElement(element);
-        });
-    }
-    addCopyButtons(block);
-    container.appendChild(block);
 }
 
 function appendMarkdownCode(container, language, code, withCopyButton = false) {
@@ -298,9 +284,7 @@ function appendMarkdownCode(container, language, code, withCopyButton = false) {
 }
 
 function appendLabeledMarkdownBlock(container, label, language, code, withCopyButton = false) {
-    const labelElement = document.createElement('p');
-    labelElement.innerHTML = `<strong>${label}:</strong>`;
-    container.appendChild(labelElement);
+    appendLabel(container, label);
     appendMarkdownCode(container, language, code, withCopyButton);
 }
 
@@ -499,6 +483,40 @@ function createAssistantSegmentShell(messageId = null, initialKind = 'Thinking',
     };
 }
 
+function normalizeAssistantTurnItem(item) {
+    if (!item) return null;
+
+    const isTool = item.role === 'tool' || item.event_type === 'tool_call';
+    if (isTool) {
+        return {
+            type: 'tool',
+            toolPayload: item.event_type === 'tool_call'
+                ? {
+                    tool_call_id: String(item?.tool_call_id || ''),
+                    tool_name: String(item?.tool_name || ''),
+                    arguments_json: String(item?.arguments_json || '{}'),
+                    content: String(item?.result_text || ''),
+                    error_text: String(item?.error_text || ''),
+                }
+                : item,
+        };
+    }
+
+    const isAssistantSegment = item.role === 'assistant' || item.event_type === 'assistant_segment';
+    if (!isAssistantSegment) return null;
+
+    return {
+        type: 'assistant',
+        messageId: item?.message_id || null,
+        reasoningText: item.event_type === 'assistant_segment'
+            ? String(item?.reasoning_text || '')
+            : '',
+        contentText: item.event_type === 'assistant_segment'
+            ? String(item?.content_text || '')
+            : String(item?.content || ''),
+    };
+}
+
 function createChatView({ config, elements, modelSelection, renderStreamedResponseText, updateContentDiff }) {
     const {
         responsesElem,
@@ -670,55 +688,29 @@ function createChatView({ config, elements, modelSelection, renderStreamedRespon
                 return openState;
             };
 
-            for (const item of turnMessages) {
-                const isTool = item?.role === 'tool' || item?.event_type === 'tool_call';
-                if (isTool) {
-                    const toolPayload = item?.event_type === 'tool_call'
-                        ? {
-                            tool_call_id: String(item?.tool_call_id || ''),
-                            tool_name: String(item?.tool_name || ''),
-                            arguments_json: String(item?.arguments_json || '{}'),
-                            content: String(item?.result_text || ''),
-                            error_text: String(item?.error_text || ''),
-                        }
-                        : item;
+            for (const item of turnMessages.map(normalizeAssistantTurnItem).filter(Boolean)) {
+                if (item.type === 'tool') {
                     appendCommittedToolSegment(turnContentElement, {
-                        toolPayload,
+                        toolPayload: item.toolPayload,
                         stepIndex: nextStepIndex(),
                         openState: nextSegmentOpenState(),
                     });
                     continue;
                 }
 
-                const isAssistantSegment = item && (
-                    item.role === 'assistant' || item.event_type === 'assistant_segment'
-                );
-                if (!isAssistantSegment) {
-                    continue;
-                }
-
-                let reasoningText = '';
-                let contentText = '';
-                if (item?.event_type === 'assistant_segment') {
-                    reasoningText = String(item?.reasoning_text || '');
-                    contentText = String(item?.content_text || '');
-                } else {
-                    contentText = String(item?.content || '');
-                }
-
-                const hasReasoning = String(reasoningText || '').trim().length > 0;
+                const hasReasoning = String(item.reasoningText || '').trim().length > 0;
                 await appendCommittedTextSegment(turnContentElement, {
                     kind: 'Thinking',
-                    text: reasoningText,
-                    messageId: item?.message_id || null,
+                    text: item.reasoningText,
+                    messageId: item.messageId,
                     stepIndex: hasReasoning ? nextStepIndex() : segmentIndex + 1,
                     openState: hasReasoning ? nextSegmentOpenState() : undefined,
                 });
-                const hasContent = String(contentText || '').trim().length > 0;
+                const hasContent = String(item.contentText || '').trim().length > 0;
                 await appendCommittedTextSegment(turnContentElement, {
                     kind: 'Answer',
-                    text: contentText,
-                    messageId: item?.message_id || null,
+                    text: item.contentText,
+                    messageId: item.messageId,
                     stepIndex: hasContent ? nextStepIndex() : segmentIndex + 1,
                     openState: hasContent ? nextSegmentOpenState() : undefined,
                 });
