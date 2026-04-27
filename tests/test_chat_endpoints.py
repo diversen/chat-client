@@ -544,6 +544,24 @@ class TestChatEndpoints(BaseTestCase):
 
         assert title == "By listing the first six prime numbers 2 3 5 7 11 and 13 we can see"
 
+    def test_derive_dialog_title_from_user_message_drops_trailing_partial_word_when_truncated(self):
+        from chat_client.endpoints.chat_endpoints import _derive_dialog_title_from_user_message
+
+        title = _derive_dialog_title_from_user_message(
+            "Welcome to City 17 You have chosen to relocate to one of our finest remaining urban centers"
+        )
+
+        assert title == "Welcome to City 17 You have chosen to relocate to one of our finest remaining"
+
+    def test_normalize_generated_dialog_title_drops_trailing_single_character_fragment_when_truncated(self):
+        from chat_client.endpoints.chat_endpoints import _normalize_generated_dialog_title
+
+        title = _normalize_generated_dialog_title(
+            "By listing the first six prime numbers 2 3 5 7 11 and 13 we can see that the 6 trillion stars"
+        )
+
+        assert title == "By listing the first six prime numbers 2 3 5 7 11 and 13 we can see that the"
+
     def test_extract_first_user_message_uses_first_user_message(self):
         from chat_client.endpoints.chat_endpoints import _extract_first_user_message
 

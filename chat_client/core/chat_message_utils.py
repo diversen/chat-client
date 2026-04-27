@@ -181,7 +181,18 @@ def normalize_generated_dialog_title(value: str) -> str:
     normalized = normalized.strip(" \t\r\n\"'`")
     normalized = " ".join(normalized.split())
     if len(normalized) > TITLE_FALLBACK_MAX_LENGTH:
-        normalized = normalized[:TITLE_FALLBACK_MAX_LENGTH].rstrip(" ,.;:-")
+        truncated = normalized[:TITLE_FALLBACK_MAX_LENGTH].rstrip(" ,.;:-")
+        next_char = normalized[TITLE_FALLBACK_MAX_LENGTH:TITLE_FALLBACK_MAX_LENGTH + 1]
+        if truncated and next_char and truncated[-1].isalnum() and next_char.isalnum():
+            last_space_index = truncated.rfind(" ")
+            if last_space_index > 0:
+                truncated = truncated[:last_space_index].rstrip(" ,.;:-")
+        trailing_word = truncated.rsplit(" ", 1)[-1] if truncated else ""
+        if len(trailing_word) == 1 and trailing_word.isalnum():
+            last_space_index = truncated.rfind(" ")
+            if last_space_index > 0:
+                truncated = truncated[:last_space_index].rstrip(" ,.;:-")
+        normalized = truncated
     return normalized or DEFAULT_PENDING_DIALOG_TITLE
 
 
