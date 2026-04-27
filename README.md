@@ -43,10 +43,22 @@ Open <http://localhost:1972>.
 
 ## Tests
 
+Run everything:
+
+```bash
+./run-all-tests.sh
+```
+
 Backend tests:
 
 ```bash
 python tests/run_all_tests.py
+```
+
+JavaScript helper tests:
+
+```bash
+npm run test:js
 ```
 
 E2E tests:

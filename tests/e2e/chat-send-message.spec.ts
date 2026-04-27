@@ -106,6 +106,55 @@ test('copy message uses edited user message content', async ({ page }) => {
   }).toBe('Updated message');
 });
 
+test('edit submitted while assistant stream is still active is applied after stream completes', async ({ page }) => {
+  ensureManagedTestUser();
+
+  let chatRequestCount = 0;
+  await page.route('**/chat', async (route) => {
+    chatRequestCount += 1;
+    if (chatRequestCount === 1) {
+      await page.waitForTimeout(300);
+      const sseBody = [
+        'data: {"choices":[{"delta":{"content":"Delayed assistant reply"}}]}',
+        'data: [DONE]',
+        '',
+      ].join('\n');
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: sseBody,
+      });
+      return;
+    }
+
+    const sseBody = [
+      'data: {"choices":[{"delta":{"content":"Reply after edit"}}]}',
+      'data: [DONE]',
+      '',
+    ].join('\n');
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/event-stream',
+      body: sseBody,
+    });
+  });
+
+  await login(page);
+
+  await sendChatMessage(page, 'Original message');
+  const userMessage = page.locator('.user-message').last();
+  await expect(userMessage.locator('.content')).toContainText('Original message');
+
+  await userMessage.locator('.edit-message').click();
+  await userMessage.locator('.edit-textarea').fill('Updated during stream');
+  await userMessage.locator('.edit-send').click();
+
+  await expect(userMessage.locator('.content')).toContainText('Updated during stream');
+  await expect(page.locator('.assistant-message .content').last()).toContainText('Reply after edit');
+});
+
 test('second user message aligns directly below top bar after short assistant reply', async ({ page }) => {
   ensureManagedTestUser();
 

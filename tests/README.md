@@ -8,7 +8,17 @@ Run tests from the project root.
 uv venv
 source .venv/bin/activate
 uv pip install -e .
+npm install
+npx playwright install
 chat-client init-system
+```
+
+## All Test Types
+
+Run everything from the project root:
+
+```bash
+./run-all-tests.sh
 ```
 
 ## Backend
@@ -21,14 +31,15 @@ python tests/test_starlette_comprehensive.py
 python tests/run_all_tests.py
 ```
 
-## E2E
+## JavaScript Helpers
 
-Install Node and Playwright dependencies first:
+Pure JavaScript helper tests run with Node's built-in test runner:
 
 ```bash
-npm install
-npx playwright install
+npm run test:js
 ```
+
+## E2E
 
 Managed mode starts its own server and bootstraps its own test user:
 
