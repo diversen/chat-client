@@ -15,8 +15,9 @@
             <input type="date" name="end_date" value="{{ end_date or '' }}" />
         </label>
         <div class="usage-filter-actions">
-            <button type="submit">Apply</button>
-            <a href="/user/usage">Total</a>
+            <button class="usage-filter-button" type="submit">Apply</button>
+            <button class="usage-filter-button usage-filter-button-secondary" type="button"
+                onclick="window.location.href='/user/usage'">Total</button>
         </div>
     </form>
 
@@ -71,8 +72,8 @@
     }
 
     .usage-filters {
-        display: flex;
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(180px, 240px)) auto;
         align-items: end;
         gap: 12px;
         margin-bottom: 18px;
@@ -88,13 +89,53 @@
     }
 
     .usage-filter-field input {
+        width: 100%;
         min-height: 38px;
+        box-sizing: border-box;
     }
 
     .usage-filter-actions {
-        display: flex;
-        align-items: center;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(110px, 1fr));
         gap: 12px;
+        align-self: end;
+        padding-bottom: 8px;
+    }
+
+    .usage-filter-button {
+        min-height: 38px;
+        padding: 0 18px;
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        background: var(--button-base);
+        color: var(--text-bright);
+        font: inherit;
+        cursor: pointer;
+        transition: background-color 120ms ease, border-color 120ms ease;
+    }
+
+    .usage-filter-button:hover {
+        background: var(--button-hover);
+    }
+
+    .usage-filter-button-secondary {
+        background: transparent;
+        color: var(--links);
+    }
+
+    .usage-filter-button-secondary:hover {
+        border-color: var(--links);
+        background: color-mix(in srgb, var(--links) 10%, transparent);
+    }
+
+    @media (max-width: 720px) {
+        .usage-filters {
+            grid-template-columns: 1fr;
+        }
+
+        .usage-filter-actions {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
     }
 
     .usage-summary-grid {
