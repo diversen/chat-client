@@ -5,6 +5,21 @@
         <h3>Usage</h3>
     </div>
 
+    <form class="usage-filters" method="get" action="/user/usage">
+        <label class="usage-filter-field">
+            <span>From</span>
+            <input type="date" name="start_date" value="{{ start_date or '' }}" />
+        </label>
+        <label class="usage-filter-field">
+            <span>To</span>
+            <input type="date" name="end_date" value="{{ end_date or '' }}" />
+        </label>
+        <div class="usage-filter-actions">
+            <button type="submit">Apply</button>
+            <a href="/user/usage">Total</a>
+        </div>
+    </form>
+
     <section class="usage-summary-grid">
         <article class="usage-card">
             <div class="usage-card-label">Total cost</div>
@@ -53,6 +68,33 @@
 
     .usage-page {
         padding-bottom: 0;
+    }
+
+    .usage-filters {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: end;
+        gap: 12px;
+        margin-bottom: 18px;
+    }
+
+    .usage-filter-field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        min-width: 160px;
+        color: var(--text-muted);
+        font-size: 0.92rem;
+    }
+
+    .usage-filter-field input {
+        min-height: 38px;
+    }
+
+    .usage-filter-actions {
+        display: flex;
+        align-items: center;
+        gap: 12px;
     }
 
     .usage-summary-grid {
@@ -244,6 +286,23 @@
         let isLoadingDialogs = false;
         let hasMoreDialogs = true;
 
+        function buildUsageQueryString(page) {
+            const params = new URLSearchParams();
+            if (page) {
+                params.set('page', String(page));
+            }
+
+            const startDateInput = document.querySelector('input[name="start_date"]');
+            const endDateInput = document.querySelector('input[name="end_date"]');
+            if (startDateInput instanceof HTMLInputElement && startDateInput.value) {
+                params.set('start_date', startDateInput.value);
+            }
+            if (endDateInput instanceof HTMLInputElement && endDateInput.value) {
+                params.set('end_date', endDateInput.value);
+            }
+            return params.toString();
+        }
+
         function escapeHtml(value) {
             return String(value)
                 .replaceAll('&', '&amp;')
@@ -361,7 +420,9 @@
             }
 
             try {
-                const payload = await Requests.asyncGetJson(`/api/chat/dialogs/${encodeURIComponent(dialogId)}/usage`);
+                const queryString = buildUsageQueryString();
+                const path = `/api/chat/dialogs/${encodeURIComponent(dialogId)}/usage${queryString ? `?${queryString}` : ''}`;
+                const payload = await Requests.asyncGetJson(path);
                 contentElement.innerHTML = formatTurnRows(payload.turns);
                 contentElement.hidden = false;
                 detailsElement.dataset.loaded = 'true';
@@ -416,7 +477,8 @@
             loadMoreButton.disabled = true;
 
             try {
-                const payload = await Requests.asyncGetJson(`/api/user/usage?page=${page}`);
+                const queryString = buildUsageQueryString(page);
+                const payload = await Requests.asyncGetJson(`/api/user/usage?${queryString}`);
                 const dialogsInfo = payload.dialogs_info || {};
                 const dialogs = Array.isArray(dialogsInfo.dialogs) ? dialogsInfo.dialogs : [];
                 if (dialogs.length === 0 && currentPage === 1) {

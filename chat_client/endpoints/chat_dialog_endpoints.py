@@ -4,6 +4,8 @@ import logging
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
+from chat_client.core.usage_filters import parse_usage_date_range
+
 MAX_DIALOG_ATTACHMENTS = 10
 
 
@@ -317,12 +319,35 @@ async def get_dialog_usage(
         dialog_id = str(request.path_params.get("dialog_id", "")).strip()
         if not dialog_id:
             raise exceptions_validation.UserValidate("Dialog id is required")
-        events = await chat_repository.list_dialog_usage_events(user_id, dialog_id)
+        date_range = parse_usage_date_range(request.query_params)
+        events = await chat_repository.list_dialog_usage_events(
+            user_id,
+            dialog_id,
+            start_datetime=date_range.start_datetime,
+            end_datetime_exclusive=date_range.end_datetime_exclusive,
+        )
         if not events:
             raise exceptions_validation.UserValidate("Dialog usage not found or not owned by user")
-        totals = await chat_repository.get_dialog_usage_totals(user_id, dialog_id)
-        turns = await chat_repository.get_dialog_usage_by_turn(user_id, dialog_id)
-        return json_success(dialog_id=dialog_id, totals=totals, turns=turns, events=events)
+        totals = await chat_repository.get_dialog_usage_totals(
+            user_id,
+            dialog_id,
+            start_datetime=date_range.start_datetime,
+            end_datetime_exclusive=date_range.end_datetime_exclusive,
+        )
+        turns = await chat_repository.get_dialog_usage_by_turn(
+            user_id,
+            dialog_id,
+            start_datetime=date_range.start_datetime,
+            end_datetime_exclusive=date_range.end_datetime_exclusive,
+        )
+        return json_success(
+            dialog_id=dialog_id,
+            totals=totals,
+            turns=turns,
+            events=events,
+            start_date=date_range.start_date,
+            end_date=date_range.end_date,
+        )
     except exceptions_validation.JSONError:
         raise
     except exceptions_validation.UserValidate as e:

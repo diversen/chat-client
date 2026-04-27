@@ -2,6 +2,7 @@
 Tests for chat endpoints (chat page, streaming, models, dialogs, messages)
 """
 
+from datetime import datetime
 from pathlib import Path
 import pytest
 from unittest.mock import patch
@@ -1659,6 +1660,12 @@ class TestChatEndpoints(BaseTestCase):
         assert data["totals"]["cached_input_tokens"] == 1000
         assert data["turns"][0]["turn_id"] == "turn-server-1"
         assert data["events"][0]["request_id"] == "cmpl-1"
+        mock_list_events.assert_called_once_with(
+            1,
+            "test-dialog",
+            start_datetime=None,
+            end_datetime_exclusive=None,
+        )
 
     @patch("chat_client.repositories.chat_repository.list_dialog_usage_events")
     @patch("chat_client.repositories.chat_repository.get_dialog_usage_by_turn")
@@ -1726,6 +1733,44 @@ class TestChatEndpoints(BaseTestCase):
         assert data["dialog_id"] == "deleted-dialog"
         assert data["events"][0]["dialog_title"] == "Deleted dialog"
 
+    @patch("chat_client.repositories.chat_repository.list_dialog_usage_events")
+    @patch("chat_client.repositories.chat_repository.get_dialog_usage_by_turn")
+    @patch("chat_client.repositories.chat_repository.get_dialog_usage_totals")
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_get_dialog_usage_with_date_range(
+        self,
+        mock_logged_in,
+        mock_get_totals,
+        mock_get_turns,
+        mock_list_events,
+    ):
+        mock_logged_in.return_value = 1
+        mock_get_totals.return_value = {"request_count": 1, "input_tokens": 1, "cached_input_tokens": 0, "output_tokens": 1, "total_tokens": 2, "reasoning_tokens": 0, "currency": "USD", "cost_amount": "0.1"}
+        mock_get_turns.return_value = [{"turn_id": "turn-1", "models": ["gpt-5"], "request_count": 1, "input_tokens": 1, "cached_input_tokens": 0, "output_tokens": 1, "total_tokens": 2, "reasoning_tokens": 0, "currency": "USD", "cost_amount": "0.1", "first_created": "2026-01-03T00:00:00"}]
+        mock_list_events.return_value = [{"turn_id": "turn-1", "dialog_title": "Dialog", "round_index": 0, "provider": "openai", "model": "gpt-5", "call_type": "chat", "request_id": "cmpl-1", "input_tokens": 1, "cached_input_tokens": 0, "output_tokens": 1, "total_tokens": 2, "reasoning_tokens": 0, "currency": "USD", "cost_amount": "0.1", "usage_source": "provider", "created": "2026-01-03T00:00:00"}]
+
+        response = self.client.get("/api/chat/dialogs/test-dialog/usage?start_date=2026-01-03&end_date=2026-01-05")
+
+        assert response.status_code == 200
+        mock_list_events.assert_called_once_with(
+            1,
+            "test-dialog",
+            start_datetime=datetime(2026, 1, 3, 0, 0, 0),
+            end_datetime_exclusive=datetime(2026, 1, 6, 0, 0, 0),
+        )
+        mock_get_totals.assert_called_once_with(
+            1,
+            "test-dialog",
+            start_datetime=datetime(2026, 1, 3, 0, 0, 0),
+            end_datetime_exclusive=datetime(2026, 1, 6, 0, 0, 0),
+        )
+        mock_get_turns.assert_called_once_with(
+            1,
+            "test-dialog",
+            start_datetime=datetime(2026, 1, 3, 0, 0, 0),
+            end_datetime_exclusive=datetime(2026, 1, 6, 0, 0, 0),
+        )
+
     @patch("chat_client.core.user_session.is_logged_in")
     def test_get_user_usage_not_authenticated(self, mock_logged_in):
         mock_logged_in.return_value = False
@@ -1779,7 +1824,40 @@ class TestChatEndpoints(BaseTestCase):
         assert data["totals"]["cost_amount"] == "0.00151250"
         assert data["dialogs_info"]["dialogs"][0]["dialog_id"] == "dialog-1"
         assert data["dialogs"][0]["dialog_id"] == "dialog-1"
-        mock_get_usage_info.assert_called_once_with(1, current_page=1)
+        mock_get_totals.assert_called_once_with(1, start_datetime=None, end_datetime_exclusive=None)
+        mock_get_usage_info.assert_called_once_with(1, current_page=1, start_datetime=None, end_datetime_exclusive=None)
+
+    @patch("chat_client.repositories.chat_repository.get_user_usage_by_dialog_info")
+    @patch("chat_client.repositories.chat_repository.get_user_usage_totals")
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_get_user_usage_authenticated_with_date_range(self, mock_logged_in, mock_get_totals, mock_get_usage_info):
+        mock_logged_in.return_value = 1
+        mock_get_totals.return_value = {
+            "request_count": 1,
+            "input_tokens": 100,
+            "cached_input_tokens": 0,
+            "output_tokens": 20,
+            "total_tokens": 120,
+            "reasoning_tokens": 0,
+            "currency": "USD",
+            "cost_amount": "0.0001",
+        }
+        mock_get_usage_info.return_value = {"dialogs": [], "has_next": False}
+
+        response = self.client.get("/api/user/usage?start_date=2026-01-02&end_date=2026-01-04")
+
+        assert response.status_code == 200
+        mock_get_totals.assert_called_once_with(
+            1,
+            start_datetime=datetime(2026, 1, 2, 0, 0, 0),
+            end_datetime_exclusive=datetime(2026, 1, 5, 0, 0, 0),
+        )
+        mock_get_usage_info.assert_called_once_with(
+            1,
+            current_page=1,
+            start_datetime=datetime(2026, 1, 2, 0, 0, 0),
+            end_datetime_exclusive=datetime(2026, 1, 5, 0, 0, 0),
+        )
 
     @patch("chat_client.repositories.chat_repository.get_user_usage_totals")
     @patch("chat_client.core.user_session.is_logged_in")
@@ -1804,6 +1882,34 @@ class TestChatEndpoints(BaseTestCase):
         assert "Usage by dialog" in response.text
         assert "load-more-usage-dialogs" in response.text
         assert "usage-dialogs-container" in response.text
+        assert 'type="date"' in response.text
+        mock_get_totals.assert_called_once_with(1, start_datetime=None, end_datetime_exclusive=None)
+
+    @patch("chat_client.repositories.chat_repository.get_user_usage_totals")
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_usage_page_authenticated_with_date_range(self, mock_logged_in, mock_get_totals):
+        mock_logged_in.return_value = 1
+        mock_get_totals.return_value = {
+            "request_count": 1,
+            "input_tokens": 100,
+            "cached_input_tokens": 0,
+            "output_tokens": 20,
+            "total_tokens": 120,
+            "reasoning_tokens": 0,
+            "currency": "USD",
+            "cost_amount": "0.0001",
+        }
+
+        response = self.client.get("/user/usage?start_date=2026-01-02&end_date=2026-01-04")
+
+        assert response.status_code == 200
+        assert 'value="2026-01-02"' in response.text
+        assert 'value="2026-01-04"' in response.text
+        mock_get_totals.assert_called_once_with(
+            1,
+            start_datetime=datetime(2026, 1, 2, 0, 0, 0),
+            end_datetime_exclusive=datetime(2026, 1, 5, 0, 0, 0),
+        )
 
     @patch("chat_client.core.user_session.is_logged_in")
     def test_get_user_usage_invalid_page(self, mock_logged_in):
@@ -1815,6 +1921,17 @@ class TestChatEndpoints(BaseTestCase):
         data = response.json()
         assert data["error"] is True
         assert "Invalid page parameter" in data["message"]
+
+    @patch("chat_client.core.user_session.is_logged_in")
+    def test_get_user_usage_invalid_date(self, mock_logged_in):
+        mock_logged_in.return_value = 1
+
+        response = self.client.get("/api/user/usage?start_date=bad-date")
+
+        assert response.status_code == 400
+        data = response.json()
+        assert data["error"] is True
+        assert "Invalid start_date parameter" in data["message"]
 
     @patch("chat_client.core.user_session.is_logged_in")
     def test_update_message_not_authenticated(self, mock_logged_in):

@@ -6,6 +6,7 @@ from starlette.responses import RedirectResponse
 from chat_client.core import exceptions_validation
 from chat_client.core.http import get_user_id_or_redirect, json_error_from_exception, json_success, require_user_id_json
 from chat_client.core.templates import get_templates, render_template
+from chat_client.core.usage_filters import parse_usage_date_range
 from chat_client.repositories import chat_repository
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -18,7 +19,12 @@ async def usage_page(request: Request):
         return user_id_or_response
     user_id = user_id_or_response
 
-    totals = await chat_repository.get_user_usage_totals(user_id)
+    date_range = parse_usage_date_range(request.query_params)
+    totals = await chat_repository.get_user_usage_totals(
+        user_id,
+        start_datetime=date_range.start_datetime,
+        end_datetime_exclusive=date_range.end_datetime_exclusive,
+    )
     return await render_template(
         templates,
         request,
@@ -26,6 +32,8 @@ async def usage_page(request: Request):
         {
             "title": "Usage",
             "usage_totals": totals,
+            "start_date": date_range.start_date,
+            "end_date": date_range.end_date,
         },
     )
 
@@ -44,8 +52,24 @@ async def get_usage(request: Request):
             raise exceptions_validation.JSONError("Invalid page parameter", status_code=400)
         if current_page < 1:
             raise exceptions_validation.JSONError("Invalid page parameter", status_code=400)
-        totals = await chat_repository.get_user_usage_totals(user_id)
-        dialogs_info = await chat_repository.get_user_usage_by_dialog_info(user_id, current_page=current_page)
-        return json_success(totals=totals, dialogs_info=dialogs_info, dialogs=dialogs_info["dialogs"])
+        date_range = parse_usage_date_range(request.query_params)
+        totals = await chat_repository.get_user_usage_totals(
+            user_id,
+            start_datetime=date_range.start_datetime,
+            end_datetime_exclusive=date_range.end_datetime_exclusive,
+        )
+        dialogs_info = await chat_repository.get_user_usage_by_dialog_info(
+            user_id,
+            current_page=current_page,
+            start_datetime=date_range.start_datetime,
+            end_datetime_exclusive=date_range.end_datetime_exclusive,
+        )
+        return json_success(
+            totals=totals,
+            dialogs_info=dialogs_info,
+            dialogs=dialogs_info["dialogs"],
+            start_date=date_range.start_date,
+            end_date=date_range.end_date,
+        )
     except exceptions_validation.JSONError as error:
         return json_error_from_exception(error)

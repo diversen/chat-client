@@ -21,6 +21,7 @@ import uuid
 import logging
 import json
 from decimal import Decimal
+from datetime import datetime
 from sqlalchemy import select, func, update, delete, exists, or_
 
 logger: logging.Logger = logging.getLogger(__name__)
@@ -487,12 +488,42 @@ async def create_llm_usage_event(
         await session.commit()
 
 
-async def get_dialog_usage_totals(user_id: int, dialog_id: str) -> dict[str, str | int]:
+def _build_usage_event_filters(
+    user_id: int,
+    *,
+    dialog_id: str | None = None,
+    start_datetime: datetime | None = None,
+    end_datetime_exclusive: datetime | None = None,
+) -> list:
+    filters = [LlmUsageEvent.user_id == user_id]
+    if dialog_id is not None:
+        filters.append(LlmUsageEvent.dialog_id == dialog_id)
+    if start_datetime is not None:
+        filters.append(LlmUsageEvent.created >= start_datetime)
+    if end_datetime_exclusive is not None:
+        filters.append(LlmUsageEvent.created < end_datetime_exclusive)
+    return filters
+
+
+async def get_dialog_usage_totals(
+    user_id: int,
+    dialog_id: str,
+    *,
+    start_datetime: datetime | None = None,
+    end_datetime_exclusive: datetime | None = None,
+) -> dict[str, str | int]:
     async with async_session() as session:
         rows = (
             (
                 await session.execute(
-                    select(LlmUsageEvent).where(LlmUsageEvent.user_id == user_id, LlmUsageEvent.dialog_id == dialog_id)
+                    select(LlmUsageEvent).where(
+                        *_build_usage_event_filters(
+                            user_id,
+                            dialog_id=dialog_id,
+                            start_datetime=start_datetime,
+                            end_datetime_exclusive=end_datetime_exclusive,
+                        )
+                    )
                 )
             )
             .scalars()
@@ -545,13 +576,26 @@ async def get_dialog_usage_totals(user_id: int, dialog_id: str) -> dict[str, str
     }
 
 
-async def list_dialog_usage_events(user_id: int, dialog_id: str) -> list[dict[str, str | int]]:
+async def list_dialog_usage_events(
+    user_id: int,
+    dialog_id: str,
+    *,
+    start_datetime: datetime | None = None,
+    end_datetime_exclusive: datetime | None = None,
+) -> list[dict[str, str | int]]:
     async with async_session() as session:
         rows = (
             (
                 await session.execute(
                     select(LlmUsageEvent)
-                    .where(LlmUsageEvent.user_id == user_id, LlmUsageEvent.dialog_id == dialog_id)
+                    .where(
+                        *_build_usage_event_filters(
+                            user_id,
+                            dialog_id=dialog_id,
+                            start_datetime=start_datetime,
+                            end_datetime_exclusive=end_datetime_exclusive,
+                        )
+                    )
                     .order_by(LlmUsageEvent.created.asc(), LlmUsageEvent.llm_usage_event_id.asc())
                 )
             )
@@ -602,8 +646,19 @@ async def list_dialog_usage_events(user_id: int, dialog_id: str) -> list[dict[st
     return events
 
 
-async def get_dialog_usage_by_turn(user_id: int, dialog_id: str) -> list[dict[str, str | int]]:
-    events = await list_dialog_usage_events(user_id, dialog_id)
+async def get_dialog_usage_by_turn(
+    user_id: int,
+    dialog_id: str,
+    *,
+    start_datetime: datetime | None = None,
+    end_datetime_exclusive: datetime | None = None,
+) -> list[dict[str, str | int]]:
+    events = await list_dialog_usage_events(
+        user_id,
+        dialog_id,
+        start_datetime=start_datetime,
+        end_datetime_exclusive=end_datetime_exclusive,
+    )
     turns_by_id: dict[str, dict[str, str | int]] = {}
     turn_order: list[str] = []
 
@@ -649,12 +704,25 @@ async def get_dialog_usage_by_turn(user_id: int, dialog_id: str) -> list[dict[st
     return [turns_by_id[turn_id] for turn_id in turn_order]
 
 
-async def get_user_usage_totals(user_id: int) -> dict[str, str | int]:
+async def get_user_usage_totals(
+    user_id: int,
+    *,
+    start_datetime: datetime | None = None,
+    end_datetime_exclusive: datetime | None = None,
+) -> dict[str, str | int]:
     async with async_session() as session:
         rows = (
             (
                 await session.execute(
-                    select(LlmUsageEvent).where(LlmUsageEvent.user_id == user_id).order_by(LlmUsageEvent.created.asc())
+                    select(LlmUsageEvent)
+                    .where(
+                        *_build_usage_event_filters(
+                            user_id,
+                            start_datetime=start_datetime,
+                            end_datetime_exclusive=end_datetime_exclusive,
+                        )
+                    )
+                    .order_by(LlmUsageEvent.created.asc())
                 )
             )
             .scalars()
@@ -707,13 +775,24 @@ async def get_user_usage_totals(user_id: int) -> dict[str, str | int]:
     }
 
 
-async def list_user_usage_by_dialog(user_id: int) -> list[dict[str, str | int]]:
+async def list_user_usage_by_dialog(
+    user_id: int,
+    *,
+    start_datetime: datetime | None = None,
+    end_datetime_exclusive: datetime | None = None,
+) -> list[dict[str, str | int]]:
     async with async_session() as session:
         usage_rows = (
             (
                 await session.execute(
                     select(LlmUsageEvent)
-                    .where(LlmUsageEvent.user_id == user_id)
+                    .where(
+                        *_build_usage_event_filters(
+                            user_id,
+                            start_datetime=start_datetime,
+                            end_datetime_exclusive=end_datetime_exclusive,
+                        )
+                    )
                     .order_by(LlmUsageEvent.created.asc(), LlmUsageEvent.llm_usage_event_id.asc())
                 )
             )
@@ -777,8 +856,18 @@ async def list_user_usage_by_dialog(user_id: int) -> list[dict[str, str | int]]:
     return ordered_dialogs
 
 
-async def get_user_usage_by_dialog_info(user_id: int, current_page: int = 1) -> dict[str, list[dict[str, str | int]] | bool]:
-    dialogs = await list_user_usage_by_dialog(user_id)
+async def get_user_usage_by_dialog_info(
+    user_id: int,
+    current_page: int = 1,
+    *,
+    start_datetime: datetime | None = None,
+    end_datetime_exclusive: datetime | None = None,
+) -> dict[str, list[dict[str, str | int]] | bool]:
+    dialogs = await list_user_usage_by_dialog(
+        user_id,
+        start_datetime=start_datetime,
+        end_datetime_exclusive=end_datetime_exclusive,
+    )
     dialogs_per_page = _dialogs_per_page()
     start_index = max(current_page - 1, 0) * dialogs_per_page
     end_index = start_index + dialogs_per_page
