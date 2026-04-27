@@ -20,6 +20,12 @@ function ensureManagedTestUser(): void {
   );
 }
 
+async function sendChatMessage(page: Parameters<typeof login>[0], message: string): Promise<void> {
+  await page.fill('#message', message);
+  await expect(page.locator('#send')).toBeEnabled();
+  await page.click('#send');
+}
+
 test('send a message and render assistant response', async ({ page }) => {
   await page.route('**/chat', async (route) => {
     const sseBody = [
@@ -37,8 +43,7 @@ test('send a message and render assistant response', async ({ page }) => {
 
   await login(page);
 
-  await page.fill('#message', 'Hello from Playwright');
-  await page.click('#send');
+  await sendChatMessage(page, 'Hello from Playwright');
 
   await expect(page.locator('.user-message .content').last()).toContainText('Hello from Playwright');
   await expect(page.locator('.assistant-message .content').last()).toContainText('Playwright test response');
@@ -85,8 +90,7 @@ test('copy message uses edited user message content', async ({ page }) => {
 
   await login(page);
 
-  await page.fill('#message', 'Original message');
-  await page.click('#send');
+  await sendChatMessage(page, 'Original message');
   await expect(page.locator('.user-message .content').last()).toContainText('Original message');
 
   const userMessage = page.locator('.user-message').last();
@@ -125,12 +129,10 @@ test('second user message aligns directly below top bar after short assistant re
 
   await login(page);
 
-  await page.fill('#message', 'First message');
-  await page.click('#send');
+  await sendChatMessage(page, 'First message');
   await expect(page.locator('.assistant-message .content').last()).toContainText('ok');
 
-  await page.fill('#message', 'Second message');
-  await page.click('#send');
+  await sendChatMessage(page, 'Second message');
 
   const secondUserMessage = page.locator('.user-message').nth(1);
   await expect(secondUserMessage.locator('.content')).toContainText('Second message');
@@ -182,8 +184,7 @@ test('renders valid KaTeX, preserves prose dollars, and highlights invalid expre
 
   await login(page);
 
-  await page.fill('#message', 'Test KaTeX rendering');
-  await page.click('#send');
+  await sendChatMessage(page, 'Test KaTeX rendering');
 
   const assistantContent = page.locator('.assistant-message .content').last();
   await expect(assistantContent).toContainText('Valid display math:');
@@ -221,12 +222,11 @@ test('scroll-to-bottom hides after reaching the bottom', async ({ page }) => {
 
   await login(page);
 
-  await page.fill('#message', 'Generate a long reply');
-  await page.click('#send');
+  await sendChatMessage(page, 'Generate a long reply');
   await expect(page.locator('.assistant-message .content').last()).toContainText('Line 100');
+  await expect(page.locator('#abort')).toBeDisabled();
 
-  await page.fill('#message', 'follow-up');
-  await page.click('#send');
+  await sendChatMessage(page, 'follow-up');
   await expect(page.locator('.assistant-message .content').last()).toContainText('follow-up');
 
   await page.evaluate(() => {

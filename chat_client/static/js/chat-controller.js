@@ -621,6 +621,12 @@ class ConversationController {
 
             await this.view.scrollMessageToTop(userContainer);
 
+            // Release submit state before the assistant stream starts so the
+            // composer can re-enable as soon as streaming finishes, even if
+            // post-stream persistence/render cleanup is still running.
+            this.isSubmitting = false;
+            this.updateSendButtonState();
+
             await this.renderAssistantMessage({
                 shouldGenerateTitle: createdNewDialog && Boolean(userMessage),
                 model: this.modelSelection.getSelectedModel(),
