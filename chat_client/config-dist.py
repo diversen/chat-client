@@ -30,9 +30,6 @@ RELOAD = True
 DATA_DIR = "data"
 DATABASE = Path(DATA_DIR) / "database.db"
 
-# Number of dialogs shown per page in dialogs and usage listings.
-DIALOGS_PER_PAGE = 20
-
 # Used when sending emails
 HOSTNAME_WITH_SCHEME = "https://home.10kilobyte.com"
 SITE_NAME = "home.10kilobyte.com"
@@ -93,31 +90,16 @@ PROVIDERS = {
         "base_url": "http://localhost:11434/v1",
         "api_key": "ollama",
     },
+    "llama": {
+        "base_url": "http://localhost:8080/v1",
+        "api_key": "llama",
+    }
 }
 
+# Ollama models are discovered automatically and this can be left empty.
 MODELS: dict[str, str] = {
-    # "gpt-5.4-nano": "openai",
     # "gpt-5.4-mini": "openai",
-    # "gemma-3-27b-it": "gemini",
-}
-
-# Optional pricing table used for exact cost calculations stored alongside usage events.
-# Rates are per 1M tokens and should match your provider's published pricing at the time of use.
-MODEL_PRICING = {
-    "openai": {
-        "gpt-5.4-mini": {
-            "input_per_million": "0.75",
-            "cached_input_per_million": "0.075",
-            "output_per_million": "4.50",
-            "currency": "USD",
-        },
-        "gpt-5.4-nano": {
-            "input_per_million": "0.20",
-            "cached_input_per_million": "0.02",
-            "output_per_million": "1.25",
-            "currency": "USD",
-        },
-    },
+    # "default": "llama", # Default provider for models not explicitly listed.
 }
 
 # Enable vision models (models that can process both text and images)
@@ -128,40 +110,34 @@ VISION_MODELS: list[str] = []
 # Their custom prompts will instead be injected as the first user message.
 SYSTEM_MESSAGE_DENYLIST: list[str] = []
 
-# Optional local tool registry (preferred over MCP when configured).
+# Tool registry
 # Functions must be callables that accept keyword arguments.
 TOOL_REGISTRY: dict[str, Any] = {
     "python_tool": python_hardened_tool,
 }
 
-# Optional explicit local tool definitions in MCP-style schema.
-# `name` must exist in TOOL_REGISTRY.
-LOCAL_TOOL_DEFINITIONS = [
-    {
-        "name": "python_tool",
-        "description": (
-            'Run Python code in a sandboxed container. '
-            'Use this tool only with a JSON object of the form {"code": "..."} where '
-            'the code value is a single Python script string. Call the tool name exactly '
-            'as "python_tool". Print out the final result on the last line like this `print(result)`'
-        ),
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string",
-                    "description": "Python code to execute.",
-                }
-            },
-            "required": ["code"],
-            "additionalProperties": False,
-        },
-        "execution": {
-            "mount_workspace": True,
-        },
-    },
+# Models that should receive tool definitions.
+# Ollama tool models are discovered automatically.
+TOOL_MODELS: list[str] = [
+    # "gpt-5.4-mini": "openai",
+    # "default": "llama", # Default provider for models not explicitly listed.
 ]
 
-# Models that should receive tool definitions (local + MCP).
-# Ollama tool models are discovered automatically.
-TOOL_MODELS: list[str] = []
+# Optional pricing table used for exact cost calculations stored alongside usage events.
+# Rates are per 1M tokens and should match your provider's published pricing at the time of use.
+# MODEL_PRICING = {
+#     "openai": {
+#         "gpt-5.4-mini": {
+#             "input_per_million": "0.75",
+#             "cached_input_per_million": "0.075",
+#             "output_per_million": "4.50",
+#             "currency": "USD",
+#         },
+#         "gpt-5.4-nano": {
+#             "input_per_million": "0.20",
+#             "cached_input_per_million": "0.02",
+#             "output_per_million": "1.25",
+#             "currency": "USD",
+#         },
+#     },
+# }
