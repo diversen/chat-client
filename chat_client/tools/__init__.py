@@ -1,6 +1,0 @@
-from chat_client.tools.registry import BUILTIN_LOCAL_TOOL_DEFINITIONS, BUILTIN_TOOL_REGISTRY
-
-__all__ = [
-    "BUILTIN_TOOL_REGISTRY",
-    "BUILTIN_LOCAL_TOOL_DEFINITIONS",
-]
