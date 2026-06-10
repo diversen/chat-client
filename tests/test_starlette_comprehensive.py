@@ -37,6 +37,7 @@ class TestStarletteBackend:
 
             # Test chat streaming with authentication
             with patch("chat_client.core.user_session.is_logged_in", return_value=1):
+
                 async def _fake_chat_stream_response(*_args, **_kwargs):
                     return Response("data: {}\n\n", media_type="text/event-stream")
 

@@ -355,11 +355,7 @@ def test_update_dialog_title_updates_existing_dialog():
             assert result["title"] == "Short summary"
 
             async with session_factory() as session:
-                row = (
-                    await session.execute(
-                        select(Dialog.title, Dialog.updated).where(Dialog.dialog_id == dialog_id)
-                    )
-                ).one()
+                row = (await session.execute(select(Dialog.title, Dialog.updated).where(Dialog.dialog_id == dialog_id))).one()
 
             assert row.title == "Short summary"
             assert str(row.updated) != "2020-01-01 00:00:00"
@@ -935,24 +931,8 @@ def test_delete_dialog_preserves_llm_usage_events():
             await chat_repository.delete_dialog(user_id, dialog_id)
 
             async with session_factory() as session:
-                usage_rows = (
-                    (
-                        await session.execute(
-                            select(LlmUsageEvent).where(LlmUsageEvent.dialog_id == dialog_id)
-                        )
-                    )
-                    .scalars()
-                    .all()
-                )
-                dialog_rows = (
-                    (
-                        await session.execute(
-                            select(Dialog).where(Dialog.dialog_id == dialog_id)
-                        )
-                    )
-                    .scalars()
-                    .all()
-                )
+                usage_rows = (await session.execute(select(LlmUsageEvent).where(LlmUsageEvent.dialog_id == dialog_id))).scalars().all()
+                dialog_rows = (await session.execute(select(Dialog).where(Dialog.dialog_id == dialog_id))).scalars().all()
 
             assert dialog_rows == []
             assert len(usage_rows) == 1

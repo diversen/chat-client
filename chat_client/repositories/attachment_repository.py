@@ -21,7 +21,7 @@ async def create_attachment(
     content_type: str,
     size_bytes: int,
     storage_path: str,
-):
+) -> int | None:
     async with async_session() as session:
         attachment = Attachment(
             user_id=user_id,

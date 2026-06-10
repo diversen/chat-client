@@ -76,9 +76,7 @@ def _normalize_cost_amount(
 
 async def _touch_dialog_in_session(session, user_id: int, dialog_id: str) -> None:
     await session.execute(
-        update(Dialog)
-        .where(Dialog.dialog_id == dialog_id, Dialog.user_id == user_id)
-        .values(updated=func.current_timestamp())
+        update(Dialog).where(Dialog.dialog_id == dialog_id, Dialog.user_id == user_id).values(updated=func.current_timestamp())
     )
 
 
@@ -174,10 +172,12 @@ async def create_message(
 
         for image in images or []:
             attachment_id = image.get("attachment_id")
-            try:
-                normalized_attachment_id = int(attachment_id)
-            except (TypeError, ValueError):
-                normalized_attachment_id = 0
+            normalized_attachment_id = 0
+            if isinstance(attachment_id, (str, int)):
+                try:
+                    normalized_attachment_id = int(attachment_id)
+                except (TypeError, ValueError):
+                    normalized_attachment_id = 0
 
             if normalized_attachment_id > 0:
                 attachment_stmt = select(Attachment).where(
@@ -284,7 +284,7 @@ async def get_messages(user_id: int, dialog_id: str):
         messages = result.scalars().all()
 
         message_ids = [m.message_id for m in messages if m.message_id is not None]
-        images_by_message: dict[int, list[dict[str, str]]] = {}
+        images_by_message: dict[int, list[dict[str, str | int]]] = {}
         attachments_by_message: dict[int, list[dict[str, str | int]]] = {}
         if message_ids:
             images_by_message = await image_repository.load_message_images(
@@ -456,9 +456,7 @@ async def create_llm_usage_event(
     async with async_session() as session:
         dialog_title = ""
         if dialog_id:
-            dialog_result = await session.execute(
-                select(Dialog.title).where(Dialog.dialog_id == dialog_id, Dialog.user_id == user_id)
-            )
+            dialog_result = await session.execute(select(Dialog.title).where(Dialog.dialog_id == dialog_id, Dialog.user_id == user_id))
             dialog_title = str(dialog_result.scalar_one_or_none() or "")
 
         event = LlmUsageEvent(
@@ -652,14 +650,14 @@ async def get_dialog_usage_by_turn(
     *,
     start_datetime: datetime | None = None,
     end_datetime_exclusive: datetime | None = None,
-) -> list[dict[str, str | int]]:
+) -> list[dict[str, str | int | list[str]]]:
     events = await list_dialog_usage_events(
         user_id,
         dialog_id,
         start_datetime=start_datetime,
         end_datetime_exclusive=end_datetime_exclusive,
     )
-    turns_by_id: dict[str, dict[str, str | int]] = {}
+    turns_by_id: dict[str, dict[str, str | int | list[str]]] = {}
     turn_order: list[str] = []
 
     for event in events:
@@ -685,15 +683,26 @@ async def get_dialog_usage_by_turn(
         turn = turns_by_id[turn_id]
         model_name = str(event.get("model", "") or "").strip()
         if model_name:
-            existing_models = [str(model) for model in turn.get("models", []) if str(model).strip()]
+            models_value = turn.get("models", [])
+            existing_models = [str(model) for model in models_value if str(model).strip()] if isinstance(models_value, list) else []
             if model_name not in existing_models:
                 turn["models"] = existing_models + [model_name]
-        turn["request_count"] = int(turn["request_count"]) + 1
-        turn["input_tokens"] = int(turn["input_tokens"]) + int(event.get("input_tokens", 0))
-        turn["cached_input_tokens"] = int(turn["cached_input_tokens"]) + int(event.get("cached_input_tokens", 0))
-        turn["output_tokens"] = int(turn["output_tokens"]) + int(event.get("output_tokens", 0))
-        turn["total_tokens"] = int(turn["total_tokens"]) + int(event.get("total_tokens", 0))
-        turn["reasoning_tokens"] = int(turn["reasoning_tokens"]) + int(event.get("reasoning_tokens", 0))
+        request_count = turn.get("request_count", 0)
+        input_tokens = turn.get("input_tokens", 0)
+        cached_input_tokens = turn.get("cached_input_tokens", 0)
+        output_tokens = turn.get("output_tokens", 0)
+        total_tokens = turn.get("total_tokens", 0)
+        reasoning_tokens = turn.get("reasoning_tokens", 0)
+        turn["request_count"] = int(request_count) + 1 if isinstance(request_count, (str, int)) else 1
+        turn["input_tokens"] = int(input_tokens) + int(event.get("input_tokens", 0)) if isinstance(input_tokens, (str, int)) else 0
+        turn["cached_input_tokens"] = (
+            int(cached_input_tokens) + int(event.get("cached_input_tokens", 0)) if isinstance(cached_input_tokens, (str, int)) else 0
+        )
+        turn["output_tokens"] = int(output_tokens) + int(event.get("output_tokens", 0)) if isinstance(output_tokens, (str, int)) else 0
+        turn["total_tokens"] = int(total_tokens) + int(event.get("total_tokens", 0)) if isinstance(total_tokens, (str, int)) else 0
+        turn["reasoning_tokens"] = (
+            int(reasoning_tokens) + int(event.get("reasoning_tokens", 0)) if isinstance(reasoning_tokens, (str, int)) else 0
+        )
         turn["currency"] = str(event.get("currency", "USD") or "USD")
         try:
             total_cost = Decimal(str(turn.get("cost_amount", "0"))) + Decimal(str(event.get("cost_amount", "0")))

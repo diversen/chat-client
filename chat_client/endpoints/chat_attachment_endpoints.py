@@ -37,15 +37,19 @@ async def upload_attachment(
         pending_attachment_ids = form.getlist("pending_attachment_ids")
         pending_image_count_raw = form.get("pending_image_count", 0)
         normalized_pending_attachment_ids: list[int] = []
-        for attachment_id in pending_attachment_ids:
+        for pending_attachment_id in pending_attachment_ids:
+            if not isinstance(pending_attachment_id, str):
+                continue
             try:
-                normalized_pending_attachment_ids.append(int(attachment_id))
+                normalized_pending_attachment_ids.append(int(pending_attachment_id))
             except (TypeError, ValueError):
                 continue
-        try:
-            pending_image_count = max(0, int(pending_image_count_raw))
-        except (TypeError, ValueError):
-            pending_image_count = 0
+        pending_image_count = 0
+        if isinstance(pending_image_count_raw, str):
+            try:
+                pending_image_count = max(0, int(pending_image_count_raw))
+            except (TypeError, ValueError):
+                pending_image_count = 0
 
         dialog_media_count = 0
         if dialog_id:
@@ -79,7 +83,7 @@ async def upload_attachment(
             content_type,
             size_bytes,
         )
-        attachment_id = await attachment_repository.create_attachment(
+        attachment_id: int | None = await attachment_repository.create_attachment(
             user_id=user_id,
             name=safe_name,
             content_type=normalized_content_type or content_type,

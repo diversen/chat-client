@@ -124,9 +124,7 @@ def test_summarize_last_user_message_for_log_truncates_long_text():
     )
 
     assert summary["last_user_message_full"].endswith("...[truncated]")
-    assert len(summary["last_user_message_full"]) == (
-        chat_service.GENERIC_LOG_TEXT_PREVIEW_LIMIT + len("...[truncated]")
-    )
+    assert len(summary["last_user_message_full"]) == (chat_service.GENERIC_LOG_TEXT_PREVIEW_LIMIT + len("...[truncated]"))
 
 
 class DummyRequest:

@@ -1798,9 +1798,51 @@ class TestChatEndpoints(BaseTestCase):
         mock_list_events,
     ):
         mock_logged_in.return_value = 1
-        mock_get_totals.return_value = {"request_count": 1, "input_tokens": 1, "cached_input_tokens": 0, "output_tokens": 1, "total_tokens": 2, "reasoning_tokens": 0, "currency": "USD", "cost_amount": "0.1"}
-        mock_get_turns.return_value = [{"turn_id": "turn-1", "models": ["gpt-5"], "request_count": 1, "input_tokens": 1, "cached_input_tokens": 0, "output_tokens": 1, "total_tokens": 2, "reasoning_tokens": 0, "currency": "USD", "cost_amount": "0.1", "first_created": "2026-01-03T00:00:00"}]
-        mock_list_events.return_value = [{"turn_id": "turn-1", "dialog_title": "Dialog", "round_index": 0, "provider": "openai", "model": "gpt-5", "call_type": "chat", "request_id": "cmpl-1", "input_tokens": 1, "cached_input_tokens": 0, "output_tokens": 1, "total_tokens": 2, "reasoning_tokens": 0, "currency": "USD", "cost_amount": "0.1", "usage_source": "provider", "created": "2026-01-03T00:00:00"}]
+        mock_get_totals.return_value = {
+            "request_count": 1,
+            "input_tokens": 1,
+            "cached_input_tokens": 0,
+            "output_tokens": 1,
+            "total_tokens": 2,
+            "reasoning_tokens": 0,
+            "currency": "USD",
+            "cost_amount": "0.1",
+        }
+        mock_get_turns.return_value = [
+            {
+                "turn_id": "turn-1",
+                "models": ["gpt-5"],
+                "request_count": 1,
+                "input_tokens": 1,
+                "cached_input_tokens": 0,
+                "output_tokens": 1,
+                "total_tokens": 2,
+                "reasoning_tokens": 0,
+                "currency": "USD",
+                "cost_amount": "0.1",
+                "first_created": "2026-01-03T00:00:00",
+            }
+        ]
+        mock_list_events.return_value = [
+            {
+                "turn_id": "turn-1",
+                "dialog_title": "Dialog",
+                "round_index": 0,
+                "provider": "openai",
+                "model": "gpt-5",
+                "call_type": "chat",
+                "request_id": "cmpl-1",
+                "input_tokens": 1,
+                "cached_input_tokens": 0,
+                "output_tokens": 1,
+                "total_tokens": 2,
+                "reasoning_tokens": 0,
+                "currency": "USD",
+                "cost_amount": "0.1",
+                "usage_source": "provider",
+                "created": "2026-01-03T00:00:00",
+            }
+        ]
 
         response = self.client.get("/api/chat/dialogs/test-dialog/usage?start_date=2026-01-03&end_date=2026-01-05")
 

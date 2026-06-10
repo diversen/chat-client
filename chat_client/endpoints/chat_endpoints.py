@@ -140,10 +140,7 @@ def _resolve_provider_name(model: str) -> str:
 
 
 def _build_model_providers() -> dict[str, str]:
-    return {
-        str(model_name): _resolve_provider_name(str(model_name))
-        for model_name in MODELS.keys()
-    }
+    return {str(model_name): _resolve_provider_name(str(model_name)) for model_name in MODELS.keys()}
 
 
 def _provider_supports_stream_usage(provider_name: str, provider_info: dict[str, Any]) -> bool:

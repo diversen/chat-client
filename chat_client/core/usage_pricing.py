@@ -164,9 +164,7 @@ def normalize_usage_payload(value: Any) -> dict[str, Any]:
     prompt_tokens_details = usage.get("prompt_tokens_details", {})
     completion_tokens_details = usage.get("completion_tokens_details", {})
     cached_tokens = _coerce_int(prompt_tokens_details.get("cached_tokens") if isinstance(prompt_tokens_details, dict) else 0)
-    reasoning_tokens = _coerce_int(
-        completion_tokens_details.get("reasoning_tokens") if isinstance(completion_tokens_details, dict) else 0
-    )
+    reasoning_tokens = _coerce_int(completion_tokens_details.get("reasoning_tokens") if isinstance(completion_tokens_details, dict) else 0)
 
     return {
         "request_id": str(value.get("id", "") or ""),

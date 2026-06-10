@@ -81,6 +81,38 @@ def list_local_tools(
     ]
 
 
+def build_startup_tool_summary(
+    *,
+    tool_registry: dict[str, Callable[..., Any]] | Any,
+    local_tool_definitions: list[dict[str, Any]] | Any,
+    mcp_server_url: str,
+    mcp_auth_token: str,
+    tool_models: list[str] | Any,
+) -> dict[str, Any]:
+    local_tools = [
+        {
+            "name": spec.name,
+            "description": spec.description,
+        }
+        for spec in get_local_tool_specs(
+            tool_registry=tool_registry,
+            local_tool_definitions=local_tool_definitions,
+        )
+        if spec.is_executable
+    ]
+    normalized_mcp_server_url = str(mcp_server_url or "").strip()
+    return {
+        "local_tool_count": len(local_tools),
+        "local_tools": local_tools,
+        "mcp": {
+            "enabled": bool(normalized_mcp_server_url),
+            "server_url": normalized_mcp_server_url,
+            "auth_configured": bool(str(mcp_auth_token or "").strip()),
+        },
+        "tool_models": tool_models if isinstance(tool_models, list) else [],
+    }
+
+
 def find_tool_definition(name: str, tools: list[dict[str, Any]]) -> dict[str, Any] | None:
     if not isinstance(name, str) or not name.strip():
         return None

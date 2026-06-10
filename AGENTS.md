@@ -29,6 +29,7 @@ chat-client init-system
 - Dev server: `chat-client server-dev`
 - Prod server: `chat-client server-prod`
 - Checks: `bin/check_code.sh`
+- Full test runner: `./run-all-tests.sh`
 - Backend tests: `python tests/run_all_tests.py`
 - Smoke test: `python tests/test_starlette_simple.py`
 
@@ -38,3 +39,5 @@ chat-client init-system
 - Do not commit secrets to `data/config.py`.
 - Do not edit migration history unless the task is explicitly about migrations.
 - If behavior changes, update tests in `tests/`.
+- Use the test commands documented in `README.md` and `tests/README.md`.
+- Do not use raw pytest invocations for the endpoint suite, such as `pytest tests/test_chat_endpoints.py` or the old selected pytest block from `bin/check_code.sh`; those can hang or behave differently from the project test runner. Use `python tests/run_all_tests.py` for backend coverage, or `./run-all-tests.sh` when JS/E2E coverage is needed.

@@ -154,7 +154,7 @@ def parse_image_attachment_ref(value: str) -> int | None:
     if not raw.startswith(IMAGE_ATTACHMENT_REF_PREFIX):
         return None
     try:
-        attachment_id = int(raw[len(IMAGE_ATTACHMENT_REF_PREFIX):])
+        attachment_id = int(raw[len(IMAGE_ATTACHMENT_REF_PREFIX) :])
     except (TypeError, ValueError):
         return None
     return attachment_id if attachment_id > 0 else None

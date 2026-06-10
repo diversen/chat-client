@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 from typing import Any
 from chat_client.tools.python_tool import python_hardened as python_hardened_tool
+from chat_client.tools.wikipedia_tool import get_wikipedia_pages_json, search_wikipedia
 
 
 # SMTP
@@ -93,7 +94,7 @@ PROVIDERS = {
     "llama": {
         "base_url": "http://localhost:8080/v1",
         "api_key": "llama",
-    }
+    },
 }
 
 # Ollama models are discovered automatically and this can be left empty.
@@ -114,6 +115,8 @@ SYSTEM_MESSAGE_DENYLIST: list[str] = []
 # Functions must be callables that accept keyword arguments.
 TOOL_REGISTRY: dict[str, Any] = {
     "python_tool": python_hardened_tool,
+    "get_wikipedia_pages_json": get_wikipedia_pages_json,
+    "search_wikipedia": search_wikipedia,
 }
 
 # Models that should receive tool definitions.

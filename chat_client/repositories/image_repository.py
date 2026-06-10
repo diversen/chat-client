@@ -22,10 +22,7 @@ async def load_message_images(
 
     raw_images: list[tuple[int, str]] = [(int(message_id), str(data_url or "")) for message_id, data_url in result.all()]
     attachment_ids = {
-        attachment_id
-        for _, data_url in raw_images
-        for attachment_id in [parse_image_attachment_ref(data_url)]
-        if attachment_id is not None
+        attachment_id for _, data_url in raw_images for attachment_id in [parse_image_attachment_ref(data_url)] if attachment_id is not None
     }
 
     attachments_by_id: dict[int, Attachment] = {}

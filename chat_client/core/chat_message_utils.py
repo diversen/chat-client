@@ -182,7 +182,7 @@ def normalize_generated_dialog_title(value: str) -> str:
     normalized = " ".join(normalized.split())
     if len(normalized) > TITLE_FALLBACK_MAX_LENGTH:
         truncated = normalized[:TITLE_FALLBACK_MAX_LENGTH].rstrip(" ,.;:-")
-        next_char = normalized[TITLE_FALLBACK_MAX_LENGTH:TITLE_FALLBACK_MAX_LENGTH + 1]
+        next_char = normalized[TITLE_FALLBACK_MAX_LENGTH : TITLE_FALLBACK_MAX_LENGTH + 1]
         if truncated and next_char and truncated[-1].isalnum() and next_char.isalnum():
             last_space_index = truncated.rfind(" ")
             if last_space_index > 0:

@@ -232,11 +232,14 @@ def test_supports_model_thinking_control_uses_built_capabilities():
             "context_length": 8192,
         },
     ):
-        assert model_capabilities.supports_model_thinking_control(
-            model_name="qwen3:latest",
-            models={"qwen3:latest": "ollama"},
-            vision_models=[],
-            tool_models=[],
-            system_message_denylist=[],
-            provider_info_resolver=lambda _model_name: {"base_url": "http://localhost:11434/v1", "api_key": "ollama"},
-        ) is True
+        assert (
+            model_capabilities.supports_model_thinking_control(
+                model_name="qwen3:latest",
+                models={"qwen3:latest": "ollama"},
+                vision_models=[],
+                tool_models=[],
+                system_message_denylist=[],
+                provider_info_resolver=lambda _model_name: {"base_url": "http://localhost:11434/v1", "api_key": "ollama"},
+            )
+            is True
+        )

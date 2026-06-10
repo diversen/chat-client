@@ -119,6 +119,8 @@ async def chat_response_stream(
                     if not isinstance(image, dict):
                         continue
                     attachment_id = image.get("attachment_id")
+                    if attachment_id is None:
+                        continue
                     try:
                         normalized_attachment_id = int(attachment_id)
                     except (TypeError, ValueError):
