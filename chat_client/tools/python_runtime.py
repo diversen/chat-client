@@ -75,8 +75,81 @@ def build_user_code_wrapper(code: str) -> str:
     return code
 
 
+def normalize_escaped_code_newlines(code: str) -> str:
+    """
+    Convert double-escaped line breaks emitted by tool callers into Python source
+    line breaks, while leaving string literals and comments unchanged.
+    """
+    if "\\n" not in code:
+        return code
+
+    result: list[str] = []
+    index = 0
+    quote = ""
+    triple_quoted = False
+    escaped = False
+    in_comment = False
+
+    while index < len(code):
+        char = code[index]
+
+        if in_comment:
+            result.append(char)
+            if char == "\n":
+                in_comment = False
+            index += 1
+            continue
+
+        if quote:
+            if triple_quoted and code.startswith(quote * 3, index):
+                result.append(quote * 3)
+                index += 3
+                quote = ""
+                triple_quoted = False
+                escaped = False
+                continue
+
+            result.append(char)
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif not triple_quoted and char == quote:
+                quote = ""
+            index += 1
+            continue
+
+        if char == "#":
+            in_comment = True
+            result.append(char)
+            index += 1
+            continue
+
+        if char in {"'", '"'}:
+            quote = char
+            triple_quoted = code.startswith(char * 3, index)
+            if triple_quoted:
+                result.append(char * 3)
+                index += 3
+            else:
+                result.append(char)
+                index += 1
+            escaped = False
+            continue
+
+        if char == "\\" and index + 1 < len(code) and code[index + 1] == "n":
+            result.append("\n")
+            index += 2
+            continue
+
+        result.append(char)
+        index += 1
+
+    return "".join(result)
+
+
 def build_runtime_script(code: str) -> str:
-    return f"{build_runtime_prelude()}\n\n{build_user_code_wrapper(code)}"
+    return f"{build_runtime_prelude()}\n\n{build_user_code_wrapper(normalize_escaped_code_newlines(code))}"
 
 
 def resolve_docker_image(docker_image: str | None) -> str:

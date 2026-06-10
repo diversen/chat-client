@@ -8,7 +8,12 @@ import pytest
 
 from chat_client.core.attachments import prepare_tool_attachment_mount
 from chat_client.tools.python_tool import NO_RESULT_ERROR, python_hardened, python_relaxed
-from chat_client.tools.python_runtime import PythonRuntimeError, build_user_code_wrapper
+from chat_client.tools.python_runtime import (
+    PythonRuntimeError,
+    build_runtime_script,
+    build_user_code_wrapper,
+    normalize_escaped_code_newlines,
+)
 
 
 def test_python_tool_evaluates_expression():
@@ -20,6 +25,21 @@ def test_python_tool_evaluates_expression():
 def test_user_code_wrapper_returns_code_unchanged():
     code = "x = 2\nx + 3"
     assert build_user_code_wrapper(code) == code
+
+
+def test_python_tool_normalizes_escaped_newlines_outside_strings_and_comments():
+    code = 'result = 1234 * 2345\\nprint(result)\\nprint("literal \\\\n stays")  # comment \\\\n stays'
+
+    assert normalize_escaped_code_newlines(code) == (
+        'result = 1234 * 2345\nprint(result)\nprint("literal \\\\n stays")  # comment \\\\n stays'
+    )
+
+
+def test_python_tool_runtime_script_accepts_double_escaped_model_code():
+    script = build_runtime_script("result = 1234 * 2345\\nprint(result)")
+
+    assert "result = 1234 * 2345\nprint(result)" in script
+    assert "result = 1234 * 2345\\nprint(result)" not in script
 
 
 def test_python_tool_allows_imports():

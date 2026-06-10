@@ -146,6 +146,24 @@ class TestChatEndpoints(BaseTestCase):
         assert tools[0]["function"]["description"] == "Get local time by locale"
         assert tools[0]["function"]["parameters"]["required"] == ["locale"]
 
+    def test_list_local_tools_infers_schema_for_registry_only_tools(self):
+        from chat_client.endpoints.chat_endpoints import _list_local_tools
+        from chat_client.tools.python_tool import python_hardened
+
+        with (
+            patch("chat_client.endpoints.chat_endpoints.TOOL_REGISTRY", {"python_tool": python_hardened}),
+            patch("chat_client.endpoints.chat_endpoints.LOCAL_TOOL_DEFINITIONS", []),
+        ):
+            tools = _list_local_tools()
+
+        assert len(tools) == 1
+        parameters = tools[0]["function"]["parameters"]
+        assert tools[0]["function"]["name"] == "python_tool"
+        assert parameters["properties"]["code"]["type"] == "string"
+        assert parameters["required"] == ["code"]
+        assert "attachment_host_dir" not in parameters["properties"]
+        assert "docker_image" not in parameters["properties"]
+
     def test_list_tools_merges_local_and_mcp_tools(self):
         from chat_client.endpoints.chat_endpoints import _list_tools
 
@@ -326,6 +344,23 @@ class TestChatEndpoints(BaseTestCase):
                 _execute_tool(tool_call)
 
         assert str(error.value) == 'Tool "python_hardened" was called with invalid JSON arguments.'
+
+    def test_execute_registry_only_tool_validates_missing_required_argument(self):
+        from chat_client.core import chat_service
+        from chat_client.endpoints.chat_endpoints import _execute_tool
+        from chat_client.tools.python_tool import python_hardened
+
+        tool_call = {"function": {"name": "python_tool", "arguments": "{}"}}
+
+        with (
+            patch("chat_client.endpoints.chat_endpoints.TOOL_REGISTRY", {"python_tool": python_hardened}),
+            patch("chat_client.endpoints.chat_endpoints.LOCAL_TOOL_DEFINITIONS", []),
+            patch("chat_client.endpoints.chat_endpoints.MCP_SERVER_URL", ""),
+        ):
+            with pytest.raises(chat_service.ToolArgumentsError) as error:
+                _execute_tool(tool_call)
+
+        assert str(error.value) == 'Tool "python_tool" requires argument "code".'
 
     def test_execute_tool_raises_for_invalid_argument_shape(self):
         from chat_client.core import chat_service
