@@ -9,7 +9,7 @@ uv venv
 source .venv/bin/activate
 uv pip install -e .
 npm install
-npx playwright install
+npx playwright install --with-deps chromium
 chat-client init-system
 ```
 

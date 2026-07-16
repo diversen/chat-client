@@ -65,7 +65,7 @@ E2E tests:
 
 ```bash
 npm install
-npx playwright install
+npx playwright install --with-deps chromium
 npm run e2e
 ```
 

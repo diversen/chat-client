@@ -8,7 +8,7 @@ Before running the Playwright tests, install the Node dependencies and browser b
 
 ```bash
 npm install
-npx playwright install
+npx playwright install --with-deps chromium
 ```
 
 If `npm run e2e` fails with `playwright: not found`, the install step above has not been run in the current workspace yet.
